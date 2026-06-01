@@ -46,6 +46,19 @@
      - Color-coded status badges matching assessment lifecycle states
    - Navigation links to Specialties and Criteria Sets pages (placeholder role guards)
    - All code committed and pushed to main branch
+9. **Completed Issue #5 — User authentication & role management:**
+   - Backend: Full auth API (`/api/auth`) with login, refresh, me, logout, change-password endpoints
+     - JWT access tokens (7d) + refresh tokens (30d); bcrypt password hashing (12 rounds)
+     - Email verification enforced by default; SSO users supported via null passwordHash
+   - Backend: SA-only user management (`/api/users`) with full CRUD
+     - Duplicate email detection, role assignment (BU/Admin/SA), email verification toggle
+     - Safety measure: prevents self-deactivation
+   - Frontend: Global nav bar in App.vue with role-based link visibility (SA=red badge, Admin=purple, BU=blue)
+   - Frontend: Login page with gradient design, loading states, error handling for unverified accounts
+   - Frontend: SA-only User Management page with paginated table, add/edit modals, deactivate action
+   - Frontend: API client with automatic token refresh on 401 responses
+   - Router: Token validation guard via /api/auth/me verification
+   - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -56,12 +69,12 @@ The approved breakdown:
 | 2 | Specialties management (SA) | AFK | 1 | ✅ Done |
 | 3 | Criteria sets management (SA) | AFK | 2 | ✅ Done |
 | 4 | HCP master record CRUD | AFK | 1 | ✅ Done |
-| 5 | User authentication & role management | AFK | 1 | 🟢 Ready |
+| 5 | User authentication & role management | AFK | 1 | ✅ Done |
 | 6 | AI worker service | AFK | 3, 4 | 🟢 Ready |
 | 7 | Assessment creation by BU | AFK | 4, 6 | ⏳ Blocked |
 | 8 | Admin review workflow | HITL | 7 | ⏳ Blocked |
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ⏳ Blocked |
-| 10 | BU dashboard & notifications | AFK | 5, 8 | ⏳ Blocked |
+| 10 | BU dashboard & notifications | AFK | 5, 8 | 🟢 Ready |
 
 Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 
