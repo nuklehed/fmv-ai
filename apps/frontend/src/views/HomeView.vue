@@ -11,7 +11,9 @@ const searchQuery = ref('')
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
         <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
         <nav class="flex space-x-4">
-          <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
+          <a href="/" class="text-sm font-medium text-blue-600">Dashboard</a>
+          <!-- TODO: Show specialties link only for SAs (issue #5) -->
+          <a href="/specialties" class="text-sm text-gray-600 hover:text-gray-900">Specialties</a>
           <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Settings</a>
         </nav>
       </div>

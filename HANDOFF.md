@@ -7,27 +7,33 @@
    - `0001-assessments-as-discrete-events.md` — Assessments are discrete events, not HCP record updates
    - `0002-async-single-worker-ai-processing.md` — Async queue, single worker, local LLM
    - `0003-logical-multi-tenancy.md` — tenant_id on every record
+4. **Published 10 tracer-bullet issues to GitHub** (nuklehed/fmv-ai) with agent briefs and triage labels
+5. **Completed Issue #1 — Foundation setup:**
+   - Monorepo structure: `apps/frontend/`, `apps/backend/`, `packages/shared/`
+   - Frontend: Vue 3 + TypeScript + Vite + Tailwind CSS + PrimeVue + Pinia + Vue Router 4+
+   - Backend: Express + Prisma ORM with complete schema (12 models)
+   - Docker Compose: PostgreSQL 16 + Redis 7
+   - GitHub Actions CI pipeline (lint + type-check)
+   - README.md, .env.example files, .gitignore
+   - All code committed and pushed to main branch
 
 ## What's next (in progress)
-**Breaking the plan into 10 tracer-bullet issues and publishing them to GitHub.** The approved breakdown:
+The approved breakdown:
 
-| # | Issue Title | Type | Blocked By |
-|---|-------------|------|------------|
-| 1 | Foundation setup | AFK | None |
-| 2 | Specialties management (SA) | AFK | 1 |
-| 3 | Criteria sets management (SA) | AFK | 2 |
-| 4 | HCP master record CRUD | AFK | 1 |
-| 5 | User authentication & role management | AFK | 1 |
-| 6 | AI worker service | AFK | 3, 4 |
-| 7 | Assessment creation by BU | AFK | 4, 6 |
-| 8 | Admin review workflow | HITL | 7 |
-| 9 | Tier/rate assignment & expiry tracking | AFK | 8 |
-| 10 | BU dashboard & notifications | AFK | 5, 8 |
+| # | Issue Title | Type | Blocked By | Status |
+|---|-------------|------|------------|--------|
+| 1 | Foundation setup | AFK | None | ✅ Done |
+| 2 | Specialties management (SA) | AFK | 1 | 🔵 In Progress |
+| 3 | Criteria sets management (SA) | AFK | 2 | ⏳ Blocked |
+| 4 | HCP master record CRUD | AFK | 1 | 🟢 Ready |
+| 5 | User authentication & role management | AFK | 1 | 🟢 Ready |
+| 6 | AI worker service | AFK | 3, 4 | ⏳ Blocked |
+| 7 | Assessment creation by BU | AFK | 4, 6 | ⏳ Blocked |
+| 8 | Admin review workflow | HITL | 7 | ⏳ Blocked |
+| 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ⏳ Blocked |
+| 10 | BU dashboard & notifications | AFK | 5, 8 | ⏳ Blocked |
 
-**Blocker:** GitHub CLI (`gh`) was just installed and needs authentication. The user is reloading the chat to get `gh` working, then will:
-- Run `gh auth login`
-- Create repo at https://github.com/nuklehed/fmv-ai (if not already done)
-- Notify this agent to publish the 10 issues
+Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events

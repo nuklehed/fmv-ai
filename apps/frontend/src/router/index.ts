@@ -9,6 +9,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/specialties',
+    name: 'specialties',
+    component: () => import('@/views/SpecialtiesView.vue'),
+    meta: { requiresAuth: true, requiresSA: true }
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue')
@@ -24,7 +30,10 @@ router.beforeEach((to, _from, next) => {
   const isAuthenticated = !!localStorage.getItem('token')
   if (to.meta.requiresAuth && !isAuthenticated) {
     next({ name: 'login' })
-  } else {
-    next()
+    return
   }
+
+  // TODO: Add SA-only route guard once authentication is implemented (issue #5)
+  // For now, all authenticated users can access specialties
+  next()
 })
