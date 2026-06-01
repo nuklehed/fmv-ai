@@ -49,8 +49,11 @@ model User {
   tenantId      String
   isActive      Boolean   @default(true)
   emailVerified Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  submittedAssessments Assessment[] @relation("SubmittedAssessments")
+  approvedAssessments  Assessment[] @relation("ApprovedAssessments")
 
   @@index([tenantId, role])
   @@index([email])
@@ -72,6 +75,7 @@ model Hcp {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  specialty   Specialty?       @relation(fields: [specialtyId], references: [id])
   identifiers HcpIdentifier[]
   assessments Assessment[]
 
@@ -101,8 +105,9 @@ model Specialty {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  hcps      Hcp[]
-  tiers     Tier[]
+  hcps          Hcp[]
+  assessments   Assessment[]         @relation("AssessmentSpecialty")
+  tiers         Tier[]
 
   @@unique([name, tenantId])
   @@index([tenantId, isActive])
@@ -121,7 +126,7 @@ model CriteriaSet {
   updatedAt      DateTime  @updatedAt
 
   questions Question[]
-  assessments Assessment[]
+  assessments Assessment[]      @relation("CriteriaSetAssessments")
 
   @@index([tenantId, isActive])
 }
@@ -172,6 +177,7 @@ model Assessment {
   rate            Decimal?           @db.Decimal(10, 2)
   approvedByUserId String?
   rejectionReason String?
+  tenantId        String             // Multi-tenant isolation (ADR-0003)
   effectiveDate   DateTime?
   renewalDate     DateTime?
   createdAt       DateTime           @default(now())
@@ -180,11 +186,15 @@ model Assessment {
   completedAt     DateTime?
 
   hcp             Hcp                @relation(fields: [hcpId], references: [id])
+  specialty       Specialty?         @relation("AssessmentSpecialty", fields: [specialtyId], references: [id])
+  criteriaSet     CriteriaSet?       @relation("CriteriaSetAssessments", fields: [criteriaSetId], references: [id])
+  submittedByUser User               @relation("SubmittedAssessments", fields: [submittedByUserId], references: [id])
+  approvedByUser  User?              @relation("ApprovedAssessments", fields: [approvedByUserId], references: [id])
   tier            Tier?              @relation(fields: [tierId], references: [id])
 
   @@index([hcpId, status])
   @@index([submittedByUserId])
-  @@index([status])
+  @@index([tenantId, status])
 }
 
 // ─── Tiers & Rates ─────────────────────────────────────────────────
@@ -202,7 +212,8 @@ model Tier {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  specialty Specialty @relation(fields: [specialtyId], references: [id])
+  specialty   Specialty    @relation(fields: [specialtyId], references: [id])
+  assessments Assessment[]
 
   @@index([tenantId, specialtyId])
 }

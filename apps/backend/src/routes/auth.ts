@@ -70,14 +70,14 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         tenantId: user.tenantId
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRES_IN } as any
     )
 
     // Generate refresh token (long-lived)
     const refreshToken = jwt.sign(
       { userId: user.id, type: 'refresh' },
       JWT_SECRET,
-      { expiresIn: JWT_REFRESH_EXPIRES_IN }
+      { expiresIn: JWT_REFRESH_EXPIRES_IN } as any
     )
 
     res.json({
@@ -153,7 +153,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
         tenantId: user.tenantId
       },
       JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
+      { expiresIn: JWT_EXPIRES_IN } as any
     )
 
     res.json({ accessToken })

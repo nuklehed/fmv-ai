@@ -29,6 +29,11 @@ async function handleLogout() {
                 Dashboard
               </router-link>
 
+              <!-- All authenticated users: Assessments -->
+              <router-link to="/assessments" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
+                Assessments
+              </router-link>
+
               <!-- SA-only links -->
               <template v-if="authStore.isSA">
                 <router-link to="/specialties" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">

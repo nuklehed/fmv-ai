@@ -9,6 +9,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/assessments',
+    name: 'assessments',
+    component: () => import('@/views/AssessmentsListView.vue'),
+    meta: { requiresAuth: true, requiresBUOrHigher: true }
+  },
+  {
+    path: '/assessments/new',
+    name: 'assessmentNew',
+    component: () => import('@/views/AssessmentFormView.vue'),
+    meta: { requiresAuth: true, requiresBUOrHigher: true }
+  },
+  {
     path: '/specialties',
     name: 'specialties',
     component: () => import('@/views/SpecialtiesView.vue'),

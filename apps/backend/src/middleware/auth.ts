@@ -1,4 +1,5 @@
 import type { Request, Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
@@ -9,10 +10,12 @@ export interface AuthenticatedRequest extends Request {
   tenantId?: string
 }
 
+// JWT configuration — must match auth.ts
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
+
 /**
- * Extracts user info from the Authorization header (Bearer token).
- * Token validation is implemented in the auth module — this middleware
- * assumes the token has already been verified and decoded.
+ * Extracts and verifies the JWT token from the Authorization header.
+ * Populates req.userId, req.userRole, and req.tenantId from decoded claims.
  */
 export async function authenticate(req: AuthenticatedRequest, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization
@@ -24,11 +27,32 @@ export async function authenticate(req: AuthenticatedRequest, _res: Response, ne
 
   const token = authHeader.slice(7)
 
-  // TODO: Verify JWT token and extract user claims
-  // For now, this is a placeholder — actual implementation in issue #5
-  req.userId = 'placeholder-user-id'
-  req.userRole = 'SA'
-  req.tenantId = 'placeholder-tenant-id'
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as {
+      userId: string
+      email: string
+      role: 'BU' | 'ADMIN' | 'SA'
+      tenantId: string
+    }
+
+    // Verify user still exists and is active
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId, isActive: true },
+      select: { id: true, role: true, tenantId: true }
+    })
+
+    if (!user) {
+      _res.status(401).json({ error: 'User not found or inactive' })
+      return
+    }
+
+    req.userId = user.id
+    req.userRole = user.role
+    req.tenantId = user.tenantId
+  } catch (err) {
+    _res.status(401).json({ error: 'Invalid or expired token' })
+    return
+  }
 
   next()
 }
@@ -54,6 +78,19 @@ export function requireAdminOrSA(req: AuthenticatedRequest, res: Response, next:
     return
   }
 
+  next()
+}
+
+/**
+ * Ensures the authenticated user has BU, Admin, or SA role (any authenticated user).
+ */
+export function requireBUOrHigher(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (!req.userRole) {
+    res.status(403).json({ error: 'Authentication required' })
+    return
+  }
+
+  // All three roles (BU, ADMIN, SA) are allowed
   next()
 }
 

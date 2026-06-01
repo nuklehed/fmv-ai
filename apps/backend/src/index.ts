@@ -7,6 +7,8 @@ import criteriaSetRoutes from './routes/criteriaSets'
 import hcpRoutes from './routes/hcps'
 import authRoutes from './routes/auth'
 import userRoutes from './routes/users'
+import assessmentRoutes from './routes/assessments'
+import { getAIWorker, closeConnection } from './services/queue'
 
 const app = express()
 const prisma = new PrismaClient()
@@ -18,6 +20,7 @@ app.use(express.json())
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/assessments', assessmentRoutes)
 app.use('/api/specialties', specialtyRoutes)
 app.use('/api/criteria-sets', criteriaSetRoutes)
 app.use('/api/hcps', hcpRoutes)
@@ -39,7 +42,6 @@ app.get('/api/db/health', async (_req, res) => {
 })
 
 // TODO: Add route handlers for:
-// - Assessment creation and processing (POST /api/assessments, POST /api/assessments/:id/cv)
 // - Tier/rate assignment & expiry tracking
 // - Notification delivery
 
@@ -47,9 +49,40 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
 
+// ─── Worker Service Startup ────────────────────────────────────────
+
+// Start the AI worker — processes assessments sequentially from BullMQ queue
+const aiWorker = getAIWorker()
+aiWorker.on('ready', () => {
+  console.log('🤖 AI Worker service started (single-worker, sequential processing)')
+})
+
+// ─── Graceful Shutdown ─────────────────────────────────────────────
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  console.log(`\n${signal} received. Starting graceful shutdown...`)
+
+  // Stop accepting new jobs
+  await aiWorker.close()
+
+  // Close database connection
+  await prisma.$disconnect()
+
+  // Close Redis connection (also closes BullMQ queue)
+  await closeConnection()
+
+  console.log('✅ All connections closed. Shutting down.')
+  process.exit(0)
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
+// ─── Start Server ──────────────────────────────────────────────────
+
 const PORT = process.env.PORT || 3000
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 FMV AI Backend running on http://localhost:${PORT}`)
   console.log(`📊 Database: ${process.env.DATABASE_URL?.split('@')[1]?.split(':')[0] ?? 'not configured'}`)
 })
