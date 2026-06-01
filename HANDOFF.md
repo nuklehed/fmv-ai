@@ -77,6 +77,20 @@
     - Prisma schema: Added tenantId to Assessment; fixed all missing reverse relations (Specialty.assessments, CriteriaSet.assessments, Tier.assessments, User.submittedAssessments/approvedAssessments)
     - Auth middleware: Fixed authenticate() JWT verification (was placeholder); added requireBUOrHigher guard
     - All code committed and pushed to main branch
+11. **Completed Issue #7 — Assessment creation by BU:**
+    - Backend: Added POST /api/hcps/bu-create endpoint for BU-facing HCP creation
+      - Supports all HCP fields: firstName, lastName, email, phone, address, state, specialtyId, identifiers
+      - Fuzzy duplicate detection with 409 responses for exact identifier matches
+      - Name-only matches trigger warnings (not blocking) as per domain spec
+      - Multi-tenant isolation enforced via tenantId on all queries
+    - Frontend: Added 'Create New HCP' button in AssessmentFormView.vue search section
+      - Inline form for creating new HCPs during assessment workflow
+      - Fields: First Name, Last Name (required), Email, Phone, Address, State, Specialty
+      - Smooth slide-fade transition animation for the new form
+      - Auto-selects newly created HCP after successful creation
+      - Updates editable contact fields from newly created HCP data
+      - Proper loading states and error handling
+    - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -89,8 +103,8 @@ The approved breakdown:
 | 4 | HCP master record CRUD | AFK | 1 | ✅ Done |
 | 5 | User authentication & role management | AFK | 1 | ✅ Done |
 | 6 | AI worker service | AFK | 3, 4 | ✅ Done |
-| 7 | Assessment creation by BU | AFK | 4, 6 | 🟢 Ready |
-| 8 | Admin review workflow | HITL | 7 | ⏳ Blocked |
+| 7 | Assessment creation by BU | AFK | 4, 6 | ✅ Done |
+| 8 | Admin review workflow | HITL | 7 | 🟢 Ready |
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ⏳ Blocked |
 | 10 | BU dashboard & notifications | AFK | 5, 8 | 🟢 Ready |
 
