@@ -16,6 +16,14 @@
    - GitHub Actions CI pipeline (lint + type-check)
    - README.md, .env.example files, .gitignore
    - All code committed and pushed to main branch
+6. **Completed Issue #2 — Specialties management (SA):**
+   - Backend: SA-only middleware (`authenticate`, `requireSA`), CRUD routes for `/api/specialties`
+   - Multi-tenant isolation via `tenantId` on all queries
+   - Duplicate name detection (case-insensitive, per tenant) with 409 responses
+   - Soft-delete via `isActive` flag instead of hard delete
+   - Frontend: SpecialtiesView admin page with table, search, add/edit modals, deactivate action
+   - Role-based navigation link (SA-only placeholder guard — full auth in issue #5)
+   - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -23,8 +31,8 @@ The approved breakdown:
 | # | Issue Title | Type | Blocked By | Status |
 |---|-------------|------|------------|--------|
 | 1 | Foundation setup | AFK | None | ✅ Done |
-| 2 | Specialties management (SA) | AFK | 1 | 🔵 In Progress |
-| 3 | Criteria sets management (SA) | AFK | 2 | ⏳ Blocked |
+| 2 | Specialties management (SA) | AFK | 1 | ✅ Done |
+| 3 | Criteria sets management (SA) | AFK | 2 | 🟢 Ready |
 | 4 | HCP master record CRUD | AFK | 1 | 🟢 Ready |
 | 5 | User authentication & role management | AFK | 1 | 🟢 Ready |
 | 6 | AI worker service | AFK | 3, 4 | ⏳ Blocked |
