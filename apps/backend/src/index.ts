@@ -8,6 +8,7 @@ import hcpRoutes from './routes/hcps'
 import authRoutes from './routes/auth'
 import userRoutes from './routes/users'
 import assessmentRoutes from './routes/assessments'
+import tierRoutes from './routes/tiers'
 import { getAIWorker, closeConnection } from './services/queue'
 
 const app = express()
@@ -24,6 +25,7 @@ app.use('/api/assessments', assessmentRoutes)
 app.use('/api/specialties', specialtyRoutes)
 app.use('/api/criteria-sets', criteriaSetRoutes)
 app.use('/api/hcps', hcpRoutes)
+app.use('/api/tiers', tierRoutes)
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {

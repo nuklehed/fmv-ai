@@ -14,10 +14,24 @@ interface AssessmentListItem {
   rate?: number | null
   approvedByUserId?: string | null
   rejectionReason?: string | null
+  effectiveDate?: string | null
+  renewalDate?: string | null
   createdAt: string
   updatedAt: string
   submittedAt?: string | null
   completedAt?: string | null
+}
+
+interface AiResultItem {
+  questionId: string
+  selectedAnswerId: string
+  rationale: string
+  isOverride?: boolean
+  overriddenBy?: string
+  overriddenAt?: string
+  questionText?: string
+  selectedAnswerText?: string
+  score?: number
 }
 
 const assessments = ref<AssessmentListItem[]>([])
@@ -33,6 +47,48 @@ const formError = ref('')
 // Detail panel state
 const selectedAssessment = ref<AssessmentListItem | null>(null)
 const showDetailPanel = ref(false)
+
+// Review workflow state (Admin/SA only)
+const isReviewing = ref(false)
+const reviewOverrides = ref<Array<{ questionId: string; selectedAnswerId: string; rationale: string }>>([])
+const rejectionReason = ref('')
+const approveTierId = ref('')
+const approveRateOverride = ref('')
+const approveRationale = ref('')
+const isApproving = ref(false)
+const isRejecting = ref(false)
+const reviewError = ref('')
+
+// Available tiers for approval (loaded from API)
+const availableTiers = ref<Array<{ id: string; name: string; lowRate: number; highRate: number }>>([])
+
+// Helper to get question text by ID
+function getQuestionText(questionId: string | undefined): string {
+  if (!questionId || !selectedAssessment.value?.aiResults) return 'Unknown Question'
+  const aiResults = selectedAssessment.value.aiResults as AiResultItem[]
+  // This would ideally come from the criteria set data
+  return `Question ${aiResults.findIndex(r => r.questionId === questionId) + 1}`
+}
+
+// Helper to get answers for a question (would need criteria set data)
+function getAnswersForQuestion(questionId: string | undefined): Array<{ id: string; text: string; score: number }> {
+  // This would be populated from the criteria set data when loading assessment details
+  return []
+}
+
+// Add new override entry
+function addOverride() {
+  reviewOverrides.value.push({
+    questionId: '',
+    selectedAnswerId: '',
+    rationale: ''
+  })
+}
+
+// Remove override entry
+function removeOverride(index: number) {
+  reviewOverrides.value.splice(index, 1)
+}
 
 async function fetchAssessments() {
   loading.value = true
@@ -94,14 +150,33 @@ function formatDate(dateStr?: string | null): string {
   return new Date(dateStr).toLocaleDateString()
 }
 
-function openDetailPanel(assessment: AssessmentListItem) {
+async function openDetailPanel(assessment: AssessmentListItem) {
   selectedAssessment.value = assessment
   showDetailPanel.value = true
+  isReviewing.value = false
+  reviewOverrides.value = []
+  rejectionReason.value = ''
+  approveTierId.value = ''
+  approveRateOverride.value = ''
+  approveRationale.value = ''
+  reviewError.value = ''
+  
+  // Load tiers if assessment can be approved
+  if (canApprove(assessment)) {
+    await loadTiers()
+  }
 }
 
 function closeDetailPanel() {
   showDetailPanel.value = false
   selectedAssessment.value = null
+  isReviewing.value = false
+  reviewOverrides.value = []
+  rejectionReason.value = ''
+  approveTierId.value = ''
+  approveRateOverride.value = ''
+  approveRationale.value = ''
+  reviewError.value = ''
 }
 
 function handleSearch() {
@@ -132,6 +207,168 @@ function startAutoRefresh() {
       fetchAssessments()
     }
   }, 30000) // Every 30 seconds
+}
+
+// ─── Review Workflow Functions ──────────────────────────────────────
+
+function isAdminOrSA(): boolean {
+  const role = localStorage.getItem('userRole')
+  return role === 'ADMIN' || role === 'SA'
+}
+
+function canReview(assessment: AssessmentListItem): boolean {
+  return assessment.status === 'AI_COMPLETE' && isAdminOrSA()
+}
+
+function canApprove(assessment: AssessmentListItem): boolean {
+  return assessment.status === 'UNDER_REVIEW' && isAdminOrSA()
+}
+
+function canReject(assessment: AssessmentListItem): boolean {
+  return assessment.status === 'UNDER_REVIEW' && isAdminOrSA()
+}
+
+function startReview() {
+  isReviewing.value = true
+  reviewError.value = ''
+  // Initialize overrides with current AI results
+  if (selectedAssessment.value?.aiResults) {
+    const aiResults = selectedAssessment.value.aiResults as AiResultItem[]
+    reviewOverrides.value = aiResults.map(r => ({
+      questionId: r.questionId,
+      selectedAnswerId: r.selectedAnswerId,
+      rationale: r.rationale || ''
+    }))
+  }
+}
+
+function cancelReview() {
+  isReviewing.value = false
+  reviewOverrides.value = []
+  rejectionReason.value = ''
+  reviewError.value = ''
+}
+
+async function submitReview() {
+  if (!selectedAssessment.value) return
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch(`/api/assessments/${selectedAssessment.value.id}/review`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        overrides: reviewOverrides.value,
+        rejectionReason: rejectionReason.value || null
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to submit review')
+    }
+
+    // Refresh the assessment list
+    await fetchAssessments()
+    closeDetailPanel()
+  } catch (error) {
+    console.error('Error submitting review:', error)
+    reviewError.value = error instanceof Error ? error.message : 'Failed to submit review'
+  }
+}
+
+async function loadTiers() {
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch('/api/tiers?active=true', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (response.ok) {
+      availableTiers.value = await response.json()
+    }
+  } catch (error) {
+    console.error('Error fetching tiers:', error)
+  }
+}
+
+async function approveAssessment() {
+  if (!selectedAssessment.value) return
+
+  isApproving.value = true
+  reviewError.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch(`/api/assessments/${selectedAssessment.value.id}/approve`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        tierId: approveTierId.value || null,
+        rateOverride: approveRateOverride.value ? parseFloat(approveRateOverride.value) : null,
+        rationale: approveRationale.value || null
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to approve assessment')
+    }
+
+    // Refresh the assessment list
+    await fetchAssessments()
+    closeDetailPanel()
+  } catch (error) {
+    console.error('Error approving assessment:', error)
+    reviewError.value = error instanceof Error ? error.message : 'Failed to approve assessment'
+  } finally {
+    isApproving.value = false
+  }
+}
+
+async function rejectAssessment() {
+  if (!selectedAssessment.value) return
+
+  if (!rejectionReason.value.trim()) {
+    reviewError.value = 'Rejection reason is required'
+    return
+  }
+
+  isRejecting.value = true
+  reviewError.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch(`/api/assessments/${selectedAssessment.value.id}/reject`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        reason: rejectionReason.value
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to reject assessment')
+    }
+
+    // Refresh the assessment list
+    await fetchAssessments()
+    closeDetailPanel()
+  } catch (error) {
+    console.error('Error rejecting assessment:', error)
+    reviewError.value = error instanceof Error ? error.message : 'Failed to reject assessment'
+  } finally {
+    isRejecting.value = false
+  }
 }
 
 onMounted(() => {
@@ -310,14 +547,97 @@ onMounted(() => {
                     </div>
 
                     <!-- AI Results -->
-                    <div v-if="selectedAssessment.aiResults && Object.keys(selectedAssessment.aiResults).length > 0">
+                    <div v-if="selectedAssessment.aiResults && Array.isArray(selectedAssessment.aiResults) && selectedAssessment.aiResults.length > 0">
                       <h4 class="text-sm font-medium text-gray-500 mb-2">AI Evaluation Results</h4>
-                      <div class="space-y-3">
-                        <div v-for="(result, index) in selectedAssessment.aiResults" :key="index" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index + 1}` }}</p>
-                          <p class="text-xs text-blue-600 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{ result.score ?? '?' }} pts)</p>
-                          <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">{{ result.rationale }}</p>
+                      
+                      <!-- Review Mode -->
+                      <template v-if="isReviewing">
+                        <div class="space-y-3">
+                          <div v-for="(override, index) in reviewOverrides" :key="index" class="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <div class="flex items-start justify-between mb-2">
+                              <span class="text-xs font-medium text-blue-700">Question {{ index + 1 }}</span>
+                              <button @click="removeOverride(index)" class="text-xs text-red-600 hover:text-red-800">Remove</button>
+                            </div>
+                            
+                            <!-- Question Text -->
+                            <p class="text-sm font-medium text-gray-900 mb-2">
+                              {{ getQuestionText(selectedAssessment.aiResults[index]?.questionId) }}
+                            </p>
+
+                            <!-- Answer Selection -->
+                            <div class="mb-2">
+                              <label class="block text-xs font-medium text-gray-700 mb-1">Select Answer</label>
+                              <select
+                                v-model="override.selectedAnswerId"
+                                class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="">Select answer...</option>
+                                <!-- Options would be populated from criteria set data -->
+                                <option v-for="answer in getAnswersForQuestion(selectedAssessment.aiResults[index]?.questionId)" :key="answer.id" :value="answer.id">
+                                  {{ answer.text }} ({{ answer.score }} pts)
+                                </option>
+                              </select>
+                            </div>
+
+                            <!-- Rationale -->
+                            <div>
+                              <label class="block text-xs font-medium text-gray-700 mb-1">Rationale</label>
+                              <textarea
+                                v-model="override.rationale"
+                                rows="2"
+                                placeholder="Explain your selection..."
+                                class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                              ></textarea>
+                            </div>
+                          </div>
                         </div>
+
+                        <!-- Add Override Button -->
+                        <button @click="addOverride" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                          + Add Override
+                        </button>
+                      </template>
+
+                      <!-- View Mode (AI Results Display) -->
+                      <template v-else>
+                        <div class="space-y-3">
+                          <div v-for="(result, index) in selectedAssessment.aiResults" :key="index" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div class="flex items-start justify-between mb-1">
+                              <span class="text-xs font-medium text-gray-600">Question {{ index + 1 }}</span>
+                              <span v-if="result.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
+                            </div>
+                            <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index + 1}` }}</p>
+                            <p class="text-xs text-blue-600 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{ result.score ?? '?' }} pts)</p>
+                            <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">{{ result.rationale }}</p>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+
+                    <!-- Tier & Rate Information -->
+                    <div v-if="selectedAssessment.tier || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
+                      <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span class="text-gray-600">Tier:</span>
+                          <span class="ml-1 font-medium">{{ selectedAssessment.tier?.name || '—' }}</span>
+                        </div>
+                        <div>
+                          <span class="text-gray-600">Rate:</span>
+                          <span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Effective & Renewal Dates -->
+                    <div v-if="selectedAssessment.effectiveDate || selectedAssessment.renewalDate" class="grid grid-cols-2 gap-4">
+                      <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Effective Date</h4>
+                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                      </div>
+                      <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Renewal Date</h4>
+                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.renewalDate) }}</p>
                       </div>
                     </div>
 
@@ -344,7 +664,144 @@ onMounted(() => {
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted By</h4>
                       <p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p>
                     </div>
-                  </div>
+
+                    <!-- Review Workflow UI -->
+                    <div v-if="canReview(selectedAssessment) && isReviewing" class="border-t border-gray-200 pt-4">
+                      <h4 class="text-sm font-medium text-gray-900 mb-3">Admin Review</h4>
+
+                      <!-- Error Message -->
+                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p class="text-sm text-red-600">{{ reviewError }}</p>
+                      </div>
+
+                      <!-- Reject Section -->
+                      <div class="mb-4">
+                        <label for="rejection-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection Reason (optional)</label>
+                        <textarea
+                          id="rejection-reason"
+                          v-model="rejectionReason"
+                          rows="2"
+                          placeholder="Provide reason for rejection..."
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                        ></textarea>
+                      </div>
+
+                      <!-- Action Buttons -->
+                      <div class="flex space-x-3">
+                        <button
+                          @click="submitReview"
+                          :disabled="isRejecting || isApproving"
+                          class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                        >
+                          {{ isRejecting ? 'Processing...' : 'Save Review' }}
+                        </button>
+                        <button
+                          @click="rejectAssessment"
+                          :disabled="!rejectionReason.trim() || isRejecting || isApproving"
+                          class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                        >
+                          {{ isRejecting ? 'Processing...' : 'Reject' }}
+                        </button>
+                        <button
+                          @click="cancelReview"
+                          class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Approve Section (UNDER_REVIEW status) -->
+                    <div v-if="canApprove(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                      <h4 class="text-sm font-medium text-gray-900 mb-3">Approve Assessment</h4>
+
+                      <!-- Error Message -->
+                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p class="text-sm text-red-600">{{ reviewError }}</p>
+                      </div>
+
+                      <!-- Tier Selection -->
+                      <div class="mb-3">
+                        <label for="approve-tier" class="block text-xs font-medium text-gray-700 mb-1">Tier</label>
+                        <select
+                          id="approve-tier"
+                          v-model="approveTierId"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="">Auto-assign based on score</option>
+                          <!-- Tiers would be loaded from API -->
+                          <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">
+                            {{ tier.name }} ({{ tier.lowRate }} - {{ tier.highRate }})
+                          </option>
+                        </select>
+                      </div>
+
+                      <!-- Rate Override -->
+                      <div class="mb-3">
+                        <label for="rate-override" class="block text-xs font-medium text-gray-700 mb-1">Rate Override (optional)</label>
+                        <input
+                          id="rate-override"
+                          v-model="approveRateOverride"
+                          type="number"
+                          step="0.01"
+                          placeholder="Override calculated rate"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                      </div>
+
+                      <!-- Rationale -->
+                      <div class="mb-3">
+                        <label for="approve-rationale" class="block text-xs font-medium text-gray-700 mb-1">Rationale (optional)</label>
+                        <textarea
+                          id="approve-rationale"
+                          v-model="approveRationale"
+                          rows="2"
+                          placeholder="Explain approval decision..."
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                        ></textarea>
+                      </div>
+
+                      <!-- Approve Button -->
+                      <button
+                        @click="approveAssessment"
+                        :disabled="isApproving || isRejecting"
+                        class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                      >
+                        {{ isApproving ? 'Processing...' : 'Approve Assessment' }}
+                      </button>
+                    </div>
+
+                    <!-- Reject Section (UNDER_REVIEW status) -->
+                    <div v-if="canReject(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                      <h4 class="text-sm font-medium text-gray-900 mb-3">Reject Assessment</h4>
+
+                      <!-- Error Message -->
+                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p class="text-sm text-red-600">{{ reviewError }}</p>
+                      </div>
+
+                      <!-- Rejection Reason -->
+                      <div class="mb-3">
+                        <label for="reject-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection Reason *</label>
+                        <textarea
+                          id="reject-reason"
+                          v-model="rejectionReason"
+                          rows="3"
+                          placeholder="Provide detailed reason for rejection..."
+                          required
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+                        ></textarea>
+                      </div>
+
+                      <!-- Reject Button -->
+                      <button
+                        @click="rejectAssessment"
+                        :disabled="isRejecting || isApproving"
+                        class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                      >
+                        {{ isRejecting ? 'Processing...' : 'Reject Assessment' }}
+                      </button>
+                    </div>
 
                   <!-- Panel Footer -->
                   <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
