@@ -121,6 +121,55 @@
       - Error handling and loading states throughout
     - Audit trail created for all review actions via AuditTrail model
     - All code committed and pushed to main branch
+13. **Completed Issue #9 — Tier/rate assignment & expiry tracking:**
+    - Backend: Added pagination to GET /api/tiers endpoint (page, limit, totalCount)
+    - Backend: Created ApplicationSettings CRUD routes (`/api/application-settings`)
+      - SA-only access; upsert by key_tenantId unique constraint
+      - Supports flexible JSONB values for any system config
+    - Backend: Created user notification preferences endpoints (`/api/userSettings/me/settings`)
+      - GET returns inApp/email toggle defaults (both true)
+      - PUT upserts per-user preferences
+    - Backend: Implemented daily cron-based expiry checker service (`services/expiryChecker.ts`)
+      - Runs at 8 AM by default (configurable via EXPIRY_CHECKER_CRON env var)
+      - Checks for APPROVED assessments approaching renewal date
+      - Creates in-app notifications for submitting BU + all Admins/SAs
+      - Urgency levels: URGENT (≤7 days), HIGH (≤14 days), NORMAL (≤30 days)
+      - Graceful shutdown integration with SIGTERM/SIGINT handlers
+    - Frontend: Created TierManagementView — SA-only tier CRUD page
+      - Paginated table with name, specialty, score range, rate range, percentile columns
+      - Add/Edit modals with validation (min≤max scores, low≤high rates)
+      - Delete action with confirmation dialog
+    - Frontend: Created ApplicationSettingsView — SA-only system config page
+      - Approval validity period editor (default 730 days = 2 years)
+      - Expiry reminder lead time editor (default 30 days)
+      - System-wide notification channel status display
+    - Schema: Added EXPIRED assessment status enum value
+    - Schema: Added Notification.user relation and ApplicationSetting.userId field
+    - Dependencies: Added node-cron package for scheduled jobs
+    - All code committed and pushed to main branch
+    - ⚠️ Requires database migration: `npx prisma migrate dev` when DB is available
+14. **Completed Issue #10 — BU dashboard & notifications:**
+    - Backend: Created full notification API (`/api/notifications`)
+      - GET with pagination, unread filter, and unreadCount in response
+      - GET /unread-count for lightweight bell badge polling
+      - PUT /:id/read to mark individual notification as read
+      - PUT /mark-all-read to bulk-mark all as read
+      - DELETE /:id to remove a notification
+    - Frontend: Redesigned HomeView as BU Dashboard with role-based assessment view
+      - Stats cards: Total, In Progress, Approved, Expiring Soon counts
+      - Paginated assessment table with HCP, status, score, tier, rate, renewal columns
+      - Color-coded expiry urgency badges (green >60d, yellow 30-60d, red <30d)
+      - Detail slide-over panel showing full assessment info including tier/rate/expiry
+    - Frontend: Added notification bell in App.vue nav bar with unread count badge
+      - Auto-polls /api/notifications/unread-count every 60 seconds
+      - Badge shows count (capped at '9+' for readability)
+    - Frontend: Created SettingsView — per-user notification channel toggles
+      - In-app notifications toggle (default on)
+      - Email notifications toggle (default on)
+      - Save button with loading state and success/error feedback
+    - Router: Added /tiers route (Admin/SA) and /settings route (all users)
+    - Auth store: Persisted userRole to localStorage for frontend role checks
+    - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -135,14 +184,14 @@ The approved breakdown:
 | 6 | AI worker service | AFK | 3, 4 | ✅ Done |
 | 7 | Assessment creation by BU | AFK | 4, 6 | ✅ Done |
 | 8 | Admin review workflow | HITL | 7 | ✅ Done |
-| 9 | Tier/rate assignment & expiry tracking | AFK | 8 | 🟢 Ready |
-| 10 | BU dashboard & notifications | AFK | 5, 8 | 🟢 Ready |
+| 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ✅ Done |
+| 10 | BU dashboard & notifications | AFK | 5, 8 | ✅ Done |
 
 Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
-- Assessment lifecycle: DRAFT → SUBMITTED → AI_PROCESSING → AI_COMPLETE → UNDER_REVIEW → APPROVED/REJECTED
+- Assessment lifecycle: DRAFT → SUBMITTED → AI_PROCESSING → AI_COMPLETE → UNDER_REVIEW → APPROVED/REJECTED/EXPIRED
 - Criteria sets can be shared across specialties (e.g., prescriber vs non-prescriber)
 - Tier locked to score; rate overrideable with mandatory rationale
 - Single-worker async AI processing against local LLM (Qwen3.6-35B-a3b)
