@@ -13,26 +13,45 @@ router.use(requireAdminOrSA)
 
 /**
  * GET /api/tiers
- * List tiers with optional active filter
+ * List tiers with pagination, optional active filter and specialty filter
  */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
     const activeOnly = req.query.active === 'true'
-    
+    const specialtyId = req.query.specialtyId as string | undefined
+
     const where: Record<string, unknown> = { tenantId: req.tenantId! }
     if (activeOnly) {
       where.isActive = true
     }
+    if (specialtyId) {
+      where.specialtyId = specialtyId
+    }
+
+    // Fetch total count for pagination
+    const totalCount = await prisma.tier.count({ where })
 
     const tiers = await prisma.tier.findMany({
       where,
       include: {
         specialty: { select: { id: true, name: true } }
       },
-      orderBy: { minScore: 'asc' }
+      orderBy: { minScore: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit
     })
 
-    res.json(tiers)
+    res.json({
+      data: tiers,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    })
   } catch (error) {
     console.error('Error fetching tiers:', error)
     res.status(500).json({ error: 'Internal server error' })

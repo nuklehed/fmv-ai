@@ -24,6 +24,7 @@ enum AssessmentStatus {
   UNDER_REVIEW
   APPROVED
   REJECTED
+  EXPIRED
 }
 
 enum NotificationType {
@@ -54,6 +55,7 @@ model User {
 
   submittedAssessments Assessment[] @relation("SubmittedAssessments")
   approvedAssessments  Assessment[] @relation("ApprovedAssessments")
+  notifications        Notification[]
 
   @@index([tenantId, role])
   @@index([email])
@@ -226,6 +228,7 @@ model ApplicationSetting {
   value       Json     // Flexible config storage
   description String?
   tenantId    String
+  userId      String?  // For user-specific settings (e.g., notification preferences)
   updatedAt   DateTime @updatedAt
 
   @@unique([key, tenantId])
@@ -255,6 +258,7 @@ model AuditTrail {
 model Notification {
   id        String           @id @default(uuid())
   userId    String
+  user      User             @relation(fields: [userId], references: [id])
   type      NotificationType
   title     String
   message   String

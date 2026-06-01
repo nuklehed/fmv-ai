@@ -1,0 +1,223 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import type { ApplicationSetting } from '@/types'
+
+const settings = ref<ApplicationSetting[]>([])
+const loading = ref(false)
+const formError = ref('')
+const savingKey = ref<string | null>(null)
+
+// Default values for known settings
+const defaultValues: Record<string, unknown> = {
+  approvalValidityPeriod: 730,       // 2 years in days
+  expiryReminderLeadTime: 30         // 30 days
+}
+
+async function fetchSettings() {
+  loading.value = true
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch('/api/application-settings', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (!response.ok) throw new Error(`Failed to fetch settings: ${response.statusText}`)
+
+    settings.value = await response.json()
+  } catch (error) {
+    console.error('Error fetching application settings:', error)
+    formError.value = 'Failed to load application settings'
+  } finally {
+    loading.value = false
+  }
+}
+
+function getSettingValue(key: string): unknown {
+  const setting = settings.value.find(s => s.key === key)
+  if (setting && setting.value !== null) {
+    return typeof setting.value === 'object' ? JSON.stringify(setting.value) : String(setting.value)
+  }
+  return defaultValues[key] ?? ''
+}
+
+function getSettingDescription(key: string): string | undefined {
+  const setting = settings.value.find(s => s.key === key)
+  if (setting?.description) return setting.description
+  
+  // Provide helpful descriptions for known settings
+  const descriptions: Record<string, string> = {
+    approvalValidityPeriod: 'Default validity period for approved assessments in days (default: 730 = 2 years)',
+    expiryReminderLeadTime: 'Number of days before renewal date to send expiry reminders (default: 30)'
+  }
+  return descriptions[key]
+}
+
+async function handleSave(key: string) {
+  savingKey.value = key
+  formError.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    let value: unknown
+    
+    // Try to parse as number, otherwise keep as string
+    const rawValue = getSettingValue(key)
+    if (typeof rawValue === 'string' && !isNaN(Number(rawValue))) {
+      value = Number(rawValue)
+    } else {
+      value = rawValue
+    }
+
+    const response = await fetch(`/api/application-settings/${key}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ value })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to update setting')
+    }
+
+    await fetchSettings()
+  } catch (error) {
+    console.error(`Error updating ${key}:`, error)
+    formError.value = error instanceof Error ? error.message : `Failed to update ${key}`
+  } finally {
+    savingKey.value = null
+  }
+}
+
+onMounted(() => {
+  fetchSettings()
+})
+</script>
+
+<template>
+  <div class="min-h-screen bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-gray-200">
+      <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
+        <nav class="flex space-x-4">
+          <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
+          <a href="/specialties" class="text-sm font-medium text-blue-600">Specialties</a>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="mb-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-1">Application Settings</h2>
+        <p class="text-sm text-gray-600">Configure system-wide settings for the FMV AI platform</p>
+      </div>
+
+      <!-- Error Message -->
+      <div v-if="formError" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-sm text-red-600">{{ formError }}</p>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
+        <p class="text-sm text-gray-500">Loading settings...</p>
+      </div>
+
+      <!-- Settings List -->
+      <div v-else class="space-y-4">
+        <!-- Approval Validity Period -->
+        <div class="bg-white shadow rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <h3 class="text-base font-medium text-gray-900">Approval Validity Period</h3>
+              <p class="text-sm text-gray-500 mt-1">{{ getSettingDescription('approvalValidityPeriod') }}</p>
+            </div>
+          </div>
+          <div class="mt-4 flex items-center space-x-3">
+            <input
+              v-model.number="getSettingValue('approvalValidityPeriod')"
+              type="number"
+              :disabled="savingKey === 'approvalValidityPeriod'"
+              @blur="handleSave('approvalValidityPeriod')"
+              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span class="text-sm text-gray-500">days</span>
+            <button
+              @click="handleSave('approvalValidityPeriod')"
+              :disabled="savingKey === 'approvalValidityPeriod'"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {{ savingKey === 'approvalValidityPeriod' ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Expiry Reminder Lead Time -->
+        <div class="bg-white shadow rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <h3 class="text-base font-medium text-gray-900">Expiry Reminder Lead Time</h3>
+              <p class="text-sm text-gray-500 mt-1">{{ getSettingDescription('expiryReminderLeadTime') }}</p>
+            </div>
+          </div>
+          <div class="mt-4 flex items-center space-x-3">
+            <input
+              v-model.number="getSettingValue('expiryReminderLeadTime')"
+              type="number"
+              :disabled="savingKey === 'expiryReminderLeadTime'"
+              @blur="handleSave('expiryReminderLeadTime')"
+              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span class="text-sm text-gray-500">days</span>
+            <button
+              @click="handleSave('expiryReminderLeadTime')"
+              :disabled="savingKey === 'expiryReminderLeadTime'"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {{ savingKey === 'expiryReminderLeadTime' ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Notification Preferences (System-wide) -->
+        <div class="bg-white shadow rounded-lg p-6">
+          <h3 class="text-base font-medium text-gray-900">Notification Channels</h3>
+          <p class="text-sm text-gray-500 mt-1">Default notification channels for all users. Users can override these in their personal settings.</p>
+          <div class="mt-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-700">In-app notifications</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked disabled class="sr-only peer" />
+                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-700">Email notifications</span>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" disabled class="sr-only peer" />
+                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Card -->
+      <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div class="flex">
+          <svg class="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+          </svg>
+          <div class="ml-3">
+            <p class="text-sm text-blue-700">
+              Settings are saved automatically when you click "Save". Changes take effect immediately for new assessments.
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>

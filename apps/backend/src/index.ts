@@ -9,7 +9,11 @@ import authRoutes from './routes/auth'
 import userRoutes from './routes/users'
 import assessmentRoutes from './routes/assessments'
 import tierRoutes from './routes/tiers'
+import notificationRoutes from './routes/notifications'
+import userSettingsRoutes from './routes/userSettings'
+import applicationSettingsRoutes from './routes/applicationSettings'
 import { getAIWorker, closeConnection } from './services/queue'
+import { startExpiryChecker } from './services/expiryChecker'
 
 const app = express()
 const prisma = new PrismaClient()
@@ -26,6 +30,9 @@ app.use('/api/specialties', specialtyRoutes)
 app.use('/api/criteria-sets', criteriaSetRoutes)
 app.use('/api/hcps', hcpRoutes)
 app.use('/api/tiers', tierRoutes)
+app.use('/api/notifications', notificationRoutes)
+app.use('/api/userSettings', userSettingsRoutes)
+app.use('/api/application-settings', applicationSettingsRoutes)
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
@@ -43,9 +50,9 @@ app.get('/api/db/health', async (_req, res) => {
   }
 })
 
-// TODO: Add route handlers for:
-// - Tier/rate assignment & expiry tracking
-// - Notification delivery
+// ─── Expiry Checker (Background Job) ─────────────────────────────
+// Runs daily to check for assessments approaching their renewal date
+const expiryChecker = startExpiryChecker(prisma)
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -63,6 +70,9 @@ aiWorker.on('ready', () => {
 
 async function gracefulShutdown(signal: string): Promise<void> {
   console.log(`\n${signal} received. Starting graceful shutdown...`)
+
+  // Stop expiry checker cron job
+  expiryChecker.stop()
 
   // Stop accepting new jobs
   await aiWorker.close()

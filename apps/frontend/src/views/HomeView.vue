@@ -1,230 +1,99 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import type { Hcp } from '@/types'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import type { Assessment, Notification } from '@/types'
+import { api } from '@/api/client'
 
-const hcps = ref<Hcp[]>([])
+const router = useRouter()
+
+// Assessment list state
+const assessments = ref<Assessment[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
+const statusFilter = ref<string>('')
 const currentPage = ref(1)
 const pageSize = ref(25)
 const totalPages = ref(0)
 const totalCount = ref(0)
-const formError = ref('')
 
-// Sort state
-const sortField = ref('lastName')
-const sortOrder = ref<'asc' | 'desc'>('asc')
-
-// Detail/Edit panel state
-const selectedHcp = ref<Hcp | null>(null)
+// Detail panel state
+const selectedAssessment = ref<Assessment | null>(null)
 const showDetailPanel = ref(false)
-const isEditing = ref(false)
-const editingHcp = ref<Partial<Hcp>>({})
-const showAddModal = ref(false)
 
-// Add form state
-const addFirstName = ref('')
-const addLastName = ref('')
-const addEmail = ref('')
-const addPhone = ref('')
-const addAddress = ref('')
-const addState = ref('')
-const addSpecialtyId = ref('')
-const addIdentifiers = ref<{ type: string; value: string }[]>([])
+// Notification state
+const notifications = ref<Notification[]>([])
+const unreadCount = ref(0)
+const showNotifications = ref(false)
+const notificationLoading = ref(false)
 
-// Edit form state
-const editFirstName = ref('')
-const editLastName = ref('')
-const editEmail = ref('')
-const editPhone = ref('')
-const editAddress = ref('')
-const editState = ref('')
-const editSpecialtyId = ref('')
-const editIdentifiers = ref<{ type: string; value: string }[]>([])
+// User role (from auth store or localStorage)
+const userRole = computed(() => {
+  return localStorage.getItem('userRole') || 'BU'
+})
 
-// Specialty list for dropdowns (loaded once)
-const specialties = ref<{ id: string; name: string }[]>([])
+function isAdminOrSA(): boolean {
+  return userRole.value === 'ADMIN' || userRole.value === 'SA'
+}
 
-async function fetchHcps() {
+async function fetchAssessments() {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
-    const params = new URLSearchParams({
+    const params: Record<string, string> = {
       page: String(currentPage.value),
-      limit: String(pageSize.value),
-      sort: sortField.value,
-      order: sortOrder.value,
-      search: searchQuery.value || ''
-    })
+      limit: String(pageSize.value)
+    }
+    if (searchQuery.value) params.search = searchQuery.value
+    if (statusFilter.value) params.status = statusFilter.value
 
-    const response = await fetch(`/api/hcps?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) throw new Error(`Failed to fetch HCPs: ${response.statusText}`)
-
-    const result = await response.json()
-    hcps.value = result.data
-    totalPages.value = result.pagination.totalPages
-    totalCount.value = result.pagination.totalCount
+    const result = await api.get<{ data: Assessment[]; pagination: { totalCount: number; totalPages: number } }>('/assessments', params)
+    
+    if (result.data) {
+      assessments.value = result.data.data || []
+      totalPages.value = result.data.pagination?.totalPages || 0
+      totalCount.value = result.data.pagination?.totalCount || 0
+    }
   } catch (error) {
-    console.error('Error fetching HCPs:', error)
-    formError.value = 'Failed to load HCPs'
+    console.error('Error fetching assessments:', error)
   } finally {
     loading.value = false
   }
 }
 
-async function fetchSpecialties() {
+async function fetchNotifications() {
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch('/api/specialties?active=true', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    if (response.ok) {
-      specialties.value = await response.json()
+    const result = await api.get<{ data: Notification[]; unreadCount: number }>('/notifications?limit=10&unreadOnly=true')
+    
+    if (result.data) {
+      notifications.value = result.data.data || []
+      unreadCount.value = result.data.unreadCount ?? 0
     }
   } catch (error) {
-    console.error('Error fetching specialties:', error)
+    console.error('Error fetching notifications:', error)
   }
 }
 
-function handleSort(field: string) {
-  if (sortField.value === field) {
-    sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortField.value = field
-    sortOrder.value = 'asc'
-  }
-  currentPage.value = 1
-}
-
-function handleSearch() {
-  currentPage.value = 1
-  fetchHcps()
-}
-
-// Debounced search
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-function onSearchInput() {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => handleSearch(), 300)
-}
-
-async function openDetailPanel(hcp: Hcp) {
-  selectedHcp.value = hcp
-  showDetailPanel.value = true
-  isEditing.value = false
-}
-
-function closeDetailPanel() {
-  showDetailPanel.value = false
-  selectedHcp.value = null
-  isEditing.value = false
-}
-
-async function openEditPanel(hcp: Hcp) {
-  editingHcp.value = { ...hcp }
-  editFirstName.value = hcp.firstName
-  editLastName.value = hcp.lastName
-  editEmail.value = hcp.email || ''
-  editPhone.value = hcp.phone || ''
-  editAddress.value = hcp.address || ''
-  editState.value = hcp.state || ''
-  editSpecialtyId.value = hcp.specialtyId || ''
-  editIdentifiers.value = [] // Will be populated from HCP detail API call
-  isEditing.value = true
-}
-
-async function handleSaveEdit() {
-  if (!selectedHcp.value) return
-
+async function markNotificationAsRead(id: string) {
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch(`/api/hcps/${selectedHcp.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        firstName: editFirstName.value,
-        lastName: editLastName.value,
-        email: editEmail.value || null,
-        phone: editPhone.value || null,
-        address: editAddress.value || null,
-        state: editState.value || null,
-        specialtyId: editSpecialtyId.value || null
-      })
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update HCP')
-    }
-
-    isEditing.value = false
-    await fetchHcps()
+    await api.put(`/notifications/${id}/read`)
+    unreadCount.value = Math.max(0, unreadCount.value - 1)
+    // Remove from list
+    notifications.value = notifications.value.filter(n => n.id !== id)
   } catch (error) {
-    console.error('Error updating HCP:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update HCP'
+    console.error('Error marking notification as read:', error)
   }
 }
 
-function openAddModal() {
-  addFirstName.value = ''
-  addLastName.value = ''
-  addEmail.value = ''
-  addPhone.value = ''
-  addAddress.value = ''
-  addState.value = ''
-  addSpecialtyId.value = ''
-  addIdentifiers.value = []
-  formError.value = ''
-  showAddModal.value = true
-}
-
-async function handleAdd() {
-  if (!addFirstName.value.trim() || !addLastName.value.trim()) {
-    formError.value = 'First name and last name are required'
-    return
-  }
-
+async function markAllNotificationsAsRead() {
   try {
-    const token = localStorage.getItem('token')
-    const response = await fetch('/api/hcps', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        firstName: addFirstName.value,
-        lastName: addLastName.value,
-        email: addEmail.value || null,
-        phone: addPhone.value || null,
-        address: addAddress.value || null,
-        state: addState.value || null,
-        specialtyId: addSpecialtyId.value || null,
-        identifiers: addIdentifiers.value.length > 0 ? addIdentifiers.value : undefined
-      })
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create HCP')
-    }
-
-    showAddModal.value = false
-    formError.value = ''
-    await fetchHcps()
+    await api.put('/notifications/mark-all-read')
+    unreadCount.value = 0
+    notifications.value = []
   } catch (error) {
-    console.error('Error creating HCP:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to create HCP'
+    console.error('Error marking all as read:', error)
   }
 }
 
-function getStatusColor(status?: string): string {
+function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
     DRAFT: 'bg-gray-100 text-gray-800',
     SUBMITTED: 'bg-blue-100 text-blue-800',
@@ -234,10 +103,10 @@ function getStatusColor(status?: string): string {
     APPROVED: 'bg-green-100 text-green-800',
     REJECTED: 'bg-red-100 text-red-800'
   }
-  return colors[status || ''] || 'bg-gray-100 text-gray-800'
+  return colors[status] || 'bg-gray-100 text-gray-800'
 }
 
-function getStatusLabel(status?: string): string {
+function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     DRAFT: 'Draft',
     SUBMITTED: 'Submitted',
@@ -247,7 +116,7 @@ function getStatusLabel(status?: string): string {
     APPROVED: 'Approved',
     REJECTED: 'Rejected'
   }
-  return labels[status || ''] || status || '—'
+  return labels[status] || status
 }
 
 function formatDate(dateStr?: string | null): string {
@@ -255,17 +124,96 @@ function formatDate(dateStr?: string | null): string {
   return new Date(dateStr).toLocaleDateString()
 }
 
-// Pagination helpers
-function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-    fetchHcps()
+function getExpiryUrgency(renewalDate?: string | null): { color: string; label: string } | null {
+  if (!renewalDate) return null
+  
+  const now = new Date()
+  const renewal = new Date(renewalDate)
+  const daysUntilExpiry = Math.ceil((renewal.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  
+  if (daysUntilExpiry < 0) {
+    return { color: 'bg-red-100 text-red-800', label: `Expired ${Math.abs(daysUntilExpiry)}d ago` }
+  } else if (daysUntilExpiry <= 30) {
+    return { color: 'bg-red-100 text-red-800', label: `${daysUntilExpiry} days left` }
+  } else if (daysUntilExpiry <= 60) {
+    return { color: 'bg-yellow-100 text-yellow-800', label: `${daysUntilExpiry} days left` }
+  } else {
+    return { color: 'bg-green-100 text-green-800', label: `${daysUntilExpiry} days left` }
   }
 }
 
+function getNotificationIcon(type: string): string {
+  switch (type) {
+    case 'ASSESSMENT_APPROVED': return '✅'
+    case 'ASSESSMENT_REJECTED': return '❌'
+    case 'EXPIRY_REMINDER': return '⚠️'
+    default: return '📧'
+  }
+}
+
+function getNotificationTitle(type: string): string {
+  switch (type) {
+    case 'ASSESSMENT_APPROVED': return 'Assessment Approved'
+    case 'ASSESSMENT_REJECTED': return 'Assessment Rejected'
+    case 'EXPIRY_REMINDER': return 'Expiry Reminder'
+    default: return 'Notification'
+  }
+}
+
+function handleSearch() {
+  currentPage.value = 1
+  fetchAssessments()
+}
+
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+function onSearchInput() {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => handleSearch(), 300)
+}
+
+function goToPage(page: number) {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+    fetchAssessments()
+  }
+}
+
+async function openDetailPanel(assessment: Assessment) {
+  selectedAssessment.value = assessment
+  showDetailPanel.value = true
+}
+
+function closeDetailPanel() {
+  showDetailPanel.value = false
+  selectedAssessment.value = null
+}
+
+// Auto-refresh for AI processing assessments
+let refreshInterval: ReturnType<typeof setInterval> | null = null
+
+function startAutoRefresh() {
+  refreshInterval = setInterval(() => {
+    const hasProcessing = assessments.value.some(a => a.status === 'AI_PROCESSING')
+    if (hasProcessing) {
+      fetchAssessments()
+    }
+  }, 30000) // Every 30 seconds
+}
+
+// Refresh notifications periodically
+let notificationInterval: ReturnType<typeof setInterval> | null = null
+
+function startNotificationPolling() {
+  notificationInterval = setInterval(() => {
+    fetchNotifications()
+  }, 60000) // Every minute
+}
+
 onMounted(() => {
-  fetchHcps()
-  fetchSpecialties()
+  fetchAssessments()
+  fetchNotifications()
+  startAutoRefresh()
+  startNotificationPolling()
 })
 </script>
 
@@ -277,56 +225,75 @@ onMounted(() => {
         <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
         <nav class="flex space-x-4">
           <a href="/" class="text-sm font-medium text-blue-600">Dashboard</a>
-          <a href="/specialties" class="text-sm text-gray-600 hover:text-gray-900">Specialties</a>
-          <a href="/criteria-sets" class="text-sm text-gray-600 hover:text-gray-900">Criteria Sets</a>
-          <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Settings</a>
+          <a href="/assessments" class="text-sm text-gray-600 hover:text-gray-900">Assessments</a>
         </nav>
       </div>
     </header>
 
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Dashboard Header -->
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-1">HCP Directory</h2>
-          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} healthcare professionals</p>
+          <h2 class="text-2xl font-bold text-gray-900 mb-1">Dashboard</h2>
+          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} assessments ({{ statusFilter ? 'filtered' : 'all' }})</p>
         </div>
-        <button
-          @click="openAddModal"
+        <a
+          href="/assessments/new"
           class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium"
         >
-          + Add HCP
-        </button>
+          + Request Assessment
+        </a>
       </div>
 
-      <!-- Error Message -->
-      <div v-if="formError && !showAddModal" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
-        <p class="text-sm text-red-600">{{ formError }}</p>
+      <!-- Stats Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white shadow rounded-lg p-4 border-l-4 border-blue-500">
+          <p class="text-sm text-gray-500">Total</p>
+          <p class="text-2xl font-bold text-gray-900">{{ totalCount }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-4 border-l-4 border-yellow-500">
+          <p class="text-sm text-gray-500">In Progress</p>
+          <p class="text-2xl font-bold text-gray-900">{{ assessments.filter(a => ['SUBMITTED', 'AI_PROCESSING', 'AI_COMPLETE'].includes(a.status)).length }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-4 border-l-4 border-green-500">
+          <p class="text-sm text-gray-500">Approved</p>
+          <p class="text-2xl font-bold text-gray-900">{{ assessments.filter(a => a.status === 'APPROVED').length }}</p>
+        </div>
+        <div class="bg-white shadow rounded-lg p-4 border-l-4 border-red-500">
+          <p class="text-sm text-gray-500">Expiring Soon</p>
+          <p class="text-2xl font-bold text-gray-900">{{ assessments.filter(a => { const u = getExpiryUrgency(a.renewalDate); return u && (u.label.includes('days left') || u.label.includes('Expired')) }).length }}</p>
+        </div>
       </div>
 
-      <!-- Search Bar -->
+      <!-- Filters -->
       <div class="mb-6 flex items-center space-x-4">
         <input
           v-model="searchQuery"
           @input="onSearchInput"
           type="text"
-          placeholder="Search by name, NPI, email, or state..."
+          placeholder="Search by HCP name..."
           class="flex-1 max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <select
-          v-model="pageSize"
-          @change="currentPage = 1; fetchHcps()"
+          v-model="statusFilter"
+          @change="handleSearch"
           class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <option :value="10">10 per page</option>
-          <option :value="25">25 per page</option>
-          <option :value="50">50 per page</option>
+          <option value="">All Statuses</option>
+          <option value="DRAFT">Draft</option>
+          <option value="SUBMITTED">Submitted</option>
+          <option value="AI_PROCESSING">AI Processing</option>
+          <option value="AI_COMPLETE">AI Complete</option>
+          <option value="UNDER_REVIEW">Under Review</option>
+          <option value="APPROVED">Approved</option>
+          <option value="REJECTED">Rejected</option>
         </select>
       </div>
 
       <!-- Loading State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Loading HCPs...</p>
+        <p class="text-sm text-gray-500">Loading assessments...</p>
       </div>
 
       <!-- Table -->
@@ -334,55 +301,51 @@ onMounted(() => {
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th @click="handleSort('lastName')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none">
-                Name {{ sortField === 'lastName' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Identifier</th>
-              <th @click="handleSort('state')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none">
-                State {{ sortField === 'state' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th @click="handleSort('specialtyName')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none">
-                Specialty {{ sortField === 'specialtyName' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
-              </th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HCP</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tier</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-              <th @click="handleSort('createdAt')" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 select-none">
-                Status {{ sortField === 'createdAt' ? (sortOrder === 'asc' ? '↑' : '↓') : '' }}
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Effective</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renewal</th>
               <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="hcps.length === 0">
-              <td colspan="10" class="px-6 py-8 text-center text-sm text-gray-500">
-                No HCPs found. Click "Add HCP" to create one.
+            <tr v-if="assessments.length === 0">
+              <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                No assessments found. Click "Request Assessment" to create one.
               </td>
             </tr>
-            <tr v-for="hcp in hcps" :key="hcp.id" class="hover:bg-gray-50 cursor-pointer" @click="openDetailPanel(hcp)">
+            <tr v-for="assessment in assessments" :key="assessment.id" class="hover:bg-gray-50 cursor-pointer" @click="openDetailPanel(assessment)">
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">{{ hcp.firstName }} {{ hcp.lastName }}</div>
-                <div v-if="hcp.email" class="text-xs text-gray-500">{{ hcp.email }}</div>
+                <div class="text-sm font-medium text-gray-900">{{ (assessment as any).hcp?.firstName || '—' }} {{ (assessment as any).hcp?.lastName || '—' }}</div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ hcp.identifiers?.[0]?.value || '—' }}
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ hcp.state || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ hcp.specialtyName || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ hcp.tier ? `Tier ${hcp.tier}` : '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ hcp.rate?.toFixed(2) || '—' }}</td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(hcp.status)]">
-                  {{ getStatusLabel(hcp.status) }}
+                <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(assessment.status)]">
+                  <svg v-if="assessment.status === 'AI_PROCESSING'" class="animate-spin -ml-1 mr-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ getStatusLabel(assessment.status) }}
                 </span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(hcp.effectiveDate) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(hcp.renewalDate) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
-                <button @click="openEditPanel(hcp)" class="text-blue-600 hover:text-blue-900">Edit</button>
-                <span>|</span>
-                <button @click="handleSort('lastName')" class="text-red-600 hover:text-red-900">Deactivate</button>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {{ assessment.totalScore !== null ? assessment.totalScore : '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {{ (assessment as any).tier?.name || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                ${{ assessment.rate?.toFixed(2) || '—' }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap">
+                <span v-if="assessment.renewalDate" :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getExpiryUrgency(assessment.renewalDate)?.color || 'bg-gray-100 text-gray-800']">
+                  {{ getExpiryUrgency(assessment.renewalDate)?.label }}
+                </span>
+                <span v-else class="text-xs text-gray-400">—</span>
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" @click.stop>
+                <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
               </td>
             </tr>
           </tbody>
@@ -406,20 +369,18 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- ─── Detail/Edit Slide-over Panel ────────────────────────── -->
+      <!-- ─── Detail Slide-over Panel ────────────────────────────── -->
       <Teleport to="body">
         <Transition name="slideover">
-          <div v-if="showDetailPanel" class="fixed inset-0 z-50 overflow-hidden">
+          <div v-if="showDetailPanel && selectedAssessment" class="fixed inset-0 z-50 overflow-hidden">
             <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeDetailPanel" />
 
-            <div class="fixed inset-y-0 right-0 max-w-md w-full flex">
+            <div class="fixed inset-y-0 right-0 max-w-lg w-full flex">
               <Transition name="slideover-panel">
-                <div v-if="showDetailPanel" class="w-full h-full flex flex-col bg-white shadow-xl">
+                <div v-if="showDetailPanel && selectedAssessment" class="w-full h-full flex flex-col bg-white shadow-xl">
                   <!-- Panel Header -->
                   <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
-                    <h3 class="text-lg font-semibold text-gray-900">
-                      {{ isEditing ? 'Edit HCP' : selectedHcp?.firstName + ' ' + selectedHcp?.lastName }}
-                    </h3>
+                    <h3 class="text-lg font-semibold text-gray-900">Assessment Details</h3>
                     <button @click="closeDetailPanel" class="text-gray-400 hover:text-gray-600">
                       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -428,43 +389,82 @@ onMounted(() => {
                   </div>
 
                   <!-- Panel Content -->
-                  <div class="flex-1 overflow-y-auto p-6">
-                    <template v-if="!isEditing">
-                      <!-- Detail View -->
-                      <dl class="space-y-4">
-                        <div><dt class="text-sm font-medium text-gray-500">First Name</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.firstName }}</dd></div>
-                        <div><dt class="text-sm font-medium text-gray-500">Last Name</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.lastName }}</dd></div>
-                        <div><dt class="text-sm font-medium text-gray-500">Email</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.email || '—' }}</dd></div>
-                        <div><dt class="text-sm font-medium text-gray-500">Phone</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.phone || '—' }}</dd></div>
-                        <div><dt class="text-sm font-medium text-gray-500">Address</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.address || '—' }}</dd></div>
-                        <div><dt class="text-sm font-medium text-gray-500">State</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.state || '—' }}</dd></div>
-                        <div><dt class="text-sm font-medium text-gray-500">Specialty</dt><dd class="mt-1 text-sm text-gray-900">{{ selectedHcp?.specialtyName || '—' }}</dd></div>
-                      </dl>
+                  <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                    <!-- HCP Info -->
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">HCP</h4>
+                      <p class="text-base font-semibold text-gray-900">{{ (selectedAssessment as any).hcp?.firstName || '—' }} {{ (selectedAssessment as any).hcp?.lastName || '—' }}</p>
+                    </div>
 
-                      <!-- Actions -->
-                      <div class="mt-6 flex space-x-3">
-                        <button @click="openEditPanel(selectedHcp!)" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Edit</button>
+                    <!-- Status -->
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">Status</h4>
+                      <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
+                        {{ getStatusLabel(selectedAssessment.status) }}
+                      </span>
+                    </div>
+
+                    <!-- Score -->
+                    <div v-if="selectedAssessment.totalScore !== null">
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">Total Score</h4>
+                      <p class="text-2xl font-bold text-gray-900">{{ selectedAssessment.totalScore }}</p>
+                    </div>
+
+                    <!-- Tier & Rate -->
+                    <div v-if="(selectedAssessment as any).tier || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
+                      <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
+                      <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div><span class="text-gray-600">Tier:</span> <span class="ml-1 font-medium">{{ (selectedAssessment as any).tier?.name || '—' }}</span></div>
+                        <div><span class="text-gray-600">Rate:</span> <span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span></div>
                       </div>
-                    </template>
+                    </div>
 
-                    <template v-else>
-                      <!-- Edit Form -->
-                      <form @submit.prevent="handleSaveEdit" class="space-y-4">
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label><input v-model="editFirstName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label><input v-model="editLastName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input v-model="editEmail" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label><input v-model="editPhone" type="tel" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Address</label><input v-model="editAddress" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">State</label><input v-model="editState" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                        <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label><select v-model="editSpecialtyId" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">Select specialty...</option><option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option></select></div>
-                        <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
+                    <!-- Dates -->
+                    <div v-if="selectedAssessment.effectiveDate || selectedAssessment.renewalDate" class="grid grid-cols-2 gap-4">
+                      <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Effective Date</h4>
+                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                      </div>
+                      <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Renewal Date</h4>
+                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.renewalDate) }}</p>
+                      </div>
+                    </div>
 
-                        <div class="flex space-x-3 pt-4">
-                          <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Save</button>
-                          <button type="button" @click="isEditing = false" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
-                        </div>
-                      </form>
-                    </template>
+                    <!-- Expiry Urgency -->
+                    <div v-if="selectedAssessment.status === 'APPROVED' && selectedAssessment.renewalDate" class="p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
+                      <h4 class="text-sm font-medium mb-1">Renewal Status</h4>
+                      <p class="text-sm">{{ getExpiryUrgency(selectedAssessment.renewalDate)?.label }}</p>
+                    </div>
+
+                    <!-- Rejection Reason -->
+                    <div v-if="selectedAssessment.rejectionReason">
+                      <h4 class="text-sm font-medium text-red-600 mb-1">Rejection Reason</h4>
+                      <p class="text-sm text-gray-900 bg-red-50 p-3 rounded-lg">{{ selectedAssessment.rejectionReason }}</p>
+                    </div>
+
+                    <!-- Submitted By -->
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted By</h4>
+                      <p class="text-sm text-gray-900">{{ (selectedAssessment as any).submittedByUser?.email || '—' }}</p>
+                    </div>
+
+                    <!-- Dates -->
+                    <div class="grid grid-cols-2 gap-4">
+                      <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Created</h4>
+                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.createdAt) }}</p>
+                      </div>
+                      <div>
+                        <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted</h4>
+                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.submittedAt) }}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Panel Footer -->
+                  <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                    <a href="/assessments/new" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</a>
                   </div>
                 </div>
               </Transition>
@@ -472,49 +472,85 @@ onMounted(() => {
           </div>
         </Transition>
       </Teleport>
+    </main>
 
-      <!-- ─── Add HCP Modal ──────────────────────────────────────── -->
-      <Teleport to="body">
-        <Transition name="modal">
-          <div v-if="showAddModal" class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showAddModal = false" />
-              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Add New HCP</h3>
-                  <form @submit.prevent="handleAdd" class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label><input v-model="addFirstName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label><input v-model="addLastName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    </div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Email</label><input v-model="addEmail" type="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Phone</label><input v-model="addPhone" type="tel" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Address</label><input v-model="addAddress" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">State</label><input v-model="addState" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label><select v-model="addSpecialtyId" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">Select specialty...</option><option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option></select></div>
-                    <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
-                  </form>
-                </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button @click="handleAdd" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Create</button>
-                  <button @click="showAddModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+    <!-- ─── Notification Bell Dropdown ─────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="showNotifications" class="fixed inset-0 z-40" @click.self="showNotifications = false" />
+    </Teleport>
+    
+    <div class="fixed top-4 right-4 z-50">
+      <!-- Notification Bell Button -->
+      <button
+        @click="showNotifications = !showNotifications; fetchNotifications()"
+        class="relative p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow"
+      >
+        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        
+        <!-- Unread Badge -->
+        <span v-if="unreadCount > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+          {{ unreadCount > 9 ? '9+' : unreadCount }}
+        </span>
+      </button>
+
+      <!-- Notification Dropdown -->
+      <Transition name="notification-dropdown">
+        <div v-if="showNotifications" class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
+          <!-- Header -->
+          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900">Notifications</h3>
+            <button @click="markAllNotificationsAsRead" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Mark all read</button>
+          </div>
+
+          <!-- Notification List -->
+          <div v-if="notificationLoading" class="p-4 text-center">
+            <p class="text-sm text-gray-500">Loading...</p>
+          </div>
+          
+          <div v-else-if="notifications.length === 0" class="p-4 text-center">
+            <p class="text-sm text-gray-500">No new notifications</p>
+          </div>
+
+          <div v-else class="max-h-96 overflow-y-auto">
+            <button
+              v-for="notification in notifications"
+              :key="notification.id"
+              @click="markNotificationAsRead(notification.id)"
+              class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors"
+            >
+              <div class="flex items-start space-x-3">
+                <span class="text-lg">{{ getNotificationIcon(notification.type) }}</span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate">{{ notification.title }}</p>
+                  <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ notification.message }}</p>
+                  <p class="text-xs text-gray-400 mt-1">{{ new Date(notification.createdAt).toLocaleString() }}</p>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
-        </Transition>
-      </Teleport>
-    </main>
+
+          <!-- Footer -->
+          <div v-if="notifications.length > 0" class="px-4 py-2 bg-gray-50 border-t border-gray-200 text-center">
+            <a href="/assessments" class="text-xs text-blue-600 hover:text-blue-800 font-medium">View all assessments</a>
+          </div>
+        </div>
+      </Transition>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.modal-enter-active, .modal-leave-active { transition: opacity 0.2s ease; }
-.modal-enter-from, .modal-leave-to { opacity: 0; }
-
 .slideover-enter-active, .slideover-leave-active { transition: opacity 0.3s ease; }
 .slideover-enter-from, .slideover-leave-to { opacity: 0; }
 
 .slideover-panel-enter-active, .slideover-panel-leave-active { transition: transform 0.3s ease; }
 .slideover-panel-enter-from, .slideover-panel-leave-to { transform: translateX(100%); }
+
+.notification-dropdown-enter-active, .notification-dropdown-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.notification-dropdown-enter-from, .notification-dropdown-leave-to { 
+  opacity: 0; 
+  transform: translateY(-10px); 
+}
 </style>

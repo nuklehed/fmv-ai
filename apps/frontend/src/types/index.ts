@@ -32,7 +32,8 @@ export enum AssessmentStatus {
   AI_COMPLETE = 'AI_COMPLETE',
   UNDER_REVIEW = 'UNDER_REVIEW',
   APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED'
+  REJECTED = 'REJECTED',
+  EXPIRED = 'EXPIRED'
 }
 
 export interface Assessment {
@@ -49,6 +50,9 @@ export interface Assessment {
   rate?: number | null
   approvedByUserId?: string | null
   rejectionReason?: string | null
+  tenantId: string
+  effectiveDate?: string | null
+  renewalDate?: string | null
   createdAt: string
   updatedAt: string
   submittedAt?: string | null
@@ -73,5 +77,46 @@ export interface User {
   isActive: boolean
   emailVerified: boolean
   createdAt: string
+  updatedAt: string
+}
+
+export enum NotificationType {
+  ASSESSMENT_APPROVED = 'ASSESSMENT_APPROVED',
+  ASSESSMENT_REJECTED = 'ASSESSMENT_REJECTED',
+  EXPIRY_REMINDER = 'EXPIRY_REMINDER'
+}
+
+export interface Notification {
+  id: string
+  userId: string
+  type: NotificationType
+  title: string
+  message: string
+  readAt: string | null
+  createdAt: string
+}
+
+export interface Tier {
+  id: string
+  name: string
+  minScore: number
+  maxScore: number
+  specialtyId: string
+  lowRate: number
+  highRate: number
+  defaultPercentile: number
+  tenantId: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ApplicationSetting {
+  id: string
+  key: string
+  value: Record<string, unknown> | null
+  description?: string
+  tenantId: string
+  userId?: string
   updatedAt: string
 }

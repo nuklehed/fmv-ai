@@ -39,6 +39,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresSA: true }
   },
   {
+    path: '/tiers',
+    name: 'tierManagement',
+    component: () => import('@/views/TierManagementView.vue'),
+    meta: { requiresAuth: true, requiresAdminOrSA: true }
+  },
+  {
+    path: '/settings',
+    name: 'settings',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue')

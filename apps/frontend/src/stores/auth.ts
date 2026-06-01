@@ -30,6 +30,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setUser(userData: User) {
     user.value = userData
+    localStorage.setItem('userRole', userData.role)
   }
 
   function setTokens(newAccessToken: string, newRefreshToken: string) {
