@@ -21,6 +21,7 @@ const selectedHcp = ref<HcpOption | null>(null)
 const hcpSearchQuery = ref('')
 const hcpSuggestions = ref<HcpOption[]>([])
 const showHcpDropdown = ref(false)
+const showNewHcpForm = ref(false)
 
 // Editable contact fields (pre-populated from HCP master record)
 const editEmail = ref('')
@@ -39,6 +40,19 @@ const cvFileName = ref('')
 const cvUploadProgress = ref(0)
 const cvUploaded = ref(false)
 const cvTextLength = ref(0)
+
+// New HCP creation state
+const newHcpForm = ref({
+  firstName: '',
+  lastName: '',
+  email: '',
+  phone: '',
+  address: '',
+  state: '',
+  specialtyId: '' as string,
+  identifiers: [] as { type: string; value: string }[]
+})
+const isCreatingHcp = ref(false)
 
 // Form validation and status
 const formError = ref('')
@@ -86,6 +100,7 @@ function selectHcp(hcp: HcpOption) {
   hcpSearchQuery.value = `${hcp.firstName} ${hcp.lastName}`
   hcpSuggestions.value = []
   showHcpDropdown.value = false
+  showNewHcpForm.value = false
 
   // Pre-populate editable fields from HCP master record
   editEmail.value = hcp.email || ''
@@ -96,6 +111,66 @@ function selectHcp(hcp: HcpOption) {
 
   // Reset CV upload state when switching HCPs
   resetCvUpload()
+}
+
+async function createNewHcp() {
+  if (!newHcpForm.value.firstName.trim() || !newHcpForm.value.lastName.trim()) {
+    formError.value = 'First name and last name are required'
+    return
+  }
+
+  isCreatingHcp.value = true
+  formError.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch('/api/hcps/bu-create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        firstName: newHcpForm.value.firstName.trim(),
+        lastName: newHcpForm.value.lastName.trim(),
+        email: newHcpForm.value.email || null,
+        phone: newHcpForm.value.phone || null,
+        address: newHcpForm.value.address || null,
+        state: newHcpForm.value.state || null,
+        specialtyId: newHcpForm.value.specialtyId || null,
+        identifiers: newHcpForm.value.identifiers.length > 0 ? newHcpForm.value.identifiers : undefined
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to create HCP')
+    }
+
+    const createdHcp = await response.json()
+    
+    // Create a temporary HCP option for the form
+    const hcpOption: HcpOption = {
+      id: createdHcp.id,
+      firstName: createdHcp.firstName,
+      lastName: createdHcp.lastName,
+      email: createdHcp.email || '',
+      phone: createdHcp.phone || '',
+      address: createdHcp.address || '',
+      state: createdHcp.state || '',
+      specialtyId: createdHcp.specialty?.id || '',
+      specialtyName: createdHcp.specialty?.name || ''
+    }
+
+    selectHcp(hcpOption)
+    showNewHcpForm.value = false
+    formSuccess.value = 'New HCP created successfully'
+  } catch (error) {
+    console.error('Error creating HCP:', error)
+    formError.value = error instanceof Error ? error.message : 'Failed to create HCP'
+  } finally {
+    isCreatingHcp.value = false
+  }
 }
 
 function handleHcpInputFocus() {
@@ -384,7 +459,108 @@ onMounted(() => {
                 </div>
               </div>
             </Teleport>
+
+            <!-- Create New HCP Button -->
+            <button
+              @click="showNewHcpForm = !showNewHcpForm"
+              class="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              + Create New HCP
+            </button>
           </div>
+
+          <!-- New HCP Form -->
+          <Transition name="slide-fade">
+            <div v-if="showNewHcpForm" class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 class="text-sm font-semibold text-blue-900 mb-3">Create New Healthcare Professional</h4>
+              
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="new-hcp-first-name" class="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
+                  <input
+                    id="new-hcp-first-name"
+                    v-model="newHcpForm.firstName"
+                    type="text"
+                    required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label for="new-hcp-last-name" class="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
+                  <input
+                    id="new-hcp-last-name"
+                    v-model="newHcpForm.lastName"
+                    type="text"
+                    required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label for="new-hcp-email" class="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    id="new-hcp-email"
+                    v-model="newHcpForm.email"
+                    type="email"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label for="new-hcp-phone" class="block text-xs font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    id="new-hcp-phone"
+                    v-model="newHcpForm.phone"
+                    type="tel"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div class="sm:col-span-2">
+                  <label for="new-hcp-address" class="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                  <input
+                    id="new-hcp-address"
+                    v-model="newHcpForm.address"
+                    type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label for="new-hcp-state" class="block text-xs font-medium text-gray-700 mb-1">State</label>
+                  <input
+                    id="new-hcp-state"
+                    v-model="newHcpForm.state"
+                    type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                </div>
+                <div>
+                  <label for="new-hcp-specialty" class="block text-xs font-medium text-gray-700 mb-1">Specialty</label>
+                  <select
+                    id="new-hcp-specialty"
+                    v-model="newHcpForm.specialtyId"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  >
+                    <option value="">Select specialty...</option>
+                    <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mt-4 flex space-x-3">
+                <button
+                  @click="createNewHcp"
+                  :disabled="isCreatingHcp || !newHcpForm.firstName.trim() || !newHcpForm.lastName.trim()"
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                >
+                  {{ isCreatingHcp ? 'Creating...' : 'Create HCP' }}
+                </button>
+                <button
+                  @click="showNewHcpForm = false"
+                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </Transition>
 
           <!-- Selected HCP Summary -->
           <div v-if="selectedHcp" class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -564,5 +740,16 @@ onMounted(() => {
 /* Drag and drop visual feedback */
 .border-dashed:hover {
   border-color: #60a5fa;
+}
+
+/* Slide-fade transition for new HCP form */
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.3s ease;
+}
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { authenticate, requireAdminOrSA } from '../middleware/auth'
+import { authenticate, requireAdminOrSA, requireBUOrHigher } from '../middleware/auth'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -380,6 +380,104 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<
     res.json({ message: 'HCP deactivated', hcp })
   } catch (error) {
     console.error('Error deleting HCP:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/**
+ * POST /api/hcps/bu-create
+ * Create a new HCP — BU-facing endpoint for assessment creation flow
+ */
+router.post('/bu-create', authenticate, requireBUOrHigher, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { firstName, lastName, email, phone, address, state, specialtyId, identifiers } = req.body
+
+    if (!firstName || !lastName) {
+      res.status(400).json({ error: 'First name and last name are required' })
+      return
+    }
+
+    // Multi-tenant isolation
+    const tenantId = req.tenantId!
+
+    // Fuzzy duplicate detection — check for matching name + any provided external identifiers
+    if (identifiers && Array.isArray(identifiers) && identifiers.length > 0) {
+      for (const identifier of identifiers) {
+        const existingWithId = await prisma.hcp.findFirst({
+          where: {
+            tenantId,
+            isActive: true,
+            firstName: { equals: firstName.trim(), mode: 'insensitive' as const },
+            lastName: { equals: lastName.trim(), mode: 'insensitive' as const },
+            identifiers: {
+              some: {
+                value: { equals: identifier.value, mode: 'insensitive' as const },
+                isActive: true
+              }
+            }
+          }
+        })
+
+        if (existingWithId) {
+          res.status(409).json({
+            error: `Potential duplicate found`,
+            duplicate: {
+              id: existingWithId.id,
+              firstName: existingWithId.firstName,
+              lastName: existingWithId.lastName,
+              identifierType: identifier.type,
+              identifierValue: identifier.value
+            }
+          })
+          return
+        }
+      }
+    }
+
+    // Also check name-only match as a warning (not blocking)
+    const nameOnlyMatch = await prisma.hcp.findFirst({
+      where: {
+        tenantId,
+        isActive: true,
+        firstName: { equals: firstName.trim(), mode: 'insensitive' as const },
+        lastName: { equals: lastName.trim(), mode: 'insensitive' as const }
+      }
+    })
+
+    // Create HCP with optional identifiers
+    const hcp = await prisma.hcp.create({
+      data: {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email || null,
+        phone: phone || null,
+        address: address || null,
+        state: state || null,
+        specialtyId: specialtyId || null,
+        tenantId,
+        identifiers: identifiers && Array.isArray(identifiers) ? {
+          create: identifiers.map((id: { type: string; value: string }) => ({
+            type: id.type as 'NPI' | 'STATE_LICENSE' | 'DEA' | 'OTHER',
+            value: id.value.trim()
+          }))
+        } : undefined
+      },
+      include: {
+        identifiers: true,
+        specialty: { select: { id: true, name: true } }
+      }
+    })
+
+    // Include duplicate warning in response if name-only match found
+    const response = hcp as Record<string, unknown> & { duplicateWarning?: boolean }
+    if (nameOnlyMatch) {
+      response.duplicateWarning = true
+      response.duplicateId = nameOnlyMatch.id
+    }
+
+    res.status(201).json(response)
+  } catch (error) {
+    console.error('Error creating HCP:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
