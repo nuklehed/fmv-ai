@@ -4,6 +4,7 @@ import cors from 'cors'
 import { PrismaClient } from '@prisma/client'
 import specialtyRoutes from './routes/specialties'
 import criteriaSetRoutes from './routes/criteriaSets'
+import hcpRoutes from './routes/hcps'
 
 const app = express()
 const prisma = new PrismaClient()
@@ -15,6 +16,7 @@ app.use(express.json())
 // Routes
 app.use('/api/specialties', specialtyRoutes)
 app.use('/api/criteria-sets', criteriaSetRoutes)
+app.use('/api/hcps', hcpRoutes)
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
@@ -34,7 +36,6 @@ app.get('/api/db/health', async (_req, res) => {
 
 // TODO: Add route handlers for:
 // - Authentication (POST /api/auth/login, POST /api/auth/refresh, GET /api/auth/me)
-// - HCP CRUD (GET/POST/PUT/DELETE /api/hcps)
 // - Assessment creation and processing (POST /api/assessments, POST /api/assessments/:id/cv)
 // - User management (CRUD /api/users) — SA only
 
