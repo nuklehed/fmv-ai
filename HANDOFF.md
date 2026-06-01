@@ -91,6 +91,36 @@
       - Updates editable contact fields from newly created HCP data
       - Proper loading states and error handling
     - All code committed and pushed to main branch
+12. **Completed Issue #8 — Admin review workflow (HITL):**
+    - Backend: Added PUT /api/assessments/:id/review endpoint for overriding AI answer selections
+      - Admins can override each question's selected answer with rationale
+      - Supports adding new overrides beyond original AI results
+      - Validates answers against valid sets per question
+      - Calculates total score from final results (AI + overrides)
+      - Transitions to UNDER_REVIEW or REJECTED based on rejection reason
+    - Backend: Added POST /api/assessments/:id/approve endpoint for approval workflow
+      - Auto-assigns tier based on score if not specified
+      - Supports rate override with validation against tier bounds
+      - Calculates rate using percentile logic (default 50th)
+      - Sets effective/renewal dates (default 2-year validity from application settings)
+      - Validates tier belongs to tenant and specialty matches
+    - Backend: Added POST /api/assessments/:id/reject endpoint for rejection workflow
+      - Requires rejection reason
+      - Transitions to REJECTED status
+      - Notifies BU of rejection via Notification model
+    - Backend: Created GET /api/tiers endpoint for listing tiers (Admin/SA only)
+      - Full CRUD routes for tier management with validation
+    - Frontend: Enhanced detail panel with admin review capabilities
+      - AI results display with override mode for Admin/SA users
+      - Override form per question: answer selection dropdown, rationale textarea
+      - Add/remove override functionality
+      - Approve section with tier selection, rate override, and rationale fields
+      - Reject section with required rejection reason field
+      - Status-based UI visibility (review only for AI_COMPLETE, approve/reject for UNDER_REVIEW)
+      - Auto-refresh assessment list after review actions
+      - Error handling and loading states throughout
+    - Audit trail created for all review actions via AuditTrail model
+    - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -104,8 +134,8 @@ The approved breakdown:
 | 5 | User authentication & role management | AFK | 1 | ✅ Done |
 | 6 | AI worker service | AFK | 3, 4 | ✅ Done |
 | 7 | Assessment creation by BU | AFK | 4, 6 | ✅ Done |
-| 8 | Admin review workflow | HITL | 7 | 🟢 Ready |
-| 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ⏳ Blocked |
+| 8 | Admin review workflow | HITL | 7 | ✅ Done |
+| 9 | Tier/rate assignment & expiry tracking | AFK | 8 | 🟢 Ready |
 | 10 | BU dashboard & notifications | AFK | 5, 8 | 🟢 Ready |
 
 Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
