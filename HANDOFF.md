@@ -34,6 +34,18 @@
    - Score badges displayed as blue circles next to each answer
    - Role-based navigation link (Admin/SA placeholder guard — full auth in issue #5)
    - All code committed and pushed to main branch
+8. **Completed Issue #4 — HCP master record CRUD:**
+   - Backend: Full CRUD for `/api/hcps` with fuzzy duplicate detection via external identifiers
+   - Paginated, searchable, sortable list (search across name/email/state/identifiers)
+   - Sortable by lastName, firstName, state, specialtyName, createdAt; pagination 10/25/50 per page
+   - POST creates HCPs with optional multiple external identifiers (NPI, licenses); returns 409 on identifier match
+   - PUT replaces all identifiers atomically; partial updates supported
+   - Frontend: Complete home page as HCP directory per domain spec
+     - Table with columns: Name, Identifier, State, Specialty, Tier, Rate, Status, Effective Date, Renewal Date
+     - Add HCP modal, detail slide-over panel for view/edit
+     - Color-coded status badges matching assessment lifecycle states
+   - Navigation links to Specialties and Criteria Sets pages (placeholder role guards)
+   - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -43,7 +55,7 @@ The approved breakdown:
 | 1 | Foundation setup | AFK | None | ✅ Done |
 | 2 | Specialties management (SA) | AFK | 1 | ✅ Done |
 | 3 | Criteria sets management (SA) | AFK | 2 | ✅ Done |
-| 4 | HCP master record CRUD | AFK | 1 | 🟢 Ready |
+| 4 | HCP master record CRUD | AFK | 1 | ✅ Done |
 | 5 | User authentication & role management | AFK | 1 | 🟢 Ready |
 | 6 | AI worker service | AFK | 3, 4 | 🟢 Ready |
 | 7 | Assessment creation by BU | AFK | 4, 6 | ⏳ Blocked |
