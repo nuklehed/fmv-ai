@@ -15,6 +15,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresSA: true }
   },
   {
+    path: '/criteria-sets',
+    name: 'criteriaSets',
+    component: () => import('@/views/CriteriaSetsView.vue'),
+    meta: { requiresAuth: true, requiresAdminOrSA: true }
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue')
@@ -33,7 +39,7 @@ router.beforeEach((to, _from, next) => {
     return
   }
 
-  // TODO: Add SA-only route guard once authentication is implemented (issue #5)
-  // For now, all authenticated users can access specialties
+  // TODO: Add role-based route guards once authentication is implemented (issue #5)
+  // For now, all authenticated users can access admin pages
   next()
 })
