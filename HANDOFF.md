@@ -59,6 +59,24 @@
    - Frontend: API client with automatic token refresh on 401 responses
    - Router: Token validation guard via /api/auth/me verification
    - All code committed and pushed to main branch
+10. **Completed Issue #6 — AI worker service:**
+    - Backend: BullMQ queue + single-worker sequential processing (ADR-0002) with Redis connection
+      - Graceful shutdown handling (SIGTERM/SIGINT); queue stats endpoint
+    - Backend: Worker service fetches assessment context, calls local LLM (Ollama-compatible), parses JSON results
+      - Robust JSON extraction from LLM response; validates answers against valid sets per question
+      - Stores AI results as immutable JSONB with rationale; computes totalScore
+    - Backend: Full Assessment CRUD routes (`/api/assessments`)
+      - Paginated list (BUs see own, Admins/SAs see all); searchable/filterable by status
+      - PDF upload via multer + pdf-parse text extraction (10MB max, 50 char min)
+      - Status transitions with validation: DRAFT→SUBMITTED→AI_PROCESSING→AI_COMPLETE→UNDER_REVIEW→APPROVED/REJECTED
+    - Frontend: AssessmentFormView — 4-step guided form (Select HCP → Edit Contact → Details → Upload CV)
+      - Searchable HCP dropdown, pre-populated editable contact fields, specialty/criteria set selectors
+      - Drag-and-drop PDF upload with progress indicator; auto-updates HCP master record on submit
+    - Frontend: AssessmentsListView — Paginated table with status badges, score display, auto-refresh during AI processing
+      - Detail slide-over panel showing HCP info, AI results with rationale, rejection reason
+    - Prisma schema: Added tenantId to Assessment; fixed all missing reverse relations (Specialty.assessments, CriteriaSet.assessments, Tier.assessments, User.submittedAssessments/approvedAssessments)
+    - Auth middleware: Fixed authenticate() JWT verification (was placeholder); added requireBUOrHigher guard
+    - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -70,8 +88,8 @@ The approved breakdown:
 | 3 | Criteria sets management (SA) | AFK | 2 | ✅ Done |
 | 4 | HCP master record CRUD | AFK | 1 | ✅ Done |
 | 5 | User authentication & role management | AFK | 1 | ✅ Done |
-| 6 | AI worker service | AFK | 3, 4 | 🟢 Ready |
-| 7 | Assessment creation by BU | AFK | 4, 6 | ⏳ Blocked |
+| 6 | AI worker service | AFK | 3, 4 | ✅ Done |
+| 7 | Assessment creation by BU | AFK | 4, 6 | 🟢 Ready |
 | 8 | Admin review workflow | HITL | 7 | ⏳ Blocked |
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ⏳ Blocked |
 | 10 | BU dashboard & notifications | AFK | 5, 8 | 🟢 Ready |
