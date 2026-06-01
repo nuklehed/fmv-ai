@@ -24,6 +24,16 @@
    - Frontend: SpecialtiesView admin page with table, search, add/edit modals, deactivate action
    - Role-based navigation link (SA-only placeholder guard — full auth in issue #5)
    - All code committed and pushed to main branch
+7. **Completed Issue #3 — Criteria sets management (SA):**
+   - Backend: Full nested CRUD for criteria sets → questions → answers under `/api/criteria-sets`
+   - SA-only system prompt editing; Admins get 403 on prompt modifications
+   - Score validation: non-negative integer enforced at API level
+   - Multi-tenant isolation via tenantId chain (answer → question → criteria set → tenant)
+   - Frontend: CriteriaSetsView with expandable tree view, modals for all three levels
+   - System prompt modal with purple styling and SA-only warning banner
+   - Score badges displayed as blue circles next to each answer
+   - Role-based navigation link (Admin/SA placeholder guard — full auth in issue #5)
+   - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -32,10 +42,10 @@ The approved breakdown:
 |---|-------------|------|------------|--------|
 | 1 | Foundation setup | AFK | None | ✅ Done |
 | 2 | Specialties management (SA) | AFK | 1 | ✅ Done |
-| 3 | Criteria sets management (SA) | AFK | 2 | 🟢 Ready |
+| 3 | Criteria sets management (SA) | AFK | 2 | ✅ Done |
 | 4 | HCP master record CRUD | AFK | 1 | 🟢 Ready |
 | 5 | User authentication & role management | AFK | 1 | 🟢 Ready |
-| 6 | AI worker service | AFK | 3, 4 | ⏳ Blocked |
+| 6 | AI worker service | AFK | 3, 4 | 🟢 Ready |
 | 7 | Assessment creation by BU | AFK | 4, 6 | ⏳ Blocked |
 | 8 | Admin review workflow | HITL | 7 | ⏳ Blocked |
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ⏳ Blocked |
