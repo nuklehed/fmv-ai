@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
   {
+    path: '/users',
+    name: 'userManagement',
+    component: () => import('@/views/UserManagementView.vue'),
+    meta: { requiresAuth: true, requiresSA: true }
+  },
+  {
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue')
@@ -32,14 +38,34 @@ export const router = createRouter({
   routes
 })
 
-router.beforeEach((to, _from, next) => {
-  const isAuthenticated = !!localStorage.getItem('token')
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next({ name: 'login' })
-    return
+router.beforeEach(async (to, _from) => {
+  // Public route — no auth required
+  if (to.name === 'login') return true
+
+  // Check for existing token
+  const accessToken = localStorage.getItem('accessToken')
+  if (!accessToken) {
+    return { name: 'login' }
   }
 
-  // TODO: Add role-based route guards once authentication is implemented (issue #5)
-  // For now, all authenticated users can access admin pages
-  next()
+  // TODO: Full role-based guards will be implemented in issue #5
+  // For now, we verify the token is valid by fetching user profile
+  try {
+    const response = await fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+
+    if (!response.ok) {
+      // Token invalid — redirect to login
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      return { name: 'login' }
+    }
+
+    // Token valid — allow navigation
+    return true
+  } catch (error) {
+    console.error('Auth check error:', error)
+    return { name: 'login' }
+  }
 })

@@ -5,6 +5,8 @@ import { PrismaClient } from '@prisma/client'
 import specialtyRoutes from './routes/specialties'
 import criteriaSetRoutes from './routes/criteriaSets'
 import hcpRoutes from './routes/hcps'
+import authRoutes from './routes/auth'
+import userRoutes from './routes/users'
 
 const app = express()
 const prisma = new PrismaClient()
@@ -14,6 +16,8 @@ app.use(cors())
 app.use(express.json())
 
 // Routes
+app.use('/api/auth', authRoutes)
+app.use('/api/users', userRoutes)
 app.use('/api/specialties', specialtyRoutes)
 app.use('/api/criteria-sets', criteriaSetRoutes)
 app.use('/api/hcps', hcpRoutes)
@@ -35,9 +39,9 @@ app.get('/api/db/health', async (_req, res) => {
 })
 
 // TODO: Add route handlers for:
-// - Authentication (POST /api/auth/login, POST /api/auth/refresh, GET /api/auth/me)
 // - Assessment creation and processing (POST /api/assessments, POST /api/assessments/:id/cv)
-// - User management (CRUD /api/users) — SA only
+// - Tier/rate assignment & expiry tracking
+// - Notification delivery
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
