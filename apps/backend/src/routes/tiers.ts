@@ -22,9 +22,10 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     const activeOnly = req.query.active === 'true'
     const specialtyId = req.query.specialtyId as string | undefined
 
-    const where: Record<string, unknown> = { tenantId: req.tenantId! }
-    if (activeOnly) {
-      where.isActive = true
+    const where: Record<string, unknown> = { tenantId: req.tenantId!, isActive: true }
+    if (!activeOnly) {
+      // When not filtering to active only, remove the default filter
+      delete (where as any).isActive
     }
     if (specialtyId) {
       where.specialtyId = specialtyId
@@ -135,8 +136,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
         minScore,
         maxScore,
         specialtyId,
-        lowRate,
-        highRate,
+        lowRate: String(lowRate),
+        highRate: String(highRate),
         defaultPercentile: defaultPercentile || 50,
         tenantId: req.tenantId!
       },
@@ -210,8 +211,8 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     if (minScore !== undefined) updateData.minScore = minScore
     if (maxScore !== undefined) updateData.maxScore = maxScore
     if (specialtyIdToUse !== existingTier.specialtyId) updateData.specialtyId = specialtyIdToUse
-    if (lowRate !== undefined) updateData.lowRate = lowRate
-    if (highRate !== undefined) updateData.highRate = highRate
+    if (lowRate !== undefined) updateData.lowRate = String(lowRate)
+    if (highRate !== undefined) updateData.highRate = String(highRate)
     if (defaultPercentile !== undefined) updateData.defaultPercentile = defaultPercentile
     if (isActive !== undefined) updateData.isActive = isActive
 
@@ -238,9 +239,9 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<
   try {
     const { id } = req.params
 
-    // Verify tier belongs to tenant
+    // Verify tier belongs to tenant and is active
     const existingTier = await prisma.tier.findFirst({
-      where: { id, tenantId: req.tenantId! }
+      where: { id, tenantId: req.tenantId!, isActive: true }
     })
 
     if (!existingTier) {
@@ -248,7 +249,11 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<
       return
     }
 
-    await prisma.tier.delete({ where: { id } })
+    // Soft-delete by setting isActive=false (preserves FK integrity with assessments)
+    await prisma.tier.update({
+      where: { id },
+      data: { isActive: false }
+    })
 
     res.json({ message: 'Tier deleted successfully' })
   } catch (error) {

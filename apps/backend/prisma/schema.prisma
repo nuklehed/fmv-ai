@@ -1,6 +1,3 @@
-// FMV AI — Database Schema
-// Logical multi-tenancy via tenant_id on every record (ADR-0003)
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,61 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  BU
-  ADMIN
-  SA
-}
-
-enum AssessmentStatus {
-  DRAFT
-  SUBMITTED
-  AI_PROCESSING
-  AI_COMPLETE
-  UNDER_REVIEW
-  APPROVED
-  REJECTED
-  EXPIRED
-}
-
-enum NotificationType {
-  ASSESSMENT_APPROVED
-  ASSESSMENT_REJECTED
-  EXPIRY_REMINDER
-}
-
-enum IdentifierType {
-  NPI
-  STATE_LICENSE
-  DEA
-  OTHER
-}
-
-// ─── Users & Authentication ────────────────────────────────────────
-
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  passwordHash  String?   // null for SSO users
-  role          UserRole
-  tenantId      String
-  isActive      Boolean   @default(true)
-  emailVerified Boolean   @default(false)
-  createdAt          DateTime    @default(now())
-  updatedAt          DateTime    @updatedAt
-
-  submittedAssessments Assessment[] @relation("SubmittedAssessments")
-  approvedAssessments  Assessment[] @relation("ApprovedAssessments")
+  id                   String         @id @default(uuid())
+  email                String         @unique
+  passwordHash         String?
+  role                 String
+  tenantId             String
+  isActive             Boolean        @default(true)
+  emailVerified        Boolean        @default(false)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  approvedAssessments  Assessment[]   @relation("ApprovedAssessments")
+  submittedAssessments Assessment[]   @relation("SubmittedAssessments")
   notifications        Notification[]
 
   @@index([tenantId, role])
   @@index([email])
 }
 
-// ─── HCP Master Records ────────────────────────────────────────────
-
 model Hcp {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   firstName   String
   lastName    String
   email       String?
@@ -73,197 +35,179 @@ model Hcp {
   state       String?
   specialtyId String?
   tenantId    String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  specialty   Specialty?       @relation(fields: [specialtyId], references: [id])
-  identifiers HcpIdentifier[]
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
   assessments Assessment[]
+  specialty   Specialty?      @relation(fields: [specialtyId], references: [id])
+  identifiers HcpIdentifier[]
 
   @@index([tenantId, isActive])
   @@index([specialtyId])
 }
 
 model HcpIdentifier {
-  id      String       @id @default(uuid())
-  hcpId   String
-  type    IdentifierType
-  value   String
-  isActive Boolean     @default(true)
-  createdAt DateTime   @default(now())
-
-  hcp Hcp @relation(fields: [hcpId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  hcpId     String
+  type      String
+  value     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  hcp       Hcp      @relation(fields: [hcpId], references: [id], onDelete: Cascade)
 
   @@unique([hcpId, type, value])
 }
 
 model Specialty {
-  id          String    @id @default(uuid())
+  id          String       @id @default(uuid())
   name        String
   description String?
-  isActive    Boolean   @default(true)
+  isActive    Boolean      @default(true)
   tenantId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  hcps          Hcp[]
-  assessments   Assessment[]         @relation("AssessmentSpecialty")
-  tiers         Tier[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  assessments Assessment[] @relation("AssessmentSpecialty")
+  hcps        Hcp[]
+  tiers       Tier[]
 
   @@unique([name, tenantId])
   @@index([tenantId, isActive])
 }
 
-// ─── Criteria Sets & Questions ─────────────────────────────────────
-
 model CriteriaSet {
-  id             String    @id @default(uuid())
-  name           String
-  description    String?
-  systemPrompt   String?   // SA-only editable
-  isActive       Boolean   @default(true)
-  tenantId       String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  questions Question[]
-  assessments Assessment[]      @relation("CriteriaSetAssessments")
+  id           String       @id @default(uuid())
+  name         String
+  description  String?
+  systemPrompt String?
+  isActive     Boolean      @default(true)
+  tenantId     String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  assessments  Assessment[] @relation("CriteriaSetAssessments")
+  questions    Question[]
 
   @@index([tenantId, isActive])
 }
 
 model Question {
-  id             String    @id @default(uuid())
-  criteriaSetId  String
-  text           String
-  order          Int
-  isActive       Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  criteriaSet CriteriaSet @relation(fields: [criteriaSetId], references: [id], onDelete: Cascade)
-  answers     Answer[]
+  id            String      @id @default(uuid())
+  criteriaSetId String
+  text          String
+  order         Int
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  answers       Answer[]
+  criteriaSet   CriteriaSet @relation(fields: [criteriaSetId], references: [id], onDelete: Cascade)
 
   @@index([criteriaSetId])
 }
 
 model Answer {
-  id        String   @id @default(uuid())
+  id         String   @id @default(uuid())
   questionId String
-  text      String
-  score     Int
-  order     Int
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  score      Int
+  order      Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
   @@index([questionId])
 }
 
-// ─── Assessments ───────────────────────────────────────────────────
-
 model Assessment {
-  id              String             @id @default(uuid())
-  hcpId           String
+  id                String       @id @default(uuid())
+  hcpId             String
   submittedByUserId String
-  specialtyId     String?
-  criteriaSetId   String?
-  cvText          String?            // Extracted from PDF
-  status          AssessmentStatus   @default(DRAFT)
-  aiResults       Json?              // AI selections with rationale per question
-  totalScore      Int?               // Computed from selected answers
-  tierId          String?
-  rate            Decimal?           @db.Decimal(10, 2)
-  approvedByUserId String?
-  rejectionReason String?
-  tenantId        String             // Multi-tenant isolation (ADR-0003)
-  effectiveDate   DateTime?
-  renewalDate     DateTime?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  submittedAt     DateTime?
-  completedAt     DateTime?
-
-  hcp             Hcp                @relation(fields: [hcpId], references: [id])
-  specialty       Specialty?         @relation("AssessmentSpecialty", fields: [specialtyId], references: [id])
-  criteriaSet     CriteriaSet?       @relation("CriteriaSetAssessments", fields: [criteriaSetId], references: [id])
-  submittedByUser User               @relation("SubmittedAssessments", fields: [submittedByUserId], references: [id])
-  approvedByUser  User?              @relation("ApprovedAssessments", fields: [approvedByUserId], references: [id])
-  tier            Tier?              @relation(fields: [tierId], references: [id])
+  specialtyId       String?
+  criteriaSetId     String?
+  cvText            String?
+  status            String       @default("DRAFT")
+  aiResults         String?
+  totalScore        Int?
+  tierId            String?
+  rate              String?
+  approvedByUserId  String?
+  rejectionReason   String?
+  tenantId          String
+  effectiveDate     DateTime?
+  renewalDate       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  submittedAt       DateTime?
+  completedAt       DateTime?
+  approvedByUser    User?        @relation("ApprovedAssessments", fields: [approvedByUserId], references: [id])
+  criteriaSet       CriteriaSet? @relation("CriteriaSetAssessments", fields: [criteriaSetId], references: [id])
+  hcp               Hcp          @relation(fields: [hcpId], references: [id])
+  specialty         Specialty?   @relation("AssessmentSpecialty", fields: [specialtyId], references: [id])
+  submittedByUser   User         @relation("SubmittedAssessments", fields: [submittedByUserId], references: [id])
+  tier              Tier?        @relation(fields: [tierId], references: [id])
 
   @@index([hcpId, status])
   @@index([submittedByUserId])
   @@index([tenantId, status])
 }
 
-// ─── Tiers & Rates ─────────────────────────────────────────────────
-
 model Tier {
-  id                String   @id @default(uuid())
-  name              String   // e.g., "Tier 1"
+  id                String       @id @default(uuid())
+  name              String
   minScore          Int
   maxScore          Int
   specialtyId       String
-  lowRate           Decimal  @db.Decimal(10, 2)
-  highRate          Decimal  @db.Decimal(10, 2)
-  defaultPercentile Int      @default(50) // 0-100
+  lowRate           String
+  highRate          String
+  defaultPercentile Int          @default(50)
   tenantId          String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  specialty   Specialty    @relation(fields: [specialtyId], references: [id])
-  assessments Assessment[]
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  assessments       Assessment[]
+  specialty         Specialty    @relation(fields: [specialtyId], references: [id])
 
   @@index([tenantId, specialtyId])
+  @@index([tenantId, isActive])
 }
-
-// ─── Application Settings ──────────────────────────────────────────
 
 model ApplicationSetting {
   id          String   @id @default(uuid())
-  key         String   // e.g., "approvalValidityPeriod", "expiryReminderLeadTime"
-  value       Json     // Flexible config storage
+  key         String
+  value       String
   description String?
   tenantId    String
-  userId      String?  // For user-specific settings (e.g., notification preferences)
+  userId      String?
   updatedAt   DateTime @updatedAt
 
   @@unique([key, tenantId])
 }
 
-// ─── Audit Trail ───────────────────────────────────────────────────
-
 model AuditTrail {
-  id        String   @id @default(uuid())
-  userId    String?  // Who performed the action
-  userName  String?  // Snapshot of name at time of action (immutable)
-  entityType String // e.g., "Assessment", "Hcp", "User"
-  entityId  String   // ID of the affected record
-  action    String   // e.g., "CREATE", "UPDATE", "DELETE", "APPROVE", "REJECT"
+  id           String   @id @default(uuid())
+  userId       String?
+  userName     String?
+  entityType   String
+  entityId     String
+  action       String
   fieldChanged String?
-  oldValue  Json?
-  newValue  Json?
-  rationale String? // For overrides/rejections
-  createdAt DateTime @default(now())
+  oldValue     String?
+  newValue     String?
+  rationale    String?
+  createdAt    DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([userId])
 }
 
-// ─── Notifications ─────────────────────────────────────────────────
-
 model Notification {
-  id        String           @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User             @relation(fields: [userId], references: [id])
-  type      NotificationType
+  type      String
   title     String
   message   String
   readAt    DateTime?
-  createdAt DateTime         @default(now())
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id])
 
   @@index([userId, readAt])
 }
