@@ -45,50 +45,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TierManagementView.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
-  // ─── Settings Control Center (parent layout) ──────────────────────
+  // ─── Settings Control Center (sidebar layout) ─────────────────────
   {
     path: '/settings',
+    name: 'settingsHome',
     component: () => import('@/views/SettingsControlCenterView.vue'),
-    meta: { requiresAuth: true },
-    children: [
-      { path: '', name: 'settingsHome', redirect: { name: 'settingsNotifications' } },
-      {
-        path: 'notification-settings',
-        name: 'settingsNotifications',
-        component: () => import('@/views/SettingsView.vue'),
-        meta: { requiresAuth: true }
-      },
-      {
-        path: 'specialties',
-        name: 'settingsSpecialties',
-        component: () => import('@/views/SpecialtiesView.vue'),
-        meta: { requiresAuth: true, requiresSA: true }
-      },
-      {
-        path: 'criteria-sets',
-        name: 'settingsCriteriaSets',
-        component: () => import('@/views/CriteriaSetsView.vue'),
-        meta: { requiresAuth: true, requiresAdminOrSA: true }
-      },
-      {
-        path: 'tiers',
-        name: 'settingsTiers',
-        component: () => import('@/views/TierManagementView.vue'),
-        meta: { requiresAuth: true, requiresAdminOrSA: true }
-      },
-      {
-        path: 'users',
-        name: 'settingsUsers',
-        component: () => import('@/views/UserManagementView.vue'),
-        meta: { requiresAuth: true, requiresSA: true }
-      },
-      {
-        path: 'app-settings',
-        name: 'settingsAppSettings',
-        component: () => import('@/views/ApplicationSettingsView.vue'),
-        meta: { requiresAuth: true, requiresSA: true }
-      }
-    ]
+    meta: { requiresAuth: true }
   },
   {
     path: '/login',
