@@ -51,6 +51,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/SettingsView.vue'),
     meta: { requiresAuth: true }
   },
+  // ─── Prototype routes (experimental) ──────────────────────────────
+  {
+    path: '/prototype/settings-control-center',
+    name: 'settingsPrototype',
+    component: () => import('@/views/SettingsControlCenterView.vue'),
+    meta: { requiresAuth: true }
+  },
   {
     path: '/login',
     name: 'login',

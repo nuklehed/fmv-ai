@@ -197,6 +197,13 @@
     - The global Settings link for all users remains unchanged — both links pointed to SettingsView.vue
     - Note: ApplicationSettingsView.vue exists at route /application-settings but has no nav link; adding one is out of scope
     - Status: Published to GitHub as Issue #19 — ready-for-agent, single-file change
+18. **Consolidate settings nav links into Settings control center (#20):**
+    - Frontend: Replace individual settings nav links in App.vue with a single "Settings" link for all users
+    - Frontend: Wire up SettingsControlCenterView prototype (at /prototype/settings-control-center) as the production /settings page
+    - Frontend: Use nested routes so each sidebar item loads its existing page component inside the control center layout
+    - Role visibility preserved: BU sees only Notification Settings; Admin/SA see full system settings + notifications
+    - Prototype has three layout variations (GitHub sidebar, wider panel, compact tabs) — one will be selected for implementation
+    - Status: Published to GitHub as Issue #20 — ready-for-agent, fully specified with agent brief
 
 ## What's next (in progress)
 The approved breakdown:
@@ -214,9 +221,10 @@ The approved breakdown:
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ✅ Done |
 | 10 | BU dashboard & notifications | AFK | 5, 8 | ✅ Done |
 | 16 | Draft assessments actionable from list view & detail panel | Enhancement | None | 🟢 Ready (unblocked) |
+| 17 | Remove duplicate 'App Settings' nav link | Bug | None | 🟢 Ready (unblocked) |
+| 18 | Consolidate settings nav links into Settings control center | Enhancement | None | 🟢 Ready (unblocked) |
 
-| 17 | Remove duplicate 'App Settings' nav link | Bug | None | Ready (unblocked) |
-Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
+## Key domain decisions to remember ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
