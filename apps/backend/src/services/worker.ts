@@ -1,4 +1,4 @@
-import { PrismaClient, AssessmentStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import axios from 'axios'
 
 const prisma = new PrismaClient()
@@ -51,7 +51,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
   }
 
   // Validate assessment is in AI_PROCESSING state
-  if (assessment.status !== AssessmentStatus.AI_PROCESSING) {
+  if (assessment.status !== 'AI_PROCESSING') {
     console.warn(`Assessment ${assessmentId} is not in AI_PROCESSING state: ${assessment.status}`)
     return
   }
@@ -60,7 +60,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
   if (!assessment.cvText || !assessment.criteriaSetId) {
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: AssessmentStatus.REJECTED, rejectionReason: 'Missing required data (CV text or criteria set)' }
+      data: { status: 'REJECTED', rejectionReason: 'Missing required data (CV text or criteria set)' }
     })
     return
   }
@@ -68,7 +68,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
   if (!assessment.criteriaSet) {
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: AssessmentStatus.REJECTED, rejectionReason: 'Criteria set not found' }
+      data: { status: 'REJECTED', rejectionReason: 'Criteria set not found' }
     })
     return
   }
@@ -78,7 +78,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
   if (questions.length === 0) {
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: AssessmentStatus.REJECTED, rejectionReason: 'No active criteria questions found' }
+      data: { status: 'REJECTED', rejectionReason: 'No active criteria questions found' }
     })
     return
   }
@@ -96,7 +96,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     // Mark as failed but keep in AI_COMPLETE so admin can review partial results
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: AssessmentStatus.AI_COMPLETE }
+      data: { status: 'AI_COMPLETE' }
     })
     return
   }
@@ -108,7 +108,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     console.warn('No valid AI results parsed from LLM response')
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: AssessmentStatus.AI_COMPLETE }
+      data: { status: 'AI_COMPLETE' }
     })
     return
   }
@@ -122,8 +122,8 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
   await prisma.assessment.update({
     where: { id: assessmentId },
     data: {
-      status: AssessmentStatus.AI_COMPLETE,
-      aiResults: aiResults as any,
+      status: 'AI_COMPLETE',
+      aiResults: JSON.stringify(aiResults),
       totalScore,
       completedAt: new Date()
     }
@@ -134,24 +134,34 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
 
 /**
  * Build the default system prompt when none is configured.
+ * Uses explicit examples and strong formatting instructions to reduce LLM inconsistency.
  */
 function buildDefaultSystemPrompt(_questions: CriteriaQuestion[]): string {
   return `You are an expert evaluator for Fair Market Value (FMV) assessments of healthcare professionals (HCPs).
 
 Your task is to review the HCP's CV text and select the BEST matching answer for each evaluation question. For each question, you must choose exactly ONE answer from the provided options.
 
-Rules:
+RULES:
 1. Select only one answer per question — the most accurate based on the CV evidence.
 2. Provide a brief rationale (1-2 sentences) explaining why you chose that answer.
 3. Base your selections STRICTLY on the information in the CV text. Do not invent or assume facts.
 4. If the CV does not contain sufficient information for a question, select the lowest-scoring answer and note "insufficient data" in the rationale.
 
-Return your response as a JSON array with this exact structure:
+OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE:
+You MUST return ONLY a valid JSON array. No markdown code blocks (no \`\`\`). No extra text before or after the JSON.
+Use these EXACT field names: questionId, selectedAnswerId, rationale (camelCase).
+
+EXAMPLE OUTPUT:
 [
   {
-    "questionId": "<question id>",
-    "selectedAnswerId": "<answer id>",
-    "rationale": "<brief explanation>"
+    "questionId": "abc-123",
+    "selectedAnswerId": "def-456",
+    "rationale": "The CV shows 8 years of experience which meets the 5+ years criterion."
+  },
+  {
+    "questionId": "ghi-789",
+    "selectedAnswerId": "jkl-012",
+    "rationale": "Insufficient data in the CV to determine this criterion."
   }
 ]`
 }
@@ -190,20 +200,40 @@ function buildUserPrompt(assessment: any, questions: CriteriaQuestion[]): string
  * Call the local LLM API (Ollama-compatible endpoint).
  */
 async function callLocalLLM(systemPrompt: string, userPrompt: string): Promise<string> {
-  const response = await axios.post(`${LLM_BASE_URL}/api/chat`, {
+  const response = await axios.post(`${LLM_BASE_URL}/v1/chat/completions`, {
     model: LLM_MODEL,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt }
     ],
-    stream: false,
-    options: {
-      temperature: 0.1, // Low temperature for consistent scoring
-      num_predict: 4096 // Allow long responses with rationale
-    }
+    stream: false
   })
 
-  return response.data.message?.content || ''
+  return response.data.choices?.[0]?.message?.content || ''
+}
+
+/**
+ * Normalize a raw LLM response item by mapping all known field name aliases to canonical names.
+ * The model is inconsistent — it may use questionId/question_id, selectedAnswerId/answerId/option_id/id, etc.
+ */
+function normalizeItem(item: Record<string, unknown>): { questionId?: string; selectedAnswerId?: string; rationale?: string } {
+  const normalized: Record<string, unknown> = {}
+
+  // Map all known aliases to canonical names
+  for (const [key, value] of Object.entries(item)) {
+    if (typeof key !== 'string' || typeof value === 'undefined') continue
+    const lowerKey = key.toLowerCase()
+
+    if (lowerKey === 'questionid' || lowerKey === 'question_id') normalized.questionId = String(value)
+    else if (lowerKey === 'selectedanswerid' || lowerKey === 'answerid' || lowerKey === 'answer_id' || lowerKey === 'option_id' || lowerKey === 'id') {
+      // Only map 'id' to selectedAnswerId if we already have a questionId
+      if (!normalized.questionId) continue
+      normalized.selectedAnswerId = String(value)
+    }
+    else if (lowerKey === 'rationale' || lowerKey === 'reasoning' || lowerKey === 'explanation') normalized.rationale = String(value)
+  }
+
+  return normalized as { questionId?: string; selectedAnswerId?: string; rationale?: string }
 }
 
 /**
@@ -226,15 +256,18 @@ function parseLLMResponse(response: string, questions: CriteriaQuestion[]): AIRe
   }
 
   for (const item of extracted) {
-    if (!item.questionId || !item.selectedAnswerId || !item.rationale) continue
-    if (!questionIds.has(item.questionId)) continue
-    const validAnswers = answerMap.get(item.questionId)
-    if (!validAnswers?.has(item.selectedAnswerId)) continue
+    const normalized = normalizeItem(item as Record<string, unknown>)
+    const { questionId, selectedAnswerId, rationale } = normalized
+
+    if (!selectedAnswerId || !questionId) continue
+    if (!questionIds.has(questionId)) continue
+    const validAnswers = answerMap.get(questionId)
+    if (!validAnswers?.has(selectedAnswerId)) continue
 
     results.push({
-      questionId: item.questionId,
-      selectedAnswerId: item.selectedAnswerId,
-      rationale: String(item.rationale).slice(0, 500) // Cap rationale length
+      questionId,
+      selectedAnswerId,
+      rationale: String(rationale || '').slice(0, 500) // Cap rationale length
     })
   }
 
@@ -243,16 +276,20 @@ function parseLLMResponse(response: string, questions: CriteriaQuestion[]): AIRe
 
 /**
  * Extract JSON array from a potentially messy LLM response.
+ * Handles markdown code blocks, extra text, and various formats.
  */
 function extractJSONFromResponse(text: string): any[] {
+  // Strip markdown code block wrappers
+  let cleaned = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim()
+
   // Try direct parse first
   try {
-    const parsed = JSON.parse(text)
+    const parsed = JSON.parse(cleaned)
     if (Array.isArray(parsed)) return parsed
   } catch { /* fall through */ }
 
   // Try to find JSON array in the text
-  const jsonMatch = text.match(/\[[\s\S]*\]/)
+  const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
   if (jsonMatch) {
     try {
       return JSON.parse(jsonMatch[0])
@@ -260,7 +297,7 @@ function extractJSONFromResponse(text: string): any[] {
   }
 
   // Try to find JSON object(s) in the text
-  const objMatches = text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g)
+  const objMatches = cleaned.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g)
   if (objMatches) {
     try {
       return objMatches.map(m => JSON.parse(m)).filter(Boolean)
