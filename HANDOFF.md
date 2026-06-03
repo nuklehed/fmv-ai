@@ -184,6 +184,14 @@
     - Frontend: SpecialtiesView uses `accessToken` consistently with auth store
     - Config: Vite proxy target port 3000 → 3001; removed unused tsconfig.node.json reference
     - All code committed and pushed to main branch
+16. **Draft assessments actionable from list view & detail panel (#18):**
+    - Backend: No changes needed — `PUT /api/assessments/:id`, `POST /api/assessments/:id/cv`, `POST /api/assessments/:id/submit` already exist
+    - Frontend: Add "Continue" (BU) / "Edit" (Admin/SA) action buttons on DRAFT rows in the assessments list view
+    - Frontend: Detail panel shows role-specific actions for DRAFT status — "Continue Assessment" for BUs, "Edit Assessment" + "Delete Draft" for Admin/SA
+    - Frontend: Form reusability — support edit mode via `/assessments/edit/:id` route that loads existing draft data (HCP, specialty, criteria set pre-populated)
+    - Frontend: Show CV upload state in edit mode if `cvText` is already present on the draft
+    - Frontend: Delete draft with confirmation dialog for both BU and Admin/SA
+    - Status: Published to GitHub as Issue #18 — ready-for-agent, fully specified with agent brief
 
 ## What's next (in progress)
 The approved breakdown:
@@ -200,6 +208,7 @@ The approved breakdown:
 | 8 | Admin review workflow | HITL | 7 | ✅ Done |
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ✅ Done |
 | 10 | BU dashboard & notifications | AFK | 5, 8 | ✅ Done |
+| 16 | Draft assessments actionable from list view & detail panel | Enhancement | None | 🟢 Ready (unblocked) |
 
 Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 
