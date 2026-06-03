@@ -1,8 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
-import pdfParse from 'pdf-parse'
 import type { Response } from 'express'
-import { PrismaClient, AssessmentStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { authenticate, requireAdminOrSA, requireBUOrHigher } from '../middleware/auth'
 import { getAIQueue } from '../services/queue'
@@ -11,14 +10,15 @@ const router = Router()
 const prisma = new PrismaClient()
 
 // Configure multer for PDF uploads (memory storage)
+// Multer 2.x: options go in constructor, .single() only takes field name
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true)
+  fileFilter: (_req: any, _file: any, cb: any) => {
+    if (_file.mimetype === 'application/pdf') {
+      (cb as any)(null, true)
     } else {
-      cb(new Error('Only PDF files are allowed'))
+      (cb as any)(new Error('Only PDF files are allowed'), false)
     }
   }
 })
@@ -36,7 +36,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     const page = Math.max(1, parseInt(req.query.page as string) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
     const search = req.query.search as string | undefined
-    const statusFilter = req.query.status as AssessmentStatus | undefined
+    const statusFilter = req.query.status as string | undefined
 
     // Multi-tenant isolation + role-based visibility
     const where: Record<string, unknown> = { tenantId: req.tenantId! }
@@ -48,9 +48,9 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     if (search && typeof search === 'string' && search.length > 0) {
       const hcpWhere = {
         OR: [
-          { firstName: { contains: search, mode: 'insensitive' as const } },
-          { lastName: { contains: search, mode: 'insensitive' as const } },
-          { email: { contains: search, mode: 'insensitive' as const } }
+          { firstName: { contains: search } },
+          { lastName: { contains: search } },
+          { email: { contains: search } }
         ]
       }
       where.hcp = hcpWhere
@@ -186,7 +186,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
         submittedByUserId: req.userId!,
         specialtyId: specialtyId || undefined,
         criteriaSetId: criteriaSetId || undefined,
-        status: AssessmentStatus.DRAFT,
+        status: 'DRAFT',
         tenantId: req.tenantId!
       },
       include: {
@@ -223,7 +223,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     }
 
     // BUs can only edit drafts
-    if (req.userRole === 'BU' && existingAssessment.status !== AssessmentStatus.DRAFT) {
+    if (req.userRole === 'BU' && existingAssessment.status !== 'DRAFT') {
       res.status(403).json({ error: 'Only draft assessments can be edited by business users' })
       return
     }
@@ -270,31 +270,31 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 
     // Status transitions — Admin/SA only (except BU submitting draft)
     if (status) {
-      const currentStatus = existingAssessment.status as AssessmentStatus
+      const currentStatus = existingAssessment.status
 
       switch (status) {
-        case AssessmentStatus.SUBMITTED:
-          if (currentStatus !== AssessmentStatus.DRAFT) {
+        case 'SUBMITTED':
+          if (currentStatus !== 'DRAFT') {
             res.status(400).json({ error: 'Only draft assessments can be submitted' })
             return
           }
           updateData.submittedAt = new Date()
           break
 
-        case AssessmentStatus.UNDER_REVIEW:
-        case AssessmentStatus.APPROVED:
-        case AssessmentStatus.REJECTED:
+        case 'UNDER_REVIEW':
+        case 'APPROVED':
+        case 'REJECTED':
           if (req.userRole !== 'ADMIN' && req.userRole !== 'SA') {
             res.status(403).json({ error: 'Only administrators can change assessment status to this value' })
             return
           }
           // Validate transition
-          const validTransitions: Record<string, AssessmentStatus[]> = {
-            [AssessmentStatus.AI_COMPLETE]: [AssessmentStatus.UNDER_REVIEW],
-            [AssessmentStatus.APPROVED]: [AssessmentStatus.UNDER_REVIEW],
-            [AssessmentStatus.REJECTED]: [AssessmentStatus.UNDER_REVIEW]
+          const validTransitions: Record<string, string[]> = {
+            AI_COMPLETE: ['UNDER_REVIEW'],
+            APPROVED: ['UNDER_REVIEW'],
+            REJECTED: ['UNDER_REVIEW']
           }
-          if (!validTransitions[currentStatus]?.includes(status as AssessmentStatus)) {
+          if (!validTransitions[currentStatus]?.includes(status)) {
             res.status(400).json({ error: `Invalid status transition from ${currentStatus} to ${status}` })
             return
           }
@@ -305,7 +305,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
           return
       }
 
-      updateData.status = status as AssessmentStatus
+      updateData.status = status
 
       if (rejectionReason) {
         updateData.rejectionReason = rejectionReason
@@ -364,9 +364,18 @@ router.post('/:id/cv', upload.single('cv'), async (req: FileRequest, res: Respon
       return
     }
 
-    // Extract text from PDF
-    const pdfData = await pdfParse(req.file.buffer)
-    const cvText = pdfData.text.trim()
+    // Extract text from PDF using pdfjs-dist (pdf-parse has compatibility issues with newer Node.js)
+    const { getDocument } = await import('pdfjs-dist')
+    const uint8Array = new Uint8Array(req.file.buffer)
+    const pdfDoc = await getDocument({ data: uint8Array }).promise
+    let cvText = ''
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const page = await pdfDoc.getPage(i)
+      const textContent = await page.getTextContent()
+      const pageText = textContent.items.map((item: any) => item.str).join(' ')
+      cvText += pageText + '\n'
+    }
+    cvText = cvText.trim()
 
     if (!cvText || cvText.length < 50) {
       res.status(400).json({ error: 'CV text extraction failed or content too short' })
@@ -414,7 +423,7 @@ router.post('/:id/submit', async (req: AuthenticatedRequest, res: Response): Pro
     }
 
     // Only drafts can be submitted
-    if (existingAssessment.status !== AssessmentStatus.DRAFT) {
+    if (existingAssessment.status !== 'DRAFT') {
       res.status(400).json({ error: 'Only draft assessments can be submitted' })
       return
     }
@@ -433,26 +442,53 @@ router.post('/:id/submit', async (req: AuthenticatedRequest, res: Response): Pro
     const updatedAssessment = await prisma.assessment.update({
       where: { id },
       data: {
-        status: AssessmentStatus.AI_PROCESSING,
+        status: 'AI_PROCESSING',
         submittedAt: new Date()
       }
     })
 
     // Enqueue job in BullMQ — worker will process sequentially
-    const queue = getAIQueue()
-    await queue.add('process-assessment', {
-      assessmentId: id,
-      userId: req.userId!
-    }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 } // Retry with exponential backoff
-    })
+    const queue = await getAIQueue()
+    if (queue) {
+      await queue.add('process-assessment', {
+        assessmentId: id,
+        userId: req.userId!
+      }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 }
+      })
 
-    res.json({
-      message: 'Assessment submitted for AI processing',
-      assessment: updatedAssessment,
-      queuePosition: await queue.getWaitingCount() + 1
-    })
+      res.json({
+        message: 'Assessment submitted for AI processing (queued)',
+        assessment: updatedAssessment,
+        queuePosition: await queue.getWaitingCount() + 1
+      })
+    } else {
+      // Fallback: synchronous processing when Redis is not available
+      const { processAssessmentJob } = await import('../services/worker')
+      try {
+        await processAssessmentJob(id, req.userId!)
+        const refreshed = await prisma.assessment.findUnique({
+          where: { id },
+          include: {
+            hcp: true,
+            submittedByUser: { select: { id: true, email: true } }
+          }
+        })
+        res.json({
+          message: 'Assessment processed synchronously (no Redis queue)',
+          assessment: refreshed
+        })
+      } catch (err) {
+        console.error('Synchronous processing failed:', err)
+        // Leave in AI_PROCESSING state for retry
+        res.json({
+          message: 'Assessment queued for synchronous processing',
+          assessment: updatedAssessment,
+          note: 'AI worker not available — process manually via POST /api/assessments/:id/process'
+        })
+      }
+    }
   } catch (error) {
     console.error('Error submitting assessment:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -479,7 +515,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<
     }
 
     // Only drafts can be deleted (Admin/SA can force-delete others)
-    const isDraft = existingAssessment.status === AssessmentStatus.DRAFT
+    const isDraft = existingAssessment.status === 'DRAFT'
     const isAdminOrSA = req.userRole === 'ADMIN' || req.userRole === 'SA'
 
     if (!isDraft && !isAdminOrSA) {
@@ -527,12 +563,15 @@ router.put('/:id/review', authenticate, requireAdminOrSA, async (req: Authentica
     }
 
     // Only AI_COMPLETE assessments can be reviewed
-    if (existingAssessment.status !== AssessmentStatus.AI_COMPLETE) {
+    if (existingAssessment.status !== 'AI_COMPLETE') {
       res.status(400).json({ error: 'Only AI-complete assessments can be reviewed' })
       return
     }
 
-    const aiResults = existingAssessment.aiResults as Record<string, unknown>[] | undefined || []
+    // Parse aiResults from JSON string (PostgreSQL stores JSONB as text)
+    const aiResults: any[] = existingAssessment.aiResults
+      ? JSON.parse(existingAssessment.aiResults)
+      : []
     const finalResults = overrides ? [...aiResults] : aiResults
 
     // Apply overrides if provided
@@ -592,15 +631,15 @@ router.put('/:id/review', authenticate, requireAdminOrSA, async (req: Authentica
     }
 
     // Determine status: UNDER_REVIEW for overrides, REJECTED for rejection reason
-    let newStatus = AssessmentStatus.UNDER_REVIEW as any
+    let newStatus = 'UNDER_REVIEW' as any
     if (rejectionReason && rejectionReason.trim()) {
-      newStatus = AssessmentStatus.REJECTED
+      newStatus = 'REJECTED'
     }
 
     const updatedAssessment = await prisma.assessment.update({
       where: { id },
       data: {
-        aiResults: finalResults as any,
+        aiResults: JSON.stringify(finalResults),
         totalScore,
         status: newStatus,
         rejectionReason: rejectionReason && rejectionReason.trim() ? rejectionReason : null,
@@ -623,14 +662,14 @@ router.put('/:id/review', authenticate, requireAdminOrSA, async (req: Authentica
         entityId: id,
         action: rejectionReason && rejectionReason.trim() ? 'REJECT' : 'REVIEW_OVERRIDE',
         fieldChanged: 'aiResults',
-        oldValue: aiResults as any,
-        newValue: finalResults as any,
+        oldValue: JSON.stringify(aiResults),
+        newValue: JSON.stringify(finalResults),
         rationale: rejectionReason || undefined
       }
     })
 
     // Create notification for BU if rejected
-    if (newStatus === AssessmentStatus.REJECTED) {
+    if (newStatus === 'REJECTED') {
       await prisma.notification.create({
         data: {
           userId: existingAssessment.submittedByUserId,
@@ -673,7 +712,7 @@ router.post('/:id/approve', authenticate, requireAdminOrSA, async (req: Authenti
     }
 
     // Only UNDER_REVIEW assessments can be approved
-    if (existingAssessment.status !== AssessmentStatus.UNDER_REVIEW) {
+    if (existingAssessment.status !== 'UNDER_REVIEW') {
       res.status(400).json({ error: 'Only assessments under review can be approved' })
       return
     }
@@ -759,7 +798,7 @@ router.post('/:id/approve', authenticate, requireAdminOrSA, async (req: Authenti
     const updatedAssessment = await prisma.assessment.update({
       where: { id },
       data: {
-        status: AssessmentStatus.APPROVED,
+        status: 'APPROVED',
         tierId: assignedTierId,
         rate: finalRate as any,
         approvedByUserId: req.userId,
@@ -784,16 +823,16 @@ router.post('/:id/approve', authenticate, requireAdminOrSA, async (req: Authenti
         entityId: id,
         action: 'APPROVE',
         fieldChanged: 'status,tier,rate',
-        oldValue: {
-          status: AssessmentStatus.UNDER_REVIEW,
+        oldValue: JSON.stringify({
+          status: 'UNDER_REVIEW',
           tierId: existingAssessment.tierId,
           rate: existingAssessment.rate
-        },
-        newValue: {
-          status: AssessmentStatus.APPROVED,
+        }),
+        newValue: JSON.stringify({
+          status: 'APPROVED',
           tierId: assignedTierId,
           rate: finalRate
-        },
+        }),
         rationale: rationale || undefined
       }
     })
@@ -844,7 +883,7 @@ router.post('/:id/reject', authenticate, requireAdminOrSA, async (req: Authentic
     }
 
     // Only UNDER_REVIEW assessments can be rejected
-    if (existingAssessment.status !== AssessmentStatus.UNDER_REVIEW) {
+    if (existingAssessment.status !== 'UNDER_REVIEW') {
       res.status(400).json({ error: 'Only assessments under review can be rejected' })
       return
     }
@@ -852,7 +891,7 @@ router.post('/:id/reject', authenticate, requireAdminOrSA, async (req: Authentic
     const updatedAssessment = await prisma.assessment.update({
       where: { id },
       data: {
-        status: AssessmentStatus.REJECTED,
+        status: 'REJECTED',
         rejectionReason: reason.trim(),
         completedAt: new Date()
       },
@@ -872,8 +911,8 @@ router.post('/:id/reject', authenticate, requireAdminOrSA, async (req: Authentic
         entityId: id,
         action: 'REJECT',
         fieldChanged: 'status,rejectionReason',
-        oldValue: { status: AssessmentStatus.UNDER_REVIEW },
-        newValue: { status: AssessmentStatus.REJECTED, rejectionReason: reason.trim() },
+        oldValue: JSON.stringify({ status: 'UNDER_REVIEW' }),
+        newValue: JSON.stringify({ status: 'REJECTED', rejectionReason: reason.trim() }),
         rationale: reason
       }
     })
