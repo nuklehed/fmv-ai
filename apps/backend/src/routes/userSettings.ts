@@ -21,10 +21,9 @@ router.get('/me/settings', async (req: AuthenticatedRequest, res: Response): Pro
     })
 
     // Default preferences if none set
-    const preferences = setting ? (setting.value as Record<string, unknown>) : {
-      inApp: true,
-      email: true
-    }
+    const preferences = setting 
+      ? JSON.parse(setting.value) 
+      : { inApp: true, email: true }
 
     res.json({
       inApp: preferences.inApp !== false,  // default true

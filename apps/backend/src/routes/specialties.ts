@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { authenticate, requireSA } from '../middleware/auth'
@@ -36,8 +36,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     // Search by name or description
     if (search && typeof search === 'string' && search.length > 0) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' as const } },
-        { description: { contains: search, mode: 'insensitive' as const } }
+        { name: { contains: search } },
+        { description: { contains: search } }
       ]
     }
 
@@ -81,7 +81,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     // Check for duplicate name within the same tenant
     const existing = await prisma.specialty.findFirst({
       where: {
-        name: { equals: name.trim(), mode: 'insensitive' as const },
+        name: { equals: name.trim() },
         tenantId,
         isActive: true
       }
@@ -148,7 +148,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       const duplicate = await prisma.specialty.findFirst({
         where: {
           id: { not: id },
-          name: { equals: name.trim(), mode: 'insensitive' as const },
+          name: { equals: name.trim() },
           tenantId: req.tenantId!,
           isActive: true
         }

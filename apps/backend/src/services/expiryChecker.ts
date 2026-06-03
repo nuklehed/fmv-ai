@@ -1,4 +1,4 @@
-import { PrismaClient, AssessmentStatus } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 import cron from 'node-cron'
 
 /**
@@ -43,7 +43,7 @@ async function checkExpiringAssessments(prisma: PrismaClient): Promise<void> {
   // Find approved assessments approaching expiry
   const expiringAssessments = await prisma.assessment.findMany({
     where: {
-      status: AssessmentStatus.APPROVED,
+      status: 'APPROVED',
       renewalDate: {
         gte: expiryStart,
         lte: expiryEnd

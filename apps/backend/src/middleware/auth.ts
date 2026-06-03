@@ -47,7 +47,7 @@ export async function authenticate(req: AuthenticatedRequest, _res: Response, ne
     }
 
     req.userId = user.id
-    req.userRole = user.role
+    req.userRole = user.role as 'BU' | 'ADMIN' | 'SA'
     req.tenantId = user.tenantId
   } catch (err) {
     _res.status(401).json({ error: 'Invalid or expired token' })

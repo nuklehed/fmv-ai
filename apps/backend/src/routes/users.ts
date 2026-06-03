@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import bcrypt from 'bcryptjs'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
@@ -27,8 +27,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
 
     if (search && typeof search === 'string' && search.length > 0) {
       where.OR = [
-        { email: { contains: search.toLowerCase(), mode: 'insensitive' as const } },
-        { role: { equals: search.toUpperCase() as any, mode: 'insensitive' as const } }
+        { email: { contains: search.toLowerCase() } },
+        { role: { equals: search.toUpperCase() as any } }
       ]
     }
 
@@ -93,7 +93,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     // Check for duplicate email within the same tenant
     const existingUser = await prisma.user.findFirst({
       where: {
-        email: { equals: email.toLowerCase(), mode: 'insensitive' as const },
+        email: { equals: email.toLowerCase() },
         tenantId,
         isActive: true
       }

@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { authenticate, requireAdminOrSA } from '../middleware/auth'
@@ -36,8 +36,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     // Search by name or description
     if (search && typeof search === 'string' && search.length > 0) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' as const } },
-        { description: { contains: search, mode: 'insensitive' as const } }
+        { name: { contains: search } },
+        { description: { contains: search } }
       ]
     }
 
@@ -124,7 +124,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     // Check for duplicate name within the same tenant
     const existing = await prisma.criteriaSet.findFirst({
       where: {
-        name: { equals: name.trim(), mode: 'insensitive' as const },
+        name: { equals: name.trim() },
         tenantId,
         isActive: true
       }
@@ -219,7 +219,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       const duplicate = await prisma.criteriaSet.findFirst({
         where: {
           id: { not: id },
-          name: { equals: name.trim(), mode: 'insensitive' as const },
+          name: { equals: name.trim() },
           tenantId: req.tenantId!,
           isActive: true
         }
@@ -503,16 +503,16 @@ router.post('/:criteriaSetId/questions/:questionId/answers', async (req: Authent
  */
 router.put('/:criteriaSetId/questions/:questionId/answers/:answerId', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { criteriaSetId, questionId, answerId } = req.params
+    const { criteriaSetId: _criteriaSetId, questionId, answerId } = req.params
     const { text, score, order, isActive } = req.body
 
     // Multi-tenant isolation — verify answer belongs to user's tenant via criteria set
     const existing = await prisma.answer.findFirst({
       where: { id: answerId, questionId },
-      include: { question: true }
+      include: { question: { include: { criteriaSet: true } } }
     })
 
-    if (!existing || existing.question.criteriaSet.tenantId !== req.tenantId) {
+    if (!existing || !existing.question.criteriaSet || existing.question.criteriaSet.tenantId !== req.tenantId) {
       res.status(404).json({ error: 'Answer not found' })
       return
     }
@@ -548,15 +548,15 @@ router.put('/:criteriaSetId/questions/:questionId/answers/:answerId', async (req
  */
 router.delete('/:criteriaSetId/questions/:questionId/answers/:answerId', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { criteriaSetId, questionId, answerId } = req.params
+    const { criteriaSetId: _criteriaSetId, questionId, answerId } = req.params
 
     // Multi-tenant isolation — verify answer belongs to user's tenant via criteria set
     const existing = await prisma.answer.findFirst({
       where: { id: answerId, questionId },
-      include: { question: true }
+      include: { question: { include: { criteriaSet: true } } }
     })
 
-    if (!existing || existing.question.criteriaSet.tenantId !== req.tenantId) {
+    if (!existing || !existing.question.criteriaSet || existing.question.criteriaSet.tenantId !== req.tenantId) {
       res.status(404).json({ error: 'Answer not found' })
       return
     }

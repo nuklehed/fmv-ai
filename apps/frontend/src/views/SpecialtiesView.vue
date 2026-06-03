@@ -24,7 +24,7 @@ function resetForm() {
 async function fetchSpecialties() {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(`/api/specialties?active=true&search=${encodeURIComponent(searchQuery.value)}`, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -51,7 +51,7 @@ async function handleAdd() {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch('/api/specialties', {
       method: 'POST',
       headers: {
@@ -93,7 +93,7 @@ async function handleUpdate() {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(`/api/specialties/${editingSpecialty.value.id}`, {
       method: 'PUT',
       headers: {
@@ -127,7 +127,7 @@ async function handleDeactivate(id: string, name: string) {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(`/api/specialties/${id}`, {
       method: 'DELETE',
       headers: {
@@ -166,19 +166,8 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
-        <nav class="flex space-x-4">
-          <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
-          <a href="#" class="text-sm font-medium text-blue-600">Specialties</a>
-          <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Settings</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-2xl font-bold text-gray-900 mb-1">Specialties Management</h2>

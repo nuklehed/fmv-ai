@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { authenticate, requireAdminOrSA, requireBUOrHigher } from '../middleware/auth'
@@ -33,21 +33,19 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     if (search && typeof search === 'string' && search.length > 0) {
       const lowerSearch = search.toLowerCase()
       where.OR = [
-        { firstName: { contains: lowerSearch, mode: 'insensitive' as const } },
-        { lastName: { contains: lowerSearch, mode: 'insensitive' as const } },
-        { email: { contains: lowerSearch, mode: 'insensitive' as const } },
-        { state: { contains: lowerSearch, mode: 'insensitive' as const } }
-      ]
-
-      // Also search external identifiers via subquery
-      where.OR.push({
-        identifiers: {
-          some: {
-            value: { contains: lowerSearch, mode: 'insensitive' as const },
-            isActive: true
+        { firstName: { contains: lowerSearch } },
+        { lastName: { contains: lowerSearch } },
+        { email: { contains: lowerSearch } },
+        { state: { contains: lowerSearch } },
+        {
+          identifiers: {
+            some: {
+              value: { contains: lowerSearch },
+              isActive: true
+            }
           }
         }
-      })
+      ] as any
     }
 
     // Map sort field to Prisma format (handle nested relations)
@@ -70,19 +68,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
       orderBy: { [prismaSortField]: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        address: true,
-        state: true,
-        specialtyId: true,
-        specialtyName: { path: 'specialty.name', model: 'Specialty' },
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
+      include: {
+        specialty: { select: { id: true, name: true } },
         identifiers: {
           where: { isActive: true },
           take: 1, // Just get the first identifier for display
@@ -91,8 +78,15 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
       }
     })
 
+    // Flatten specialty relation into specialtyName for API consumers
+    const formattedHcps = hcps.map(hcp => ({
+      ...hcp,
+      specialtyName: hcp.specialty?.name || null,
+      specialty: undefined
+    }))
+
     res.json({
-      data: hcps,
+      data: formattedHcps,
       pagination: {
         page,
         limit,
@@ -178,11 +172,11 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
           where: {
             tenantId,
             isActive: true,
-            firstName: { equals: firstName.trim(), mode: 'insensitive' as const },
-            lastName: { equals: lastName.trim(), mode: 'insensitive' as const },
+            firstName: { equals: firstName.trim() },
+            lastName: { equals: lastName.trim() },
             identifiers: {
               some: {
-                value: { equals: identifier.value, mode: 'insensitive' as const },
+                value: { equals: identifier.value },
                 isActive: true
               }
             }
@@ -210,8 +204,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
       where: {
         tenantId,
         isActive: true,
-        firstName: { equals: firstName.trim(), mode: 'insensitive' as const },
-        lastName: { equals: lastName.trim(), mode: 'insensitive' as const }
+        firstName: { equals: firstName.trim() },
+        lastName: { equals: lastName.trim() }
       }
     })
 
@@ -287,11 +281,11 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
             id: { not: id },
             tenantId: req.tenantId!,
             isActive: true,
-            firstName: { equals: (firstName || existing.firstName).trim(), mode: 'insensitive' as const },
-            lastName: { equals: (lastName || existing.lastName).trim(), mode: 'insensitive' as const },
+            firstName: { equals: (firstName || existing.firstName).trim() },
+            lastName: { equals: (lastName || existing.lastName).trim() },
             identifiers: {
               some: {
-                value: { equals: identifier.value, mode: 'insensitive' as const },
+                value: { equals: identifier.value },
                 isActive: true
               }
             }
@@ -407,11 +401,11 @@ router.post('/bu-create', authenticate, requireBUOrHigher, async (req: Authentic
           where: {
             tenantId,
             isActive: true,
-            firstName: { equals: firstName.trim(), mode: 'insensitive' as const },
-            lastName: { equals: lastName.trim(), mode: 'insensitive' as const },
+            firstName: { equals: firstName.trim() },
+            lastName: { equals: lastName.trim() },
             identifiers: {
               some: {
-                value: { equals: identifier.value, mode: 'insensitive' as const },
+                value: { equals: identifier.value },
                 isActive: true
               }
             }
@@ -439,8 +433,8 @@ router.post('/bu-create', authenticate, requireBUOrHigher, async (req: Authentic
       where: {
         tenantId,
         isActive: true,
-        firstName: { equals: firstName.trim(), mode: 'insensitive' as const },
-        lastName: { equals: lastName.trim(), mode: 'insensitive' as const }
+        firstName: { equals: firstName.trim() },
+        lastName: { equals: lastName.trim() }
       }
     })
 

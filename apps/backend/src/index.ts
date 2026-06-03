@@ -61,10 +61,18 @@ app.use((_req, res) => {
 // ─── Worker Service Startup ────────────────────────────────────────
 
 // Start the AI worker — processes assessments sequentially from BullMQ queue
-const aiWorker = getAIWorker()
-aiWorker.on('ready', () => {
-  console.log('🤖 AI Worker service started (single-worker, sequential processing)')
-})
+// Only available when Redis is running; otherwise use synchronous API processing
+async function startWorker() {
+  const worker = await getAIWorker()
+  if (worker) {
+    worker.on('ready', () => {
+      console.log('🤖 AI Worker service started (single-worker, sequential processing)')
+    })
+  } else {
+    console.log('⚠️  Redis not available — AI worker disabled. Use POST /api/assessments/:id/process for synchronous processing.')
+  }
+}
+startWorker()
 
 // ─── Graceful Shutdown ─────────────────────────────────────────────
 
@@ -74,14 +82,11 @@ async function gracefulShutdown(signal: string): Promise<void> {
   // Stop expiry checker cron job
   expiryChecker.stop()
 
-  // Stop accepting new jobs
-  await aiWorker.close()
+  // Close Redis connection (also closes BullMQ queue and worker)
+  await closeConnection()
 
   // Close database connection
   await prisma.$disconnect()
-
-  // Close Redis connection (also closes BullMQ queue)
-  await closeConnection()
 
   console.log('✅ All connections closed. Shutting down.')
   process.exit(0)
@@ -96,7 +101,12 @@ const PORT = process.env.PORT || 3000
 
 app.listen(PORT, async () => {
   console.log(`🚀 FMV AI Backend running on http://localhost:${PORT}`)
-  console.log(`📊 Database: ${process.env.DATABASE_URL?.split('@')[1]?.split(':')[0] ?? 'not configured'}`)
+  const dbUrl = process.env.DATABASE_URL || ''
+  if (dbUrl.includes('sqlite')) {
+    console.log('📊 Database: SQLite (local file)')
+  } else {
+    console.log(`📊 Database: ${dbUrl.split('@')[1]?.split(':')[0] ?? 'not configured'}`)
+  }
 })
 
 export default app

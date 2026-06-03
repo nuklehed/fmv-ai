@@ -210,18 +210,6 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
-        <nav class="flex space-x-4">
-          <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
-          <a href="/specialties" class="text-sm text-gray-600 hover:text-gray-900">Specialties</a>
-          <a href="/criteria-sets" class="text-sm text-gray-600 hover:text-gray-900">Criteria Sets</a>
-          <a href="#" class="text-sm font-medium text-blue-600">User Management</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">

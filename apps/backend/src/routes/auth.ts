@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
+import { authenticate } from '../middleware/auth'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -26,10 +27,10 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return
     }
 
-    // Find user by email (case-insensitive)
+    // Find user by email (case-insensitive via lowercase comparison)
     const user = await prisma.user.findFirst({
       where: {
-        email: { equals: email.toLowerCase(), mode: 'insensitive' as const },
+        email: { equals: email.toLowerCase() },
         isActive: true
       }
     })
@@ -167,7 +168,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
  * GET /api/auth/me
  * Get current authenticated user's profile
  */
-router.get('/me', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     if (!req.userId) {
       res.status(401).json({ error: 'Authentication required' })
@@ -204,7 +205,7 @@ router.get('/me', async (req: AuthenticatedRequest, res: Response): Promise<void
  * POST /api/auth/logout
  * Invalidate refresh token (client-side cleanup + server-side blacklist optional)
  */
-router.post('/logout', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+router.post('/logout', async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
   // In a production system, you'd add the refresh token to a blacklist/revocation store.
   // For now, we rely on token expiration — clients should clear stored tokens.
   res.json({ message: 'Logged out successfully' })

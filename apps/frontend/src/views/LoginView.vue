@@ -28,10 +28,14 @@ async function handleLogin() {
   }
 }
 
-// Auto-focus email field on mount
+// Redirect if already authenticated, otherwise focus email field
 import { onMounted } from 'vue'
 onMounted(() => {
-  document.querySelector<HTMLInputElement>('input[type="email"]')?.focus()
+  if (authStore.isAuthenticated && authStore.user) {
+    router.push('/')
+  } else {
+    document.querySelector<HTMLInputElement>('input[type="email"]')?.focus()
+  }
 })
 </script>
 

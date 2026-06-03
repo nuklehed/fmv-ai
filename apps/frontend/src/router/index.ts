@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -63,23 +64,25 @@ export const router = createRouter({
 })
 
 router.beforeEach(async (to, _from) => {
-  // Public route — no auth required
-  if (to.name === 'login') return true
+  const authStore = useAuthStore()
 
-  // Check for existing token
-  const accessToken = localStorage.getItem('accessToken')
+  // Public route — no auth required
+  if (to.name === 'login') {
+    // Already authenticated? Redirect to home instead of showing login form
+    if (authStore.isAuthenticated && authStore.user) return { name: 'home' }
+    return true
+  }
+
+  // Check for existing token in store or localStorage
+  const accessToken = authStore.accessToken || localStorage.getItem('accessToken')
   if (!accessToken) {
     return { name: 'login' }
   }
 
-  // TODO: Full role-based guards will be implemented in issue #5
-  // For now, we verify the token is valid by fetching user profile
+  // Verify the token is valid by fetching user profile via auth store
   try {
-    const response = await fetch('/api/auth/me', {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    })
-
-    if (!response.ok) {
+    const profile = await authStore.fetchUserProfile()
+    if (!profile) {
       // Token invalid — redirect to login
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
