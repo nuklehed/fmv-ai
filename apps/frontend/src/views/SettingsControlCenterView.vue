@@ -6,7 +6,7 @@ type Variation = 'github-style' | 'wider-panel' | 'compact-tabs'
 interface NavItem {
   key: string
   label: string
-  icon: string
+  icon: string // PrimeIcon class name (e.g., 'pi pi-hospital')
   roles: ('SA' | 'ADMIN')[]
 }
 
@@ -23,12 +23,12 @@ function setRole(role: 'BU' | 'ADMIN' | 'SA') {
 }
 
 const navItems: NavItem[] = [
-  { key: 'specialties', label: 'Specialties', icon: '\u{1F3E5}', roles: ['SA'] },
-  { key: 'criteria-sets', label: 'Criteria Sets', icon: '\u{1F4CB}', roles: ['SA', 'ADMIN'] as const },
-  { key: 'tiers', label: 'Tiers & Rates', icon: '\u2B50', roles: ['SA', 'ADMIN'] as const },
-  { key: 'users', label: 'Users', icon: '\u{1F465}', roles: ['SA'] },
-  { key: 'app-settings', label: 'Application Settings', icon: '\u2699\uFE0F', roles: ['SA'] },
-  { key: 'notification-settings', label: 'Notification Settings', icon: '\u{1F514}', roles: [] }
+  { key: 'specialties', label: 'Specialties', icon: 'pi pi-hospital', roles: ['SA'] },
+  { key: 'criteria-sets', label: 'Criteria Sets', icon: 'pi pi-list-check', roles: ['SA', 'ADMIN'] as const },
+  { key: 'tiers', label: 'Tiers & Rates', icon: 'pi pi-star', roles: ['SA', 'ADMIN'] as const },
+  { key: 'users', label: 'Users', icon: 'pi pi-users', roles: ['SA'] },
+  { key: 'app-settings', label: 'Application Settings', icon: 'pi pi-sliders-h', roles: ['SA'] },
+  { key: 'notification-settings', label: 'Notification Settings', icon: 'pi pi-bell', roles: [] }
 ]
 
 const visibleItems = computed(() => navItems.filter(item => item.roles.length === 0 || (currentUserRole.value !== 'BU' && item.roles.includes(currentUserRole.value))))
@@ -123,10 +123,10 @@ const currentStats = computed(() => sectionStats[activeSection.value] || [])
           <nav class="space-y-0.5">
             <button v-for="item in visibleItems" :key="item.key" @click="activeSection = item.key"
               :class="[
-                'w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors',
+                'w-full flex items-center gap-3 px-3 py-1.5 text-sm rounded-md transition-colors',
                 activeSection === item.key ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
               ]">
-              <span class="text-base">{{ item.icon }}</span>
+              <i :class="[item.icon, 'w-4 h-4']" />
               <span>{{ item.label }}</span>
             </button>
           </nav>
@@ -205,7 +205,7 @@ const currentStats = computed(() => sectionStats[activeSection.value] || [])
                   'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all',
                   activeSection === item.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-50'
                 ]">
-                <span class="text-lg">{{ item.icon }}</span>
+                <i :class="[item.icon, 'w-4 h-4']" />
                 <span>{{ item.label }}</span>
                 <svg v-if="activeSection === item.key" class="ml-auto w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -226,7 +226,7 @@ const currentStats = computed(() => sectionStats[activeSection.value] || [])
                   'w-full flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all',
                   activeSection === item.key ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-50'
                 ]">
-                <span class="text-lg">{{ item.icon }}</span>
+                <i :class="[item.icon, 'w-4 h-4']" />
                 <span>{{ item.label }}</span>
                 <svg v-if="activeSection === item.key" class="ml-auto w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
@@ -294,10 +294,10 @@ const currentStats = computed(() => sectionStats[activeSection.value] || [])
         <nav class="flex space-x-1 overflow-x-auto py-1">
           <button v-for="item in visibleItems" :key="item.key" @click="activeSection = item.key"
             :class="[
-              'flex items-center gap-1.5 px-4 py-3 text-sm border-b-2 transition-colors whitespace-nowrap',
+              'flex items-center gap-2 px-4 py-3 text-sm border-b-2 transition-colors whitespace-nowrap',
               activeSection === item.key ? 'border-blue-600 text-blue-700 font-medium' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             ]">
-            <span>{{ item.icon }}</span>
+            <i :class="[item.icon, 'w-4 h-4']" />
             <span>{{ item.label }}</span>
           </button>
         </nav>
