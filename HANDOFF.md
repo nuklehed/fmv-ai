@@ -209,6 +209,12 @@
     - Enforce `requiresSA`, `requiresAdminOrSA`, and `requiresBUOrHigher` meta fields against user's actual role
     - Redirect unauthorized users to home dashboard instead of allowing direct URL access
     - Status: Published to GitHub as Issue #21 — ready-for-agent, straightforward fix (3-4 lines in guard)
+20. **Fix blank Settings page due to Vue Router 4 empty path child route mismatch (#22):**
+    - Frontend: Restructure routes so `/settings` renders SettingsView directly (notification settings)
+    - Frontend: Put control center layout behind `/settings/control-center` for Admin/SA users
+    - Frontend: Add "Switch to Control Center" link in SettingsView visible only to Admin/SA users
+    - Status: Published to GitHub as Issue #22 — ready-for-agent, fully specified with agent brief
+
 The approved breakdown:
 
 | # | Issue Title | Type | Blocked By | Status |
@@ -227,8 +233,7 @@ The approved breakdown:
 | 17 | Remove duplicate 'App Settings' nav link | Bug | None | 🟢 Ready (unblocked) |
 | 18 | Consolidate settings nav links into Settings control center | Enhancement | None | 🟢 Ready (unblocked) |
 | 19 | Enforce role-based access control in router navigation guard | Bug | None | 🟢 Ready (unblocked) |
-
-## Key domain decisions to remember
+| 20 | Fix blank Settings page due to Vue Router 4 empty path child route mismatch | Bug | None | 🟢 Ready (unblocked) |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
