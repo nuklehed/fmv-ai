@@ -170,6 +170,20 @@
     - Router: Added /tiers route (Admin/SA) and /settings route (all users)
     - Auth store: Persisted userRole to localStorage for frontend role checks
     - All code committed and pushed to main branch
+15. **Refactor — resilience, consistency & UI cleanup:**
+    - Backend: AI worker now optional — graceful fallback when Redis unavailable (synchronous processing via POST /api/assessments/:id/process)
+    - Backend: Added pdfjs-dist + pdfkit dependencies for PDF processing
+    - Backend: Hardened auth — added authenticate guard to GET /me and POST /logout endpoints
+    - Backend: Removed unnecessary Prisma `mode:'insensitive'` flags across all route files (cleaner queries)
+    - Backend: Flattened specialty relation into `specialtyName` field on HCP list API response
+    - Backend: Added null check for criteriaSet relation in answer CRUD endpoints
+    - Backend: Reorganized .env.example with section headers; port → 3001; LLM model → qwen2.5:32b
+    - Frontend: Removed duplicate `<header>` nav bars from 6 view files (App.vue provides global nav)
+    - Frontend: Login page redirects authenticated users to home instead of showing login form
+    - Frontend: Router guard uses authStore.fetchUserProfile() for token validation
+    - Frontend: SpecialtiesView uses `accessToken` consistently with auth store
+    - Config: Vite proxy target port 3000 → 3001; removed unused tsconfig.node.json reference
+    - All code committed and pushed to main branch
 
 ## What's next (in progress)
 The approved breakdown:
@@ -194,7 +208,7 @@ Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 - Assessment lifecycle: DRAFT → SUBMITTED → AI_PROCESSING → AI_COMPLETE → UNDER_REVIEW → APPROVED/REJECTED/EXPIRED
 - Criteria sets can be shared across specialties (e.g., prescriber vs non-prescriber)
 - Tier locked to score; rate overrideable with mandatory rationale
-- Single-worker async AI processing against local LLM (Qwen3.6-35B-a3b)
+- Single-worker async AI processing against local LLM (qwen2.5:32b via Ollama)
 - Logical multi-tenancy via `tenant_id` on every record
 - Notifications: in-app + email by default, active for all users
 
