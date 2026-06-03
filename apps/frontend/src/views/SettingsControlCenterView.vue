@@ -15,21 +15,18 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 // Determine active section from current route path
-// /settings/control-center → empty (notification settings)
-// /settings/control-center/specialties → 'specialties', etc.
 const activeSection = computed(() => {
-  const pathParts = route.path.split('/settings/control-center/')
-  return pathParts.length > 1 && pathParts[1] ? pathParts[1] : ''
+  const pathParts = route.path.split('/settings/')
+  return pathParts.length > 1 ? pathParts[1] : 'notification-settings'
 })
 
 const navItems: NavItem[] = [
-  { key: '', label: 'Overview', icon: 'pi pi-home', roles: [] },
-  { key: 'notification-settings', label: 'Notification Settings', icon: 'pi pi-bell', roles: [] },
   { key: 'specialties', label: 'Specialties', icon: 'pi pi-briefcase', roles: ['SA'] },
   { key: 'criteria-sets', label: 'Criteria Sets', icon: 'pi pi-file-check', roles: ['SA', 'ADMIN'] as const },
   { key: 'tiers', label: 'Tiers & Rates', icon: 'pi pi-star', roles: ['SA', 'ADMIN'] as const },
   { key: 'users', label: 'Users', icon: 'pi pi-users', roles: ['SA'] },
-  { key: 'app-settings', label: 'Application Settings', icon: 'pi pi-sliders-h', roles: ['SA'] }
+  { key: 'app-settings', label: 'Application Settings', icon: 'pi pi-sliders-h', roles: ['SA'] },
+  { key: 'notification-settings', label: 'Notification Settings', icon: 'pi pi-bell', roles: [] }
 ]
 
 const visibleItems = computed(() => navItems.filter(item => {
@@ -41,11 +38,7 @@ const visibleItems = computed(() => navItems.filter(item => {
 }))
 
 function navigateToSection(sectionKey: string): void {
-  if (!sectionKey) {
-    router.push('/settings')
-  } else {
-    router.push(`/settings/${sectionKey}`)
-  }
+  router.push(`/settings/${sectionKey}`)
 }
 </script>
 

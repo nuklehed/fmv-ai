@@ -45,20 +45,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TierManagementView.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
-  // ─── Settings (notification preferences) ──────────────────────────
+  // ─── Settings Control Center (parent layout) ──────────────────────
   {
     path: '/settings',
-    name: 'settingsHome',
-    component: () => import('@/views/SettingsView.vue'),
-    meta: { requiresAuth: true }
-  },
-  // ─── Settings Control Center (Admin/SA only, sidebar layout) ──────
-  {
-    path: '/settings/control-center',
-    name: 'settingsControlCenter',
     component: () => import('@/views/SettingsControlCenterView.vue'),
     meta: { requiresAuth: true },
     children: [
+      { path: '', name: 'settingsHome', redirect: { name: 'settingsNotifications' } },
+      {
+        path: 'notification-settings',
+        name: 'settingsNotifications',
+        component: () => import('@/views/SettingsView.vue'),
+        meta: { requiresAuth: true }
+      },
       {
         path: 'specialties',
         name: 'settingsSpecialties',

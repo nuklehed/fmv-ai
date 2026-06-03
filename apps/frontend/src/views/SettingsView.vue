@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-
-const authStore = useAuthStore()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -80,15 +77,6 @@ onMounted(() => {
       <div class="mb-6">
         <h2 class="text-2xl font-bold text-gray-900 mb-1">Notification Settings</h2>
         <p class="text-sm text-gray-600">Manage how and when you receive notifications</p>
-
-        <!-- Control Center link for Admin/SA users -->
-        <div v-if="authStore.isAdmin" class="mt-3">
-          <router-link to="/settings/control-center"
-            class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
-            <i class="pi pi-sliders-h w-4 h-4" />
-            Switch to Control Center
-          </router-link>
-        </div>
       </div>
 
       <!-- Messages -->
