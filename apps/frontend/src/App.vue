@@ -67,30 +67,7 @@ onUnmounted(() => {
                 Assessments
               </router-link>
 
-              <!-- SA-only links -->
-              <template v-if="authStore.isSA">
-                <router-link to="/settings" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
-                  App Settings
-                </router-link>
-                <router-link to="/specialties" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
-                  Specialties
-                </router-link>
-                <router-link to="/tiers" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
-                  Tiers
-                </router-link>
-                <router-link to="/users" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
-                  User Management
-                </router-link>
-              </template>
-
-              <!-- Admin/SA links -->
-              <template v-if="authStore.isAdmin">
-                <router-link to="/criteria-sets" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
-                  Criteria Sets
-                </router-link>
-              </template>
-
-              <!-- All users: Settings -->
+              <!-- All users: Settings (control center) -->
               <router-link to="/settings" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
                 Settings
               </router-link>
