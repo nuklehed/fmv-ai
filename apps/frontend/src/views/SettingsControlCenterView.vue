@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import SettingsView from './SettingsView.vue'
 import { useAuthStore } from '@/stores/auth'
 
 interface NavItem {
@@ -16,11 +15,11 @@ const authStore = useAuthStore()
 
 const navItems: NavItem[] = [
   { key: '/settings', label: 'Notification Settings', icon: 'pi pi-bell', roles: [] },
-  { key: '/specialties', label: 'Specialties', icon: 'pi pi-briefcase', roles: ['SA'] },
-  { key: '/criteria-sets', label: 'Criteria Sets', icon: 'pi pi-file-check', roles: ['SA', 'ADMIN'] as const },
-  { key: '/tiers', label: 'Tiers & Rates', icon: 'pi pi-star', roles: ['SA', 'ADMIN'] as const },
-  { key: '/users', label: 'Users', icon: 'pi pi-users', roles: ['SA'] },
-  { key: '/application-settings', label: 'Application Settings', icon: 'pi pi-sliders-h', roles: ['SA'] }
+  { key: '/settings/specialties', label: 'Specialties', icon: 'pi pi-briefcase', roles: ['SA'] },
+  { key: '/settings/criteria-sets', label: 'Criteria Sets', icon: 'pi pi-book', roles: ['SA', 'ADMIN'] as const },
+  { key: '/settings/tiers', label: 'Tiers & Rates', icon: 'pi pi-star', roles: ['SA', 'ADMIN'] as const },
+  { key: '/settings/users', label: 'Users', icon: 'pi pi-users', roles: ['SA'] },
+  { key: '/settings/application-settings', label: 'Application Settings', icon: 'pi pi-sliders-h', roles: ['SA'] }
 ]
 
 const visibleItems = computed(() => navItems.filter(item => {
@@ -53,9 +52,9 @@ function navigateTo(key: string): void {
       </div>
     </aside>
 
-    <!-- Main content area -->
+    <!-- Main content area — nested routes render here -->
     <main class="flex-1 p-8 bg-gray-50">
-      <SettingsView />
+      <RouterView />
     </main>
   </div>
 </template>
