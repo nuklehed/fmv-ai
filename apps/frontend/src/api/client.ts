@@ -16,18 +16,20 @@ interface ApiResponse<T = unknown> {
 async function request<T>(url: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   const accessToken = localStorage.getItem('accessToken')
 
-  const headers: Record<string, string> = {
+  const headersInit: HeadersInit = {
     'Content-Type': 'application/json',
-    ...options.headers
+    ...Object.fromEntries(
+      Object.entries(options.headers as Record<string, string> || {}).filter(([, v]) => v !== undefined)
+    )
   }
 
   if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`
+    headersInit['Authorization'] = `Bearer ${accessToken}`
   }
 
   let response = await fetch(url, {
     ...options,
-    headers
+    headers: headersInit
   })
 
   // If 401, try to refresh token and retry once
@@ -48,10 +50,7 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<ApiRe
           // Retry original request with new token
           response = await fetch(url, {
             ...options,
-            headers: {
-              ...headers,
-              Authorization: `Bearer ${data.accessToken}`
-            }
+            headers: { ...headersInit, Authorization: `Bearer ${data.accessToken}` }
           })
         } else {
           // Refresh failed — clear auth and redirect to login

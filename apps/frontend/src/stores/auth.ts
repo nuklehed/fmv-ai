@@ -10,13 +10,6 @@ export interface User {
   emailVerified: boolean
 }
 
-interface AuthState {
-  user: User | null
-  accessToken: string | null
-  refreshToken: string | null
-  isLoading: boolean
-}
-
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const accessToken = ref<string | null>(localStorage.getItem('accessToken'))
@@ -31,6 +24,15 @@ export const useAuthStore = defineStore('auth', () => {
   function setUser(userData: User) {
     user.value = userData
     localStorage.setItem('userRole', userData.role)
+    localStorage.setItem('authUser', JSON.stringify(userData))
+  }
+
+  // Restore persisted user from localStorage on store creation
+  const savedUser = localStorage.getItem('authUser')
+  if (savedUser) {
+    try {
+      setUser(JSON.parse(savedUser))
+    } catch {}
   }
 
   function setTokens(newAccessToken: string, newRefreshToken: string) {
@@ -68,6 +70,7 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken.value = null
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('authUser')
   }
 
   async function login(email: string, password: string) {

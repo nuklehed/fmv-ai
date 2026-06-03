@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const formError = ref('')
@@ -74,16 +72,6 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
-        <nav class="flex space-x-4">
-          <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
-          <a href="#" class="text-sm font-medium text-blue-600">Settings</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6">

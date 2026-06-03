@@ -8,7 +8,7 @@ interface AssessmentListItem {
   specialtyId?: string
   criteriaSetId?: string
   status: string
-  aiResults?: Record<string, unknown> | null
+  aiResults?: unknown | null
   totalScore?: number | null
   tierId?: string | null
   rate?: number | null
@@ -20,6 +20,7 @@ interface AssessmentListItem {
   updatedAt: string
   submittedAt?: string | null
   completedAt?: string | null
+  tier?: { name: string; lowRate: number; highRate: number } | null
 }
 
 interface AiResultItem {
@@ -63,15 +64,20 @@ const reviewError = ref('')
 const availableTiers = ref<Array<{ id: string; name: string; lowRate: number; highRate: number }>>([])
 
 // Helper to get question text by ID
-function getQuestionText(questionId: string | undefined): string {
-  if (!questionId || !selectedAssessment.value?.aiResults) return 'Unknown Question'
-  const aiResults = selectedAssessment.value.aiResults as AiResultItem[]
+function getQuestionText(_questionId: string | undefined): string {
+  if (!selectedAssessment.value?.aiResults) return 'Unknown Question'
   // This would ideally come from the criteria set data
-  return `Question ${aiResults.findIndex(r => r.questionId === questionId) + 1}`
+  return 'See AI results below'
+}
+
+// Cast aiResults to AiResultItem[] for template use
+function getAiResults(): AiResultItem[] {
+  if (!selectedAssessment.value?.aiResults) return []
+  return selectedAssessment.value.aiResults as unknown as AiResultItem[]
 }
 
 // Helper to get answers for a question (would need criteria set data)
-function getAnswersForQuestion(questionId: string | undefined): Array<{ id: string; text: string; score: number }> {
+function getAnswersForQuestion(_questionId: string | undefined): Array<{ id: string; text: string; score: number }> {
   // This would be populated from the criteria set data when loading assessment details
   return []
 }
@@ -160,7 +166,7 @@ async function openDetailPanel(assessment: AssessmentListItem) {
   approveRateOverride.value = ''
   approveRationale.value = ''
   reviewError.value = ''
-  
+
   // Load tiers if assessment can be approved
   if (canApprove(assessment)) {
     await loadTiers()
@@ -198,10 +204,8 @@ function goToPage(page: number) {
 }
 
 // Auto-refresh assessments that are in AI_PROCESSING status every 30 seconds
-let refreshInterval: ReturnType<typeof setInterval> | null = null
-
 function startAutoRefresh() {
-  refreshInterval = setInterval(() => {
+  void setInterval(() => {
     const hasProcessing = assessments.value.some(a => a.status === 'AI_PROCESSING')
     if (hasProcessing) {
       fetchAssessments()
@@ -233,7 +237,7 @@ function startReview() {
   reviewError.value = ''
   // Initialize overrides with current AI results
   if (selectedAssessment.value?.aiResults) {
-    const aiResults = selectedAssessment.value.aiResults as AiResultItem[]
+    const aiResults = (selectedAssessment.value!.aiResults ?? []) as unknown as AiResultItem[]
     reviewOverrides.value = aiResults.map(r => ({
       questionId: r.questionId,
       selectedAnswerId: r.selectedAnswerId,
@@ -380,27 +384,16 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
-        <nav class="flex space-x-4">
-          <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
-          <a href="/assessments" class="text-sm font-medium text-blue-600">Assessments</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-2xl font-bold text-gray-900 mb-1">Assessments</h2>
-          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} assessments ({{ statusFilter ? 'filtered' : 'all' }})</p>
+          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} assessments ({{ statusFilter ? 'filtered' :
+            'all' }})</p>
         </div>
-        <a
-          href="/assessments/new"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium"
-        >
+        <a href="/assessments/new"
+          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium">
           + Request Assessment
         </a>
       </div>
@@ -412,18 +405,10 @@ onMounted(() => {
 
       <!-- Filters -->
       <div class="mb-6 flex items-center space-x-4">
-        <input
-          v-model="searchQuery"
-          @input="onSearchInput"
-          type="text"
-          placeholder="Search by HCP name..."
-          class="flex-1 max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-        <select
-          v-model="statusFilter"
-          @change="handleSearch"
-          class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <input v-model="searchQuery" @input="onSearchInput" type="text" placeholder="Search by HCP name..."
+          class="flex-1 max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+        <select v-model="statusFilter" @change="handleSearch"
+          class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">All Statuses</option>
           <option value="DRAFT">Draft</option>
           <option value="SUBMITTED">Submitted</option>
@@ -459,17 +444,23 @@ onMounted(() => {
                 No assessments found. Click "Request Assessment" to create one.
               </td>
             </tr>
-            <tr v-for="assessment in assessments" :key="assessment.id" class="hover:bg-gray-50 cursor-pointer" @click="openDetailPanel(assessment)">
+            <tr v-for="assessment in assessments" :key="assessment.id" class="hover:bg-gray-50 cursor-pointer"
+              @click="openDetailPanel(assessment)">
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-medium text-gray-900">{{ assessment.hcp.firstName }} {{ assessment.hcp.lastName }}</div>
+                <div class="text-sm font-medium text-gray-900">{{ assessment.hcp.firstName }} {{ assessment.hcp.lastName
+                  }}</div>
                 <div v-if="assessment.hcp.email" class="text-xs text-gray-500">{{ assessment.hcp.email }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(assessment.status)]">
+                <span
+                  :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(assessment.status)]">
                   <!-- Processing spinner -->
-                  <svg v-if="assessment.status === 'AI_PROCESSING'" class="animate-spin -ml-1 mr-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg v-if="assessment.status === 'AI_PROCESSING'" class="animate-spin -ml-1 mr-2 h-3 w-3"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path class="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
                   </svg>
                   {{ getStatusLabel(assessment.status) }}
                 </span>
@@ -477,8 +468,10 @@ onMounted(() => {
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ assessment.totalScore !== null ? assessment.totalScore : '—' }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assessment.submittedAt) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assessment.completedAt) }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assessment.submittedAt) }}
+              </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assessment.completedAt) }}
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" @click.stop>
                 <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
               </td>
@@ -487,19 +480,23 @@ onMounted(() => {
         </table>
 
         <!-- Pagination -->
-        <div v-if="totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+        <div v-if="totalPages > 1"
+          class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
           <div class="text-sm text-gray-500">
-            Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, totalCount) }} of {{ totalCount }} results
+            Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, totalCount) }} of {{
+              totalCount }} results
           </div>
           <div class="flex space-x-2">
-            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Previous</button>
+            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1"
+              class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Previous</button>
             <template v-for="p in Math.min(5, totalPages)" :key="p">
               <button @click="goToPage(p)" :class="[
                 'px-3 py-1 border rounded text-sm',
                 p === currentPage ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
               ]">{{ p }}</button>
             </template>
-            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Next</button>
+            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages"
+              class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Next</button>
           </div>
         </div>
       </div>
@@ -512,13 +509,15 @@ onMounted(() => {
 
             <div class="fixed inset-y-0 right-0 max-w-lg w-full flex">
               <Transition name="slideover-panel">
-                <div v-if="showDetailPanel && selectedAssessment" class="w-full h-full flex flex-col bg-white shadow-xl">
+                <div v-if="showDetailPanel && selectedAssessment"
+                  class="w-full h-full flex flex-col bg-white shadow-xl">
                   <!-- Panel Header -->
                   <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
                     <h3 class="text-lg font-semibold text-gray-900">Assessment Details</h3>
                     <button @click="closeDetailPanel" class="text-gray-400 hover:text-gray-600">
                       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
@@ -528,14 +527,18 @@ onMounted(() => {
                     <!-- HCP Info -->
                     <div>
                       <h4 class="text-sm font-medium text-gray-500 mb-2">HCP</h4>
-                      <p class="text-base font-semibold text-gray-900">{{ selectedAssessment.hcp.firstName }} {{ selectedAssessment.hcp.lastName }}</p>
-                      <p v-if="selectedAssessment.hcp.email" class="text-sm text-gray-600">{{ selectedAssessment.hcp.email }}</p>
+                      <p class="text-base font-semibold text-gray-900">{{ selectedAssessment.hcp.firstName }} {{
+                        selectedAssessment.hcp.lastName }}</p>
+                      <p v-if="selectedAssessment.hcp.email" class="text-sm text-gray-600">{{
+                        selectedAssessment.hcp.email }}
+                      </p>
                     </div>
 
                     <!-- Status -->
                     <div>
                       <h4 class="text-sm font-medium text-gray-500 mb-2">Status</h4>
-                      <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
+                      <span
+                        :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
                         {{ getStatusLabel(selectedAssessment.status) }}
                       </span>
                     </div>
@@ -547,265 +550,250 @@ onMounted(() => {
                     </div>
 
                     <!-- AI Results -->
-                    <div v-if="selectedAssessment.aiResults && Array.isArray(selectedAssessment.aiResults) && selectedAssessment.aiResults.length > 0">
+                    <div
+                      v-if="selectedAssessment.aiResults && Array.isArray(selectedAssessment.aiResults) && selectedAssessment.aiResults.length > 0">
                       <h4 class="text-sm font-medium text-gray-500 mb-2">AI Evaluation Results</h4>
-                      
+
                       <!-- Review Mode -->
-                      <template v-if="isReviewing">
-                        <div class="space-y-3">
-                          <div v-for="(override, index) in reviewOverrides" :key="index" class="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                            <div class="flex items-start justify-between mb-2">
-                              <span class="text-xs font-medium text-blue-700">Question {{ index + 1 }}</span>
-                              <button @click="removeOverride(index)" class="text-xs text-red-600 hover:text-red-800">Remove</button>
-                            </div>
-                            
-                            <!-- Question Text -->
-                            <p class="text-sm font-medium text-gray-900 mb-2">
-                              {{ getQuestionText(selectedAssessment.aiResults[index]?.questionId) }}
-                            </p>
+                      <div v-if="isReviewing" class="space-y-3">
+                        <div v-for="(override, index) in reviewOverrides" :key="index"
+                          class="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <div class="flex items-start justify-between mb-2">
+                            <span class="text-xs font-medium text-blue-700">Question {{ index + 1 }}</span>
+                            <button @click="removeOverride(index)"
+                              class="text-xs text-red-600 hover:text-red-800">Remove</button>
+                          </div>
 
-                            <!-- Answer Selection -->
-                            <div class="mb-2">
-                              <label class="block text-xs font-medium text-gray-700 mb-1">Select Answer</label>
-                              <select
-                                v-model="override.selectedAnswerId"
-                                class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              >
-                                <option value="">Select answer...</option>
-                                <!-- Options would be populated from criteria set data -->
-                                <option v-for="answer in getAnswersForQuestion(selectedAssessment.aiResults[index]?.questionId)" :key="answer.id" :value="answer.id">
-                                  {{ answer.text }} ({{ answer.score }} pts)
-                                </option>
-                              </select>
-                            </div>
+                          <!-- Question Text -->
+                          <p class="text-sm font-medium text-gray-900 mb-2">
+                            {{ getQuestionText(selectedAssessment.aiResults[index]?.questionId) }}
+                          </p>
 
-                            <!-- Rationale -->
-                            <div>
-                              <label class="block text-xs font-medium text-gray-700 mb-1">Rationale</label>
-                              <textarea
-                                v-model="override.rationale"
-                                rows="2"
-                                placeholder="Explain your selection..."
-                                class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                              ></textarea>
-                            </div>
+                          <!-- Answer Selection -->
+                          <div class="mb-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Select Answer</label>
+                            <select v-model="override.selectedAnswerId"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                              <option value="">Select answer...</option>
+                              <!-- Options would be populated from criteria set data -->
+                              <option
+                                v-for="answer in getAnswersForQuestion(selectedAssessment.aiResults[index]?.questionId)"
+                                :key="answer.id" :value="answer.id">
+                                {{ answer.text }} ({{ answer.score }} pts)
+                              </option>
+                            </select>
+                          </div>
+
+                          <!-- Rationale -->
+                          <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Rationale</label>
+                            <textarea v-model="override.rationale" rows="2" placeholder="Explain your selection..."
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
                           </div>
                         </div>
+                      </div>
 
-                        <!-- Add Override Button -->
-                        <button @click="addOverride" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">
-                          + Add Override
-                        </button>
-                      </template>
-
-                      <!-- View Mode (AI Results Display) -->
-                      <template v-else>
-                        <div class="space-y-3">
-                          <div v-for="(result, index) in selectedAssessment.aiResults" :key="index" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div class="flex items-start justify-between mb-1">
-                              <span class="text-xs font-medium text-gray-600">Question {{ index + 1 }}</span>
-                              <span v-if="result.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
-                            </div>
-                            <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index + 1}` }}</p>
-                            <p class="text-xs text-blue-600 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{ result.score ?? '?' }} pts)</p>
-                            <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">{{ result.rationale }}</p>
-                          </div>
-                        </div>
-                      </template>
+                      <!-- Add Override Button -->
+                      <button @click="addOverride" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        + Add Override
+                      </button>
                     </div>
 
-                    <!-- Tier & Rate Information -->
-                    <div v-if="selectedAssessment.tier || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
-                      <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
-                      <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span class="text-gray-600">Tier:</span>
-                          <span class="ml-1 font-medium">{{ selectedAssessment.tier?.name || '—' }}</span>
+                    <!-- View Mode (AI Results Display) -->
+                    <div v-else class="space-y-3">
+                      <div v-for="(result, index) in getAiResults()" :key="index"
+                        class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div class="flex items-start justify-between mb-1">
+                          <span class="text-xs font-medium text-gray-600">Question {{ index + 1 }}</span>
+                          <span v-if="result.isOverride"
+                            class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
                         </div>
-                        <div>
-                          <span class="text-gray-600">Rate:</span>
-                          <span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span>
-                        </div>
+                        <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index +
+                          1}` }}</p>
+                        <p class="text-xs text-blue-600 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{
+                          result.score ?? '?' }} pts)</p>
+                        <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">{{ result.rationale }}
+                        </p>
                       </div>
                     </div>
+                  </div>
 
-                    <!-- Effective & Renewal Dates -->
-                    <div v-if="selectedAssessment.effectiveDate || selectedAssessment.renewalDate" class="grid grid-cols-2 gap-4">
+                  <!-- Tier & Rate Information -->
+                  <div v-if="selectedAssessment.tier || selectedAssessment.rate"
+                    class="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
                       <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Effective Date</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                        <span class="text-gray-600">Tier:</span>
+                        <span class="ml-1 font-medium">{{ selectedAssessment.tier?.name || '—' }}</span>
                       </div>
                       <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Renewal Date</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.renewalDate) }}</p>
+                        <span class="text-gray-600">Rate:</span>
+                        <span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span>
                       </div>
                     </div>
+                  </div>
 
-                    <!-- Dates -->
-                    <div class="grid grid-cols-2 gap-4">
-                      <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Created</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.createdAt) }}</p>
-                      </div>
-                      <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.submittedAt) }}</p>
-                      </div>
+                  <!-- Effective & Renewal Dates -->
+                  <div v-if="selectedAssessment.effectiveDate || selectedAssessment.renewalDate"
+                    class="grid grid-cols-2 gap-4">
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">Effective Date</h4>
+                      <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                    </div>
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">Renewal Date</h4>
+                      <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.renewalDate) }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Dates -->
+                  <div class="grid grid-cols-2 gap-4 p-6">
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">Created</h4>
+                      <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.createdAt) }}</p>
+                    </div>
+                    <div>
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">Submitted</h4>
+                      <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.submittedAt) }}</p>
+                    </div>
+                  </div>
+
+                  <!-- Rejection Reason -->
+                  <div v-if="selectedAssessment.rejectionReason">
+                    <h4 class="text-sm font-medium text-red-600 mb-2">Rejection Reason</h4>
+                    <p class="text-sm text-gray-900 bg-red-50 p-3 rounded-lg">{{ selectedAssessment.rejectionReason }}
+                    </p>
+                  </div>
+
+                  <!-- Submitted By -->
+                  <div class="p-6">
+                    <h4 class="text-sm font-medium text-gray-500 mb-2">Submitted By</h4>
+                    <p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p>
+                  </div>
+
+                  <!-- Start Review Button (shown when review is possible but not yet started) -->
+                  <div v-if="canReview(selectedAssessment) && !isReviewing" class="border-t border-gray-200 pt-4">
+                    <button @click="startReview"
+                      class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">
+                      Start Review
+                    </button>
+                  </div>
+
+                  <!-- Review Workflow UI -->
+                  <div v-if="canReview(selectedAssessment) && isReviewing" class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Admin Review</h4>
+
+                    <!-- Error Message -->
+                    <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p class="text-sm text-red-600">{{ reviewError }}</p>
+                    </div>
+
+                    <!-- Reject Section -->
+                    <div class="mb-4">
+                      <label for="rejection-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection
+                        Reason
+                        (optional)</label>
+                      <textarea id="rejection-reason" v-model="rejectionReason" rows="2"
+                        placeholder="Provide reason for rejection..."
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"></textarea>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex space-x-3">
+                      <button @click="submitReview" :disabled="isRejecting || isApproving"
+                        class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
+                        {{ isRejecting ? 'Processing...' : 'Save Review' }}
+                      </button>
+                      <button @click="rejectAssessment"
+                        :disabled="!rejectionReason.trim() || isRejecting || isApproving"
+                        class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
+                        {{ isRejecting ? 'Processing...' : 'Reject' }}
+                      </button>
+                      <button @click="cancelReview"
+                        class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Approve Section (UNDER_REVIEW status) -->
+                  <div v-if="canApprove(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Approve Assessment</h4>
+
+                    <!-- Error Message -->
+                    <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p class="text-sm text-red-600">{{ reviewError }}</p>
+                    </div>
+
+                    <!-- Tier Selection -->
+                    <div class="mb-3">
+                      <label for="approve-tier" class="block text-xs font-medium text-gray-700 mb-1">Tier</label>
+                      <select id="approve-tier" v-model="approveTierId"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <option value="">Auto-assign based on score</option>
+                        <!-- Tiers would be loaded from API -->
+                        <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">
+                          {{ tier.name }} ({{ tier.lowRate }} - {{ tier.highRate }})
+                        </option>
+                      </select>
+                    </div>
+
+                    <!-- Rate Override -->
+                    <div class="mb-3">
+                      <label for="rate-override" class="block text-xs font-medium text-gray-700 mb-1">Rate Override
+                        (optional)</label>
+                      <input id="rate-override" v-model="approveRateOverride" type="number" step="0.01"
+                        placeholder="Override calculated rate"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+
+                    <!-- Rationale -->
+                    <div class="mb-3">
+                      <label for="approve-rationale" class="block text-xs font-medium text-gray-700 mb-1">Rationale
+                        (optional)</label>
+                      <textarea id="approve-rationale" v-model="approveRationale" rows="2"
+                        placeholder="Explain approval decision..."
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+                    </div>
+
+                    <!-- Approve Button -->
+                    <button @click="approveAssessment" :disabled="isApproving || isRejecting"
+                      class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
+                      {{ isApproving ? 'Processing...' : 'Approve Assessment' }}
+                    </button>
+                  </div>
+
+                  <!-- Reject Section (UNDER_REVIEW status) -->
+                  <div v-if="canReject(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Reject Assessment</h4>
+
+                    <!-- Error Message -->
+                    <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p class="text-sm text-red-600">{{ reviewError }}</p>
                     </div>
 
                     <!-- Rejection Reason -->
-                    <div v-if="selectedAssessment.rejectionReason">
-                      <h4 class="text-sm font-medium text-red-600 mb-1">Rejection Reason</h4>
-                      <p class="text-sm text-gray-900 bg-red-50 p-3 rounded-lg">{{ selectedAssessment.rejectionReason }}</p>
+                    <div class="mb-3">
+                      <label for="reject-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection Reason
+                        *</label>
+                      <textarea id="reject-reason" v-model="rejectionReason" rows="3"
+                        placeholder="Provide detailed reason for rejection..." required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"></textarea>
                     </div>
 
-                    <!-- Submitted By -->
-                    <div>
-                      <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted By</h4>
-                      <p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p>
-                    </div>
-
-                    <!-- Review Workflow UI -->
-                    <div v-if="canReview(selectedAssessment) && isReviewing" class="border-t border-gray-200 pt-4">
-                      <h4 class="text-sm font-medium text-gray-900 mb-3">Admin Review</h4>
-
-                      <!-- Error Message -->
-                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p class="text-sm text-red-600">{{ reviewError }}</p>
-                      </div>
-
-                      <!-- Reject Section -->
-                      <div class="mb-4">
-                        <label for="rejection-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection Reason (optional)</label>
-                        <textarea
-                          id="rejection-reason"
-                          v-model="rejectionReason"
-                          rows="2"
-                          placeholder="Provide reason for rejection..."
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                        ></textarea>
-                      </div>
-
-                      <!-- Action Buttons -->
-                      <div class="flex space-x-3">
-                        <button
-                          @click="submitReview"
-                          :disabled="isRejecting || isApproving"
-                          class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                        >
-                          {{ isRejecting ? 'Processing...' : 'Save Review' }}
-                        </button>
-                        <button
-                          @click="rejectAssessment"
-                          :disabled="!rejectionReason.trim() || isRejecting || isApproving"
-                          class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                        >
-                          {{ isRejecting ? 'Processing...' : 'Reject' }}
-                        </button>
-                        <button
-                          @click="cancelReview"
-                          class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Approve Section (UNDER_REVIEW status) -->
-                    <div v-if="canApprove(selectedAssessment)" class="border-t border-gray-200 pt-4">
-                      <h4 class="text-sm font-medium text-gray-900 mb-3">Approve Assessment</h4>
-
-                      <!-- Error Message -->
-                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p class="text-sm text-red-600">{{ reviewError }}</p>
-                      </div>
-
-                      <!-- Tier Selection -->
-                      <div class="mb-3">
-                        <label for="approve-tier" class="block text-xs font-medium text-gray-700 mb-1">Tier</label>
-                        <select
-                          id="approve-tier"
-                          v-model="approveTierId"
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        >
-                          <option value="">Auto-assign based on score</option>
-                          <!-- Tiers would be loaded from API -->
-                          <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">
-                            {{ tier.name }} ({{ tier.lowRate }} - {{ tier.highRate }})
-                          </option>
-                        </select>
-                      </div>
-
-                      <!-- Rate Override -->
-                      <div class="mb-3">
-                        <label for="rate-override" class="block text-xs font-medium text-gray-700 mb-1">Rate Override (optional)</label>
-                        <input
-                          id="rate-override"
-                          v-model="approveRateOverride"
-                          type="number"
-                          step="0.01"
-                          placeholder="Override calculated rate"
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
-
-                      <!-- Rationale -->
-                      <div class="mb-3">
-                        <label for="approve-rationale" class="block text-xs font-medium text-gray-700 mb-1">Rationale (optional)</label>
-                        <textarea
-                          id="approve-rationale"
-                          v-model="approveRationale"
-                          rows="2"
-                          placeholder="Explain approval decision..."
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                        ></textarea>
-                      </div>
-
-                      <!-- Approve Button -->
-                      <button
-                        @click="approveAssessment"
-                        :disabled="isApproving || isRejecting"
-                        class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                      >
-                        {{ isApproving ? 'Processing...' : 'Approve Assessment' }}
-                      </button>
-                    </div>
-
-                    <!-- Reject Section (UNDER_REVIEW status) -->
-                    <div v-if="canReject(selectedAssessment)" class="border-t border-gray-200 pt-4">
-                      <h4 class="text-sm font-medium text-gray-900 mb-3">Reject Assessment</h4>
-
-                      <!-- Error Message -->
-                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p class="text-sm text-red-600">{{ reviewError }}</p>
-                      </div>
-
-                      <!-- Rejection Reason -->
-                      <div class="mb-3">
-                        <label for="reject-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection Reason *</label>
-                        <textarea
-                          id="reject-reason"
-                          v-model="rejectionReason"
-                          rows="3"
-                          placeholder="Provide detailed reason for rejection..."
-                          required
-                          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
-                        ></textarea>
-                      </div>
-
-                      <!-- Reject Button -->
-                      <button
-                        @click="rejectAssessment"
-                        :disabled="isRejecting || isApproving"
-                        class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                      >
-                        {{ isRejecting ? 'Processing...' : 'Reject Assessment' }}
-                      </button>
-                    </div>
+                    <!-- Reject Button -->
+                    <button @click="rejectAssessment" :disabled="isRejecting || isApproving"
+                      class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
+                      {{ isRejecting ? 'Processing...' : 'Reject Assessment' }}
+                    </button>
+                  </div>
 
                   <!-- Panel Footer -->
                   <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    <a href="/assessments/new" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</a>
+                    <a href="/assessments/new"
+                      class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request
+                      New Assessment</a>
                   </div>
                 </div>
               </Transition>
@@ -818,9 +806,23 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.slideover-enter-active, .slideover-leave-active { transition: opacity 0.3s ease; }
-.slideover-enter-from, .slideover-leave-to { opacity: 0; }
+.slideover-enter-active,
+.slideover-leave-active {
+  transition: opacity 0.3s ease;
+}
 
-.slideover-panel-enter-active, .slideover-panel-leave-active { transition: transform 0.3s ease; }
-.slideover-panel-enter-from, .slideover-panel-leave-to { transform: translateX(100%); }
+.slideover-enter-from,
+.slideover-leave-to {
+  opacity: 0;
+}
+
+.slideover-panel-enter-active,
+.slideover-panel-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slideover-panel-enter-from,
+.slideover-panel-leave-to {
+  transform: translateX(100%);
+}
 </style>

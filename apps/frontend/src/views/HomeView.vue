@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
 import type { Assessment, Notification } from '@/types'
 import { api } from '@/api/client'
-
-const router = useRouter()
 
 // Assessment list state
 const assessments = ref<Assessment[]>([])
@@ -26,14 +23,6 @@ const unreadCount = ref(0)
 const showNotifications = ref(false)
 const notificationLoading = ref(false)
 
-// User role (from auth store or localStorage)
-const userRole = computed(() => {
-  return localStorage.getItem('userRole') || 'BU'
-})
-
-function isAdminOrSA(): boolean {
-  return userRole.value === 'ADMIN' || userRole.value === 'SA'
-}
 
 async function fetchAssessments() {
   loading.value = true
@@ -45,7 +34,8 @@ async function fetchAssessments() {
     if (searchQuery.value) params.search = searchQuery.value
     if (statusFilter.value) params.status = statusFilter.value
 
-    const result = await api.get<{ data: Assessment[]; pagination: { totalCount: number; totalPages: number } }>('/assessments', params)
+    const queryString = new URLSearchParams(params).toString()
+    const result = await api.get<{ data: Assessment[]; pagination: { totalCount: number; totalPages: number } }>(`/assessments?${queryString}`)
     
     if (result.data) {
       assessments.value = result.data.data || []
@@ -151,15 +141,6 @@ function getNotificationIcon(type: string): string {
   }
 }
 
-function getNotificationTitle(type: string): string {
-  switch (type) {
-    case 'ASSESSMENT_APPROVED': return 'Assessment Approved'
-    case 'ASSESSMENT_REJECTED': return 'Assessment Rejected'
-    case 'EXPIRY_REMINDER': return 'Expiry Reminder'
-    default: return 'Notification'
-  }
-}
-
 function handleSearch() {
   currentPage.value = 1
   fetchAssessments()
@@ -189,10 +170,10 @@ function closeDetailPanel() {
 }
 
 // Auto-refresh for AI processing assessments
-let refreshInterval: ReturnType<typeof setInterval> | null = null
+const refreshIntervalRef = { current: null as ReturnType<typeof setInterval> | null }
 
 function startAutoRefresh() {
-  refreshInterval = setInterval(() => {
+  refreshIntervalRef.current = setInterval(() => {
     const hasProcessing = assessments.value.some(a => a.status === 'AI_PROCESSING')
     if (hasProcessing) {
       fetchAssessments()
@@ -201,10 +182,10 @@ function startAutoRefresh() {
 }
 
 // Refresh notifications periodically
-let notificationInterval: ReturnType<typeof setInterval> | null = null
+const notificationIntervalRef = { current: null as ReturnType<typeof setInterval> | null }
 
 function startNotificationPolling() {
-  notificationInterval = setInterval(() => {
+  notificationIntervalRef.current = setInterval(() => {
     fetchNotifications()
   }, 60000) // Every minute
 }
@@ -220,16 +201,6 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
-        <nav class="flex space-x-4">
-          <a href="/" class="text-sm font-medium text-blue-600">Dashboard</a>
-          <a href="/assessments" class="text-sm text-gray-600 hover:text-gray-900">Assessments</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Dashboard Header -->
