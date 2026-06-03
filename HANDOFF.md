@@ -204,8 +204,11 @@
     - Role visibility preserved: BU sees only Notification Settings; Admin/SA see full system settings + notifications
     - Prototype has three layout variations (GitHub sidebar, wider panel, compact tabs) — one will be selected for implementation
     - Status: Published to GitHub as Issue #20 — ready-for-agent, fully specified with agent brief
-
-## What's next (in progress)
+19. **Enforce role-based access control in router navigation guard (#21):**
+    - Frontend: Add role checks to the `beforeEach` guard in router/index.ts
+    - Enforce `requiresSA`, `requiresAdminOrSA`, and `requiresBUOrHigher` meta fields against user's actual role
+    - Redirect unauthorized users to home dashboard instead of allowing direct URL access
+    - Status: Published to GitHub as Issue #21 — ready-for-agent, straightforward fix (3-4 lines in guard)
 The approved breakdown:
 
 | # | Issue Title | Type | Blocked By | Status |
@@ -223,8 +226,9 @@ The approved breakdown:
 | 16 | Draft assessments actionable from list view & detail panel | Enhancement | None | 🟢 Ready (unblocked) |
 | 17 | Remove duplicate 'App Settings' nav link | Bug | None | 🟢 Ready (unblocked) |
 | 18 | Consolidate settings nav links into Settings control center | Enhancement | None | 🟢 Ready (unblocked) |
+| 19 | Enforce role-based access control in router navigation guard | Bug | None | 🟢 Ready (unblocked) |
 
-## Key domain decisions to remember ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
+## Key domain decisions to remember
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
