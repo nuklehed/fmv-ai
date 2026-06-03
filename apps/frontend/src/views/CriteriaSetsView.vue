@@ -54,6 +54,7 @@ const showEditQuestionModal = ref(false)
 const showAddAnswerModal = ref(false)
 const showEditAnswerModal = ref(false)
 const activeCriteriaSetId = ref<string | null>(null)
+const activeQuestionIdForEdit = ref<string | null>(null)
 
 // Question form state
 const questionText = ref('')
@@ -64,6 +65,7 @@ const answerText = ref('')
 const answerScore = ref(0)
 const answerOrder = ref<number>()
 const activeQuestionId = ref<string | null>(null)
+const activeAnswerIdForEdit = ref<string | null>(null)
 
 // Expand/collapse state for tree view
 const expandedSets = ref<Set<string>>(new Set())
@@ -79,7 +81,7 @@ function toggleExpand(id: string) {
 async function fetchCriteriaSets() {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
       `/api/criteria-sets?active=true&search=${encodeURIComponent(searchQuery.value)}`,
       { headers: { Authorization: `Bearer ${token}` } }
@@ -114,7 +116,7 @@ async function handleAdd() {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch('/api/criteria-sets', {
       method: 'POST',
       headers: {
@@ -153,7 +155,7 @@ async function handleUpdate() {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(`/api/criteria-sets/${editingItem.value.id}`, {
       method: 'PUT',
       headers: {
@@ -190,7 +192,7 @@ async function handleUpdatePrompt() {
   if (!editingItem.value) return
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(`/api/criteria-sets/${editingItem.value.id}`, {
       method: 'PUT',
       headers: {
@@ -218,7 +220,7 @@ async function handleDeactivate(cs: CriteriaSet) {
   if (!confirm(`Are you sure you want to deactivate "${cs.name}"?`)) return
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(`/api/criteria-sets/${cs.id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` }
@@ -250,7 +252,7 @@ async function handleAddQuestion() {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
       `/api/criteria-sets/${activeCriteriaSetId.value}/questions`,
       {
@@ -279,6 +281,7 @@ async function handleAddQuestion() {
 
 async function openEditQuestionModal(question: Question, csId: string) {
   activeCriteriaSetId.value = csId
+  activeQuestionIdForEdit.value = question.id
   questionText.value = question.text
   questionOrder.value = question.order
   formError.value = ''
@@ -286,25 +289,15 @@ async function openEditQuestionModal(question: Question, csId: string) {
 }
 
 async function handleUpdateQuestion() {
-  if (!activeCriteriaSetId.value || !questionText.value.trim()) {
+  if (!activeCriteriaSetId.value || !activeQuestionIdForEdit.value || !questionText.value.trim()) {
     formError.value = 'Question text is required'
     return
   }
 
   try {
-    const token = localStorage.getItem('token')
-    // Find the question ID from the current criteria set data
-    const cs = criteriaSets.value.find(c => c.id === activeCriteriaSetId.value)
-    if (!cs) throw new Error('Criteria set not found')
-
-    const question = cs.questions.find(q => q.text === questionText.value.trim())
-    if (!question) {
-      formError.value = 'Question not found'
-      return
-    }
-
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
-      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${question.id}`,
+      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionIdForEdit.value}`,
       {
         method: 'PUT',
         headers: {
@@ -323,6 +316,7 @@ async function handleUpdateQuestion() {
     showEditQuestionModal.value = false
     resetForm()
     activeCriteriaSetId.value = null
+    activeQuestionIdForEdit.value = null
     await fetchCriteriaSets()
   } catch (error) {
     console.error('Error updating question:', error)
@@ -330,23 +324,13 @@ async function handleUpdateQuestion() {
   }
 }
 
-async function handleDeleteQuestion(csId: string, questionText: string) {
+async function handleDeleteQuestion(csId: string, questionId: string) {
   if (!confirm(`Are you sure you want to delete this question?`)) return
 
   try {
-    const token = localStorage.getItem('token')
-    // Find the question ID
-    const cs = criteriaSets.value.find(c => c.id === csId)
-    if (!cs) throw new Error('Criteria set not found')
-
-    const question = cs.questions.find(q => q.text === questionText.trim())
-    if (!question) {
-      formError.value = 'Question not found'
-      return
-    }
-
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
-      `/api/criteria-sets/${csId}/questions/${question.id}`,
+      `/api/criteria-sets/${csId}/questions/${questionId}`,
       {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
@@ -386,7 +370,7 @@ async function handleAddAnswer() {
   }
 
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
       `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers`,
       {
@@ -418,6 +402,7 @@ async function handleAddAnswer() {
 async function openEditAnswerModal(answer: Answer, questionId: string, csId: string) {
   activeQuestionId.value = questionId
   activeCriteriaSetId.value = csId
+  activeAnswerIdForEdit.value = answer.id
   answerText.value = answer.text
   answerScore.value = answer.score
   answerOrder.value = answer.order
@@ -426,7 +411,7 @@ async function openEditAnswerModal(answer: Answer, questionId: string, csId: str
 }
 
 async function handleUpdateAnswer() {
-  if (!activeQuestionId.value || !answerText.value.trim()) {
+  if (!activeQuestionId.value || !activeAnswerIdForEdit.value || !answerText.value.trim()) {
     formError.value = 'Answer text is required'
     return
   }
@@ -437,25 +422,9 @@ async function handleUpdateAnswer() {
   }
 
   try {
-    const token = localStorage.getItem('token')
-    // Find the answer ID from current data
-    const cs = criteriaSets.value.find(c => c.id === activeCriteriaSetId.value)
-    if (!cs) throw new Error('Criteria set not found')
-
-    const question = cs.questions.find(q => q.id === activeQuestionId.value)
-    if (!question) {
-      formError.value = 'Question not found'
-      return
-    }
-
-    const answer = question.answers.find(a => a.text === answerText.value.trim())
-    if (!answer) {
-      formError.value = 'Answer not found'
-      return
-    }
-
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
-      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers/${answer.id}`,
+      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers/${activeAnswerIdForEdit.value}`,
       {
         method: 'PUT',
         headers: {
@@ -474,6 +443,7 @@ async function handleUpdateAnswer() {
     showEditAnswerModal.value = false
     resetForm()
     activeQuestionId.value = null
+    activeAnswerIdForEdit.value = null
     activeCriteriaSetId.value = null
     await fetchCriteriaSets()
   } catch (error) {
@@ -482,29 +452,13 @@ async function handleUpdateAnswer() {
   }
 }
 
-async function handleDeleteAnswer(csId: string, questionId: string, answerText: string) {
+async function handleDeleteAnswer(csId: string, questionId: string, answerId: string) {
   if (!confirm(`Are you sure you want to delete this answer?`)) return
 
   try {
-    const token = localStorage.getItem('token')
-    // Find the answer ID from current data
-    const cs = criteriaSets.value.find(c => c.id === csId)
-    if (!cs) throw new Error('Criteria set not found')
-
-    const question = cs.questions.find(q => q.id === questionId)
-    if (!question) {
-      formError.value = 'Question not found'
-      return
-    }
-
-    const answer = question.answers.find(a => a.text === answerText.trim())
-    if (!answer) {
-      formError.value = 'Answer not found'
-      return
-    }
-
+    const token = localStorage.getItem('accessToken')
     const response = await fetch(
-      `/api/criteria-sets/${csId}/questions/${questionId}/answers/${answer.id}`,
+      `/api/criteria-sets/${csId}/questions/${questionId}/answers/${answerId}`,
       {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
@@ -535,20 +489,8 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-gray-50">
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-        <h1 class="text-xl font-semibold text-gray-900">FMV AI Platform</h1>
-        <nav class="flex space-x-4">
-          <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Dashboard</a>
-          <a href="/specialties" class="text-sm text-gray-600 hover:text-gray-900">Specialties</a>
-          <a href="#" class="text-sm font-medium text-blue-600">Criteria Sets</a>
-          <a href="#" class="text-sm text-gray-600 hover:text-gray-900">Settings</a>
-        </nav>
-      </div>
-    </header>
-
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-2xl font-bold text-gray-900 mb-1">Criteria Sets Management</h2>
@@ -648,7 +590,7 @@ onMounted(() => {
                   <div class="flex items-center space-x-2 ml-4">
                     <button @click="openEditQuestionModal(question, cs.id)" class="text-blue-600 hover:text-blue-900 text-xs">Edit</button>
                     <span>|</span>
-                    <button @click="handleDeleteQuestion(cs.id, question.text)" class="text-red-600 hover:text-red-900 text-xs">Delete</button>
+                    <button @click="handleDeleteQuestion(cs.id, question.id)" class="text-red-600 hover:text-red-900 text-xs">Delete</button>
                   </div>
                 </div>
 
@@ -674,7 +616,7 @@ onMounted(() => {
                     <div class="flex items-center space-x-2">
                       <button @click="openEditAnswerModal(answer, question.id, cs.id)" class="text-blue-600 hover:text-blue-900 text-xs">Edit</button>
                       <span>|</span>
-                      <button @click="handleDeleteAnswer(cs.id, question.id, answer.text)" class="text-red-600 hover:text-red-900 text-xs">Delete</button>
+                      <button @click="handleDeleteAnswer(cs.id, question.id, answer.id)" class="text-red-600 hover:text-red-900 text-xs">Delete</button>
                     </div>
                   </div>
                 </div>
