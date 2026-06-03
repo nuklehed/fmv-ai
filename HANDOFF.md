@@ -192,6 +192,11 @@
     - Frontend: Show CV upload state in edit mode if `cvText` is already present on the draft
     - Frontend: Delete draft with confirmation dialog for both BU and Admin/SA
     - Status: Published to GitHub as Issue #18 — ready-for-agent, fully specified with agent brief
+17. **Remove duplicate 'App Settings' nav link (#19):**
+    - Frontend: Remove the SA-only App Settings router-link from App.vue (to="/settings")
+    - The global Settings link for all users remains unchanged — both links pointed to SettingsView.vue
+    - Note: ApplicationSettingsView.vue exists at route /application-settings but has no nav link; adding one is out of scope
+    - Status: Published to GitHub as Issue #19 — ready-for-agent, single-file change
 
 ## What's next (in progress)
 The approved breakdown:
@@ -210,6 +215,7 @@ The approved breakdown:
 | 10 | BU dashboard & notifications | AFK | 5, 8 | ✅ Done |
 | 16 | Draft assessments actionable from list view & detail panel | Enhancement | None | 🟢 Ready (unblocked) |
 
+| 17 | Remove duplicate 'App Settings' nav link | Bug | None | Ready (unblocked) |
 Legend: ✅ Done | 🔵 In Progress | 🟢 Ready (unblocked) | ⏳ Blocked
 
 ## Key domain decisions to remember
