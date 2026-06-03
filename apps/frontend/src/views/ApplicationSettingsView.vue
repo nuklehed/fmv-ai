@@ -2,16 +2,20 @@
 import { ref, onMounted } from 'vue'
 import type { ApplicationSetting } from '@/types'
 
-const settings = ref<ApplicationSetting[]>([])
-const loading = ref(false)
-const formError = ref('')
-const savingKey = ref<string | null>(null)
-
 // Default values for known settings
 const defaultValues: Record<string, unknown> = {
   approvalValidityPeriod: 730,       // 2 years in days
   expiryReminderLeadTime: 30         // 30 days
 }
+
+const settings = ref<ApplicationSetting[]>([])
+const loading = ref(false)
+const formError = ref('')
+const savingKey = ref<string | null>(null)
+
+// Reactive variables for editable settings (v-model requires member expressions, not function calls)
+const approvalValidityPeriod = ref<number>(defaultValues.approvalValidityPeriod as number)
+const expiryReminderLeadTime = ref<number>(defaultValues.expiryReminderLeadTime as number)
 
 async function fetchSettings() {
   loading.value = true
@@ -23,21 +27,20 @@ async function fetchSettings() {
 
     if (!response.ok) throw new Error(`Failed to fetch settings: ${response.statusText}`)
 
-    settings.value = await response.json()
+    const fetchedSettings = await response.json()
+    settings.value = fetchedSettings
+
+    // Populate reactive variables from fetched settings or defaults
+    fetchedSettings.forEach((s: ApplicationSetting) => {
+      if (s.key === 'approvalValidityPeriod') approvalValidityPeriod.value = Number(s.value ?? defaultValues.approvalValidityPeriod)
+      if (s.key === 'expiryReminderLeadTime') expiryReminderLeadTime.value = Number(s.value ?? defaultValues.expiryReminderLeadTime)
+    })
   } catch (error) {
     console.error('Error fetching application settings:', error)
     formError.value = 'Failed to load application settings'
   } finally {
     loading.value = false
   }
-}
-
-function getSettingValue(key: string): unknown {
-  const setting = settings.value.find(s => s.key === key)
-  if (setting && setting.value !== null) {
-    return typeof setting.value === 'object' ? JSON.stringify(setting.value) : String(setting.value)
-  }
-  return defaultValues[key] ?? ''
 }
 
 function getSettingDescription(key: string): string | undefined {
@@ -58,14 +61,12 @@ async function handleSave(key: string) {
 
   try {
     const token = localStorage.getItem('accessToken')
+    // Use reactive variables directly (v-model bound values)
     let value: unknown
-    
-    // Try to parse as number, otherwise keep as string
-    const rawValue = getSettingValue(key)
-    if (typeof rawValue === 'string' && !isNaN(Number(rawValue))) {
-      value = Number(rawValue)
-    } else {
-      value = rawValue
+    if (key === 'approvalValidityPeriod') {
+      value = approvalValidityPeriod.value
+    } else if (key === 'expiryReminderLeadTime') {
+      value = expiryReminderLeadTime.value
     }
 
     const response = await fetch(`/api/application-settings/${key}`, {
@@ -128,7 +129,7 @@ onMounted(() => {
           </div>
           <div class="mt-4 flex items-center space-x-3">
             <input
-              v-model.number="getSettingValue('approvalValidityPeriod')"
+              v-model.number="approvalValidityPeriod"
               type="number"
               :disabled="savingKey === 'approvalValidityPeriod'"
               @blur="handleSave('approvalValidityPeriod')"
@@ -155,7 +156,7 @@ onMounted(() => {
           </div>
           <div class="mt-4 flex items-center space-x-3">
             <input
-              v-model.number="getSettingValue('expiryReminderLeadTime')"
+              v-model.number="expiryReminderLeadTime"
               type="number"
               :disabled="savingKey === 'expiryReminderLeadTime'"
               @blur="handleSave('expiryReminderLeadTime')"
