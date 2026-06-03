@@ -214,6 +214,11 @@
     - Frontend: Put control center layout behind `/settings/control-center` for Admin/SA users
     - Frontend: Add "Switch to Control Center" link in SettingsView visible only to Admin/SA users
     - Status: Published to GitHub as Issue #22 — ready-for-agent, fully specified with agent brief
+21. **Fix ApplicationSettingsView v-model binding to function call (#23):**
+    - Frontend: Replace `v-model.number="getSettingValue('key')"` with reactive variables (Vue requires member expressions)
+    - Add `approvalValidityPeriod` and `expiryReminderLeadTime` as `ref<number>` initialized from defaults
+    - Populate reactive vars in fetchSettings after API response; handleSave reads directly from them
+    - Status: Published to GitHub as Issue #23 — ready-for-agent, fully specified with agent brief
 
 The approved breakdown:
 
@@ -234,6 +239,7 @@ The approved breakdown:
 | 18 | Consolidate settings nav links into Settings control center | Enhancement | None | 🟢 Ready (unblocked) |
 | 19 | Enforce role-based access control in router navigation guard | Bug | None | 🟢 Ready (unblocked) |
 | 20 | Fix blank Settings page due to Vue Router 4 empty path child route mismatch | Bug | None | 🟢 Ready (unblocked) |
+| 21 | Fix ApplicationSettingsView v-model binding to function call | Bug | None | 🟢 Ready (unblocked) |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
