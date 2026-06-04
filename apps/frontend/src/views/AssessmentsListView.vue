@@ -9,6 +9,7 @@ interface AssessmentListItem {
   specialtyId?: string
   criteriaSetId?: string
   status: string
+  cvText?: string | null
   aiResults?: unknown | null
   totalScore?: number | null
   tierId?: string | null
@@ -844,6 +845,37 @@ onMounted(() => {
                       class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
                       {{ isRejecting ? 'Processing...' : 'Reject Assessment' }}
                     </button>
+                  </div>
+
+                  <!-- DRAFT Assessment Actions -->
+                  <div v-if="isDraft(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-medium text-gray-900 mb-3">Draft Assessment</h4>
+
+                    <!-- Draft context info -->
+                    <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p class="text-xs text-blue-700 font-medium mb-1">Draft Status</p>
+                      <p class="text-sm text-gray-700">
+                        {{ selectedAssessment.cvText ? `CV uploaded (${selectedAssessment.cvText.length} chars)` : 'No CV uploaded yet' }}
+                        · HCP: {{ selectedAssessment.hcp.firstName }} {{ selectedAssessment.hcp.lastName }}
+                      </p>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="space-y-2">
+                      <button
+                        @click="navigateToEditDraft(selectedAssessment.id)"
+                        class="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
+                      >
+                        {{ isAdminOrSA() ? 'Edit Draft Assessment' : 'Continue Assessment' }}
+                      </button>
+
+                      <button
+                        @click="deleteDraft(selectedAssessment)"
+                        class="w-full px-4 py-2.5 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors"
+                      >
+                        Delete Draft
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Panel Footer -->
