@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
 interface AssessmentListItem {
   id: string
@@ -34,6 +35,8 @@ interface AiResultItem {
   selectedAnswerText?: string
   score?: number
 }
+
+const router = useRouter()
 
 const assessments = ref<AssessmentListItem[]>([])
 const loading = ref(false)
@@ -214,6 +217,42 @@ function startAutoRefresh() {
 }
 
 // ─── Review Workflow Functions ──────────────────────────────────────
+
+// ─── Draft Assessment Actions ──────────────────────────────────────
+
+function isDraft(assessment: AssessmentListItem): boolean {
+  return assessment.status === 'DRAFT'
+}
+
+function navigateToEditDraft(id: string): void {
+  router.push(`/assessments/edit/${id}`)
+}
+
+async function deleteDraft(assessment: AssessmentListItem) {
+  if (!confirm(`Are you sure you want to delete the draft assessment for ${assessment.hcp.firstName} ${assessment.hcp.lastName}?`)) {
+    return
+  }
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch(`/api/assessments/${assessment.id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to delete draft')
+    }
+
+    // Refresh the list
+    await fetchAssessments()
+  } catch (error) {
+    console.error('Error deleting draft:', error)
+    formError.value = error instanceof Error ? error.message : 'Failed to delete draft'
+    setTimeout(() => { formError.value = '' }, 5000)
+  }
+}
 
 function isAdminOrSA(): boolean {
   const role = localStorage.getItem('userRole')
@@ -472,8 +511,26 @@ onMounted(() => {
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(assessment.completedAt) }}
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" @click.stop>
-                <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
+                <!-- DRAFT status actions -->
+                <template v-if="isDraft(assessment)">
+                  <button
+                    @click="navigateToEditDraft(assessment.id)"
+                    class="text-blue-600 hover:text-blue-900 font-medium mr-3"
+                  >
+                    {{ isAdminOrSA() ? 'Edit' : 'Continue' }}
+                  </button>
+                  <button
+                    @click.stop="deleteDraft(assessment)"
+                    class="text-red-600 hover:text-red-900"
+                  >
+                    Delete
+                  </button>
+                </template>
+                <!-- Non-DRAFT status actions -->
+                <template v-else>
+                  <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
+                </template>
               </td>
             </tr>
           </tbody>
