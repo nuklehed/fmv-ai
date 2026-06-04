@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 interface HcpOption {
   id: string
@@ -14,7 +14,13 @@ interface HcpOption {
   specialtyName?: string
 }
 
+// ─── Edit Mode Detection ──────────────────────────────────────────
+
+const route = useRoute()
 const router = useRouter()
+
+const isEditMode = computed(() => !!route.params.id)
+const draftId = computed(() => route.params.id as string | undefined)
 
 // Form state
 const selectedHcp = ref<HcpOption | null>(null)
@@ -318,46 +324,126 @@ async function handleSubmit() {
   try {
     const token = localStorage.getItem('accessToken')
 
-    // Step 1: Update HCP contact info if changed
-    const needsHcpUpdate = (
-      editEmail.value !== selectedHcp.value.email ||
-      editPhone.value !== selectedHcp.value.phone ||
-      editAddress.value !== selectedHcp.value.address ||
-      editState.value !== selectedHcp.value.state
-    )
+    if (isEditMode.value && draftId.value) {
+      // ─── EDIT MODE: Update existing draft ──────────────────────
 
-    if (needsHcpUpdate) {
-      await fetch(`/api/hcps/${selectedHcp.value.id}`, {
+      // Step 1: Update HCP contact info if changed
+      const needsHcpUpdate = (
+        editEmail.value !== selectedHcp.value.email ||
+        editPhone.value !== selectedHcp.value.phone ||
+        editAddress.value !== selectedHcp.value.address ||
+        editState.value !== selectedHcp.value.state
+      )
+
+      if (needsHcpUpdate) {
+        await fetch(`/api/hcps/${selectedHcp.value.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            email: editEmail.value || null,
+            phone: editPhone.value || null,
+            address: editAddress.value || null,
+            state: editState.value || null
+          })
+        })
+      }
+
+      // Step 2: Update assessment fields (specialty, criteria set)
+      const updateResponse = await fetch(`/api/assessments/${draftId.value}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          email: editEmail.value || null,
-          phone: editPhone.value || null,
-          address: editAddress.value || null,
-          state: editState.value || null
+          specialtyId: specialtyId.value || null,
+          criteriaSetId: criteriaSetId.value || null
         })
       })
-    }
 
-    // Step 2: Submit assessment for AI processing
-    const response = await fetch(`/api/assessments/${selectedHcp.value.id}/submit`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json()
+        throw new Error(errorData.error || 'Failed to update draft')
       }
-    })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to submit assessment')
+      // Step 3: Upload CV if not already uploaded
+      if (!cvUploaded.value && cvFile.value) {
+        const formData = new FormData()
+        formData.append('cv', cvFile.value)
+
+        const uploadResponse = await fetch(`/api/assessments/${draftId.value}/cv`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json()
+          throw new Error(errorData.error || 'Failed to upload CV')
+        }
+      }
+
+      // Step 4: Submit for AI processing
+      const submitResponse = await fetch(`/api/assessments/${draftId.value}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      if (!submitResponse.ok) {
+        const errorData = await submitResponse.json()
+        throw new Error(errorData.error || 'Failed to submit draft')
+      }
+
+      formSuccess.value = 'Draft submitted for AI processing!'
+    } else {
+      // ─── CREATE MODE: Original flow ────────────────────────────
+
+      // Step 1: Update HCP contact info if changed
+      const needsHcpUpdate = (
+        editEmail.value !== selectedHcp.value.email ||
+        editPhone.value !== selectedHcp.value.phone ||
+        editAddress.value !== selectedHcp.value.address ||
+        editState.value !== selectedHcp.value.state
+      )
+
+      if (needsHcpUpdate) {
+        await fetch(`/api/hcps/${selectedHcp.value.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            email: editEmail.value || null,
+            phone: editPhone.value || null,
+            address: editAddress.value || null,
+            state: editState.value || null
+          })
+        })
+      }
+
+      // Step 2: Submit assessment for AI processing
+      const response = await fetch(`/api/assessments/${selectedHcp.value.id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to submit assessment')
+      }
+
+      const result = await response.json()
+      formSuccess.value = `Assessment submitted! Queue position: ${result.queuePosition}`
     }
-
-    const result = await response.json()
-    formSuccess.value = `Assessment submitted! Queue position: ${result.queuePosition}`
 
     // Redirect to assessments list after a brief delay
     setTimeout(() => {
@@ -366,6 +452,61 @@ async function handleSubmit() {
   } catch (error) {
     console.error('Error submitting assessment:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to submit assessment'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// ─── Draft Loading (Edit Mode) ────────────────────────────────────
+
+async function loadDraft() {
+  if (!draftId.value || !isEditMode.value) return
+
+  formError.value = ''
+  isSubmitting.value = true // reuse as loading indicator
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch(`/api/assessments/${draftId.value}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (!response.ok) throw new Error(`Failed to load draft: ${response.statusText}`)
+
+    const draft = await response.json()
+
+    // Pre-select HCP from draft
+    selectedHcp.value = {
+      id: draft.hcpId,
+      firstName: draft.hcp?.firstName || '',
+      lastName: draft.hcp?.lastName || '',
+      email: draft.hcp?.email || '',
+      phone: draft.hcp?.phone || '',
+      address: draft.hcp?.address || '',
+      state: draft.hcp?.state || '',
+      specialtyId: draft.specialtyId || '',
+      specialtyName: draft.specialty?.name || ''
+    }
+
+    // Pre-populate contact fields
+    editEmail.value = selectedHcp.value.email || ''
+    editPhone.value = selectedHcp.value.phone || ''
+    editAddress.value = selectedHcp.value.address || ''
+    editState.value = selectedHcp.value.state || ''
+
+    // Pre-select specialty and criteria set
+    specialtyId.value = draft.specialtyId || ''
+    criteriaSetId.value = draft.criteriaSetId || ''
+
+    // Show CV upload state if already uploaded
+    if (draft.cvText) {
+      cvUploaded.value = true
+      cvTextLength.value = draft.cvText.length
+      cvFileName.value = 'CV previously uploaded'
+    }
+  } catch (error) {
+    console.error('Error loading draft:', error)
+    formError.value = error instanceof Error ? error.message : 'Failed to load draft assessment'
   } finally {
     isSubmitting.value = false
   }
@@ -380,6 +521,11 @@ const canSubmit = computed(() => {
 onMounted(() => {
   fetchSpecialties()
   fetchCriteriaSets()
+
+  // Load draft data if in edit mode
+  if (isEditMode.value) {
+    loadDraft()
+  }
 })
 </script>
 
@@ -389,8 +535,25 @@ onMounted(() => {
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6">
-        <h2 class="text-2xl font-bold text-gray-900 mb-1">Request Assessment</h2>
-        <p class="text-sm text-gray-600">Submit an HCP's CV for AI-powered FMV evaluation</p>
+        <div class="flex items-center space-x-3 mb-1">
+          <button
+            v-if="isEditMode"
+            @click="router.push('/assessments')"
+            class="text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h2 class="text-2xl font-bold text-gray-900">
+            {{ isEditMode ? 'Edit Draft Assessment' : 'Request Assessment' }}
+          </h2>
+        </div>
+        <p class="text-sm text-gray-600">
+          {{ isEditMode
+            ? `Editing draft for ${selectedHcp?.firstName || ''} ${selectedHcp?.lastName || ''}`
+            : "Submit an HCP's CV for AI-powered FMV evaluation" }}
+        </p>
       </div>
 
       <!-- Error / Success Messages -->
