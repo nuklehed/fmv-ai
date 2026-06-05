@@ -193,6 +193,9 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
         <select v-model="statusFilter" @change="handleSearch"
           class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="">All Statuses</option>
+          <template v-if="assessmentDomain.isAdminOrSAUser()">
+            <option value="AI_COMPLETE">⚠️ Needs Review</option>
+          </template>
           <option v-for="(label, status) in assessmentDomain.StatusLabels" :key="status" :value="status">{{ label }}</option>
         </select>
       </div>
@@ -231,6 +234,10 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
                   {{ assessmentDomain.getStatusLabel(assessment.status) }}
+                </span>
+                <span v-if="assessmentDomain.isActionRequired(assessment) && assessmentDomain.isAdminOrSAUser()" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse">
+                  <svg class="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                  Action Required
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ assessment.totalScore !== null ? assessment.totalScore : '—' }}</td>
