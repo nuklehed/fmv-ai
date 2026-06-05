@@ -244,6 +244,32 @@ The approved breakdown:
 - Logical multi-tenancy via `tenant_id` on every record
 - Notifications: in-app + email by default, active for all users
 
+## Session notes — 2026-06-05 (architecture deepening)
+### Completed refactors
+| # | What | Commit |
+|---|------|--------|
+| 1 | Collapsed `routes/assessments.ts` (~700 lines) → `domain/assessment.ts` (9-method domain module, routes now ~240 lines thin adapters) | `0666649` |
+| 2 | Split monolithic AI worker into `promptBuilder.ts`, `llmClient.ts`, `responseParser.ts` + thin orchestrator | `a61ee0c` |
+| 3 | Extracted assessment lifecycle from two frontend views (~1100 lines) → `frontend/src/domain/assessment.ts` (shared helpers + 15 API ops) | `63268a2` |
+
+### Bug fixes in this session
+- **Frontend domain module missing auth headers** — all 15+ fetch() calls were unauthenticated. Added `authHeaders()` helper that reads `accessToken` from localStorage and attaches Bearer token.
+- **FormData upload corrupted by JSON Content-Type** — `authHeaders()` was injecting `'Content-Type': 'application/json'` into every request, breaking the multipart boundary on CV uploads. Created separate `authHeadersFormData()` for file uploads (no Content-Type header, lets browser set boundary).
+- **Backend `.env` pointed at production DB** — `DATABASE_URL` and `REDIS_URL` were still pointing at `diskstation.local:5430` / `6379`. Changed to `localhost:5432` / `6379` for local Docker.
+
+### Current blockers (user-side)
+- **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
+  ```bash
+  docker compose up -d          # start postgres + redis
+  npm run db:seed               # create default users (sa@fmv.local / admin123, etc.)
+  npm run dev                   # start backend + frontend
+  ```
+- **Port conflicts** — old node processes can linger. If ports are in use:
+  ```bash
+  netstat -ano | findstr :3001   # find PID on port 3001
+  taskkill //PID <pid> //F       # kill it
+  ```
+
 ## Suggested skills to invoke next
 - **triage** — to label issues as ready for AFK agents once published
 - **to-prd** — if a formal PRD is needed before implementation starts
