@@ -22,7 +22,7 @@ const formError = ref('')
 const selectedAssessment = ref<assessmentDomain.AssessmentListItem | null>(null)
 const showDetailPanel = ref(false)
 
-// ─── Review Workflow State (Admin/SA only) ───────────────────────
+// ─── Review Workflow State (Admin/SA only) — used for inline approve/reject in detail panel ──
 
 const isReviewing = ref(false)
 const reviewOverrides = ref<Array<{ questionId: string; selectedAnswerId: string; rationale: string }>>([])
@@ -114,25 +114,8 @@ async function deleteDraft(assessment: assessmentDomain.AssessmentListItem) {
   }
 }
 
-// ─── Review Workflow ─────────────────────────────────────────────
-
-function startReview() {
-  isReviewing.value = true; reviewError.value = ''
-  if (selectedAssessment.value?.aiResults) {
-    const aiResults = assessmentDomain.getAiResults(selectedAssessment.value)
-    reviewOverrides.value = aiResults.map(r => ({ questionId: r.questionId, selectedAnswerId: r.selectedAnswerId, rationale: r.rationale || '' }))
-  }
-}
-
-function cancelReview() { isReviewing.value = false; reviewOverrides.value = []; rejectionReason.value = ''; reviewError.value = '' }
-
-async function submitReview() {
-  if (!selectedAssessment.value) return
-  try {
-    await assessmentDomain.submitReview(selectedAssessment.value.id, reviewOverrides.value, rejectionReason.value || null)
-    await fetchAssessments(); closeDetailPanel()
-  } catch (error) { reviewError.value = error instanceof Error ? error.message : 'Failed to submit review' }
-}
+// ─── Review Workflow (inline approve/reject for UNDER_REVIEW status) ─────────────────────────────
+// Note: Inline review mode removed — use dedicated /assessments/:id/review page instead
 
 async function loadTiers() {
   try { availableTiers.value = await assessmentDomain.fetchTiers() } catch { /* silent */ }
@@ -317,30 +300,18 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     <div v-if="selectedAssessment.aiResults && Array.isArray(selectedAssessment.aiResults) && selectedAssessment.aiResults.length > 0">
                       <h4 class="text-sm font-medium text-gray-500 mb-2">AI Evaluation Results</h4>
 
-                      <!-- Review Mode -->
-                      <div v-if="isReviewing" class="space-y-3">
-                        <div v-for="(override, index) in reviewOverrides" :key="index" class="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <div class="flex items-start justify-between mb-2">
-                            <span class="text-xs font-medium text-blue-700">Question {{ index + 1 }}</span>
-                            <button @click="reviewOverrides.splice(index, 1)" class="text-xs text-red-600 hover:text-red-800">Remove</button>
+                      <!-- View Mode (read-only AI results display) -->
+                      <div v-if="selectedAssessment.status === 'AI_COMPLETE' || selectedAssessment.status === 'UNDER_REVIEW'" class="space-y-3">
+                        <div v-for="(result, index) in assessmentDomain.getAiResults(selectedAssessment)" :key="index" class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                          <div class="flex items-start justify-between mb-1">
+                            <span class="text-xs font-medium text-purple-700">Question {{ index + 1 }}</span>
+                            <span v-if="result.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
                           </div>
-                          <p class="text-sm font-medium text-gray-900 mb-2">{{ `Question ${index + 1}` }}</p>
-                          <div class="mb-2">
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Select Answer</label>
-                            <select v-model="override.selectedAnswerId" class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                              <option value="">Select answer...</option>
-                              <!-- Options would be populated from criteria set data -->
-                            </select>
-                          </div>
-                          <div>
-                            <label class="block text-xs font-medium text-gray-700 mb-1">Rationale</label>
-                            <textarea v-model="override.rationale" rows="2" placeholder="Explain your selection..." class="w-full px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
-                          </div>
+                          <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index + 1}` }}</p>
+                          <p class="text-xs text-purple-700 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{ result.score ?? '?' }} pts)</p>
+                          <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">"{{ result.rationale }}"</p>
                         </div>
                       </div>
-
-                      <!-- Add Override Button -->
-                      <button @click="reviewOverrides.push({ questionId: '', selectedAnswerId: '', rationale: '' })" class="mt-3 text-sm text-blue-600 hover:text-blue-800 font-medium">+ Add Override</button>
                     </div>
 
                     <!-- View Mode (AI Results Display) -->
@@ -387,32 +358,9 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   <!-- Submitted By -->
                   <div class="p-6"><h4 class="text-sm font-medium text-gray-500 mb-2">Submitted By</h4><p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p></div>
 
-                  <!-- Start Review Button -->
-                  <div v-if="assessmentDomain.canReview(selectedAssessment) && !isReviewing" class="border-t border-gray-200 pt-4">
-                    <button @click="startReview" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">Start Review</button>
-                  </div>
-
-                  <!-- Review Workflow UI -->
-                  <div v-if="assessmentDomain.canReview(selectedAssessment) && isReviewing" class="border-t border-gray-200 pt-4">
-                    <h4 class="text-sm font-medium text-gray-900 mb-3">Admin Review</h4>
-                    <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3"><p class="text-sm text-red-600">{{ reviewError }}</p></div>
-
-                    <!-- Reject Section -->
-                    <div class="mb-4">
-                      <label for="rejection-reason" class="block text-xs font-medium text-gray-700 mb-1">Rejection Reason (optional)</label>
-                      <textarea id="rejection-reason" v-model="rejectionReason" rows="2" placeholder="Provide reason for rejection..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"></textarea>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex space-x-3">
-                      <button @click="submitReview" :disabled="isRejecting || isApproving" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
-                        {{ isRejecting ? 'Processing...' : 'Save Review' }}
-                      </button>
-                      <button @click="rejectAssessment" :disabled="!rejectionReason.trim() || isRejecting || isApproving" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
-                        {{ isRejecting ? 'Processing...' : 'Reject' }}
-                      </button>
-                      <button @click="cancelReview" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-                    </div>
+                  <!-- Start Review Button (navigate to dedicated review page) -->
+                  <div v-if="assessmentDomain.canReview(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                    <router-link :to="`/assessments/${selectedAssessment.id}/review`" class="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">Start Review</router-link>
                   </div>
 
                   <!-- Approve Section -->

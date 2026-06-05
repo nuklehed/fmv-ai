@@ -262,6 +262,22 @@ export async function deleteDraft(assessmentId: string): Promise<void> {
   }
 }
 
+//** Start review — transitions AI_COMPLETE → UNDER_REVIEW (no answer changes yet) */
+export async function startReview(assessmentId: string): Promise<any> {
+  const response = await fetch(`/api/assessments/${assessmentId}/review`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify({ overrides: [], rejectionReason: null })
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Failed to start review' }))
+    throw new Error(errorData.error || 'Failed to start review')
+  }
+
+  return response.json()
+}
+
 /** Submit admin review with overrides */
 export async function submitReview(assessmentId: string, overrides: ReviewOverride[], rejectionReason?: string | null): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}/review`, {
