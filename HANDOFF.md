@@ -278,7 +278,7 @@ The approved breakdown:
 | # | GitHub Issue | Description |
 |---|-------------|-------------|
 | 1 | [#25](https://github.com/nuklehed/fmv-ai/issues/25) | **AI_FAILED status not handled in frontend** - Backend worker sets AI_FAILED on LLM errors but frontend has no color, label, retry button, or visual indicator for this status |
-| 2 | [#26](https://github.com/nuklehed/fmv-ai/issues/26) | **Post-AI-completion "Action Required" UX gap** - Admin/SA users have no visual indication that AI_COMPLETE assessments need review; purple badge looks identical to other statuses |
+| 2 | ~~[#26](https://github.com/nuklehed/fmv-ai/issues/26)~~ ✅ **COMPLETED** (`ba919b7`) - Added ⚠️ Action Required animated badge for AI_COMPLETE status (Admin/SA only), plus Needs Review filter option
 | 3 | [#27](https://github.com/nuklehed/fmv-ai/issues/27) | **LLM unreachable error handling** - When local LLM (qwen3.6-35b-a3b) is not available on port 11434, submission fails silently or with confusing errors; no pre-flight check, no clear user feedback |
 
 ### Current blockers (user-side)
