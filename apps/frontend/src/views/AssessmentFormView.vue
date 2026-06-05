@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import * as assessmentDomain from '@/domain/assessment'
 
@@ -21,6 +21,11 @@ const route = useRoute()
 const router = useRouter()
 const isEditMode = computed(() => !!route.params.id)
 const draftId = computed(() => route.params.id as string | undefined)
+
+// Reload draft data when navigating between assessments or from new → edit
+watch([draftId, isEditMode], ([newDraftId, newIsEditMode]) => {
+  if (newDraftId && newIsEditMode) loadDraft()
+})
 
 // ─── UI State (kept in view for reactivity) ───────────────────────
 
@@ -44,6 +49,7 @@ const cvFileName = ref('')
 const cvUploadProgress = ref(0)
 const cvUploaded = ref(false)
 const cvTextLength = ref(0)
+const createdAssessmentId = ref<string | null>(null)
 
 const newHcpForm = ref({
   firstName: '', lastName: '', email: '', phone: '', address: '', state: '',
@@ -53,6 +59,9 @@ const isCreatingHcp = ref(false)
 
 const formError = ref('')
 const formSuccess = ref('')
+const submissionBanner = ref<{ show: boolean; message: string }>({ show: false, message: '' })
+const countdownSeconds = ref(4)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
 const isSubmitting = ref(false)
 const isUploadingCv = ref(false)
 
@@ -164,6 +173,7 @@ async function uploadCv() {
     const assessment = await assessmentDomain.createDraft(
       selectedHcp.value.id, specialtyId.value || null, criteriaSetId.value || null
     )
+    createdAssessmentId.value = assessment.id
     cvUploadProgress.value = 60
 
     // Step 2: Upload CV PDF
@@ -172,6 +182,9 @@ async function uploadCv() {
     cvUploaded.value = true
     cvUploadProgress.value = 100
     formSuccess.value = `CV uploaded successfully (${cvTextLength.value} characters extracted)`
+
+    // Navigate to edit mode with the correct draft ID so submit uses the right assessment
+    router.push(`/assessments/edit/${assessment.id}`)
   } catch (error) {
     formError.value = error instanceof Error ? error.message : 'Failed to upload CV'
     cvUploaded.value = false
@@ -185,6 +198,7 @@ function resetCvUpload() {
   cvFile.value = null; cvFileName.value = ''
   cvUploadProgress.value = 0; cvUploaded.value = false
   cvTextLength.value = 0; formSuccess.value = ''
+  createdAssessmentId.value = null
 }
 
 // ─── Form Submission ──────────────────────────────────────────────
@@ -228,7 +242,16 @@ async function handleSubmit() {
 
       // Submit for AI processing
       await assessmentDomain.submitForAi(draftId.value)
-      formSuccess.value = 'Draft submitted for AI processing!'
+      countdownSeconds.value = 4
+      if (countdownTimer) clearInterval(countdownTimer)
+      countdownTimer = setInterval(() => {
+        countdownSeconds.value--
+        if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
+      }, 1000)
+      submissionBanner.value = {
+        show: true,
+        message: 'Your assessment has been submitted for AI evaluation. This may take a few minutes while our local LLM analyzes the CV.'
+      }
     } else {
       // ─── CREATE MODE (legacy path — uploadCv already creates draft) ──
       // In create mode, the CV upload flow above already created the draft.
@@ -237,9 +260,11 @@ async function handleSubmit() {
         throw new Error('CV upload is required before submission')
       }
 
-      // Find the assessment ID — in create mode it was created during uploadCv
-      // but since uploadCv redirects after success, this path handles direct submit.
-      const response = await fetch(`/api/assessments/${selectedHcp.value.id}/submit`, {
+      // Use the assessment ID created during CV upload
+      if (!createdAssessmentId.value) {
+        throw new Error('No assessment found — please upload a CV first')
+      }
+      const response = await fetch(`/api/assessments/${createdAssessmentId.value}/submit`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }
       })
 
@@ -248,11 +273,23 @@ async function handleSubmit() {
         throw new Error(errorData.error || 'Failed to submit assessment')
       }
 
-      const result = await response.json()
-      formSuccess.value = `Assessment submitted! Queue position: ${result.queuePosition}`
+      countdownSeconds.value = 4
+      if (countdownTimer) clearInterval(countdownTimer)
+      countdownTimer = setInterval(() => {
+        countdownSeconds.value--
+        if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
+      }, 1000)
+      submissionBanner.value = {
+        show: true,
+        message: 'Your assessment has been submitted for AI evaluation. This may take a few minutes while our local LLM analyzes the CV.'
+      }
     }
 
-    setTimeout(() => { router.push('/assessments') }, 2000)
+    // Redirect after showing banner — list auto-refreshes for AI_PROCESSING
+    setTimeout(() => {
+      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+      router.push('/assessments')
+    }, 4000)
   } catch (error) {
     formError.value = error instanceof Error ? error.message : 'Failed to submit assessment'
   } finally {
@@ -342,12 +379,28 @@ onMounted(async () => {
         <p class="text-sm text-red-600">{{ formError }}</p>
       </div>
 
-      <div v-if="formSuccess" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
+      <div v-if="formSuccess && !submissionBanner.show" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
         <svg class="h-5 w-5 text-green-400 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
         </svg>
         <p class="text-sm text-green-600">{{ formSuccess }}</p>
       </div>
+
+      <!-- Submission Confirmation Banner -->
+      <Transition name="slide-fade">
+        <div v-if="submissionBanner.show" class="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 flex items-start shadow-sm">
+          <svg class="h-6 w-6 text-blue-500 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+          </svg>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-blue-900 mb-1">Assessment Submitted for AI Evaluation</p>
+            <p class="text-sm text-blue-700">{{ submissionBanner.message }}</p>
+            <p class="text-xs text-blue-500 mt-2">
+              Redirecting to assessments list in {{ countdownSeconds }}s…
+            </p>
+          </div>
+        </div>
+      </Transition>
 
       <!-- Form Steps -->
       <div class="space-y-6">
