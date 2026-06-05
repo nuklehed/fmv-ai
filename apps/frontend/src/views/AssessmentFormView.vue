@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import * as assessmentDomain from '@/domain/assessment'
 
 interface HcpOption {
   id: string
@@ -14,90 +15,69 @@ interface HcpOption {
   specialtyName?: string
 }
 
-// ─── Edit Mode Detection ──────────────────────────────────────────
+// ─── Route State ──────────────────────────────────────────────────
 
 const route = useRoute()
 const router = useRouter()
-
 const isEditMode = computed(() => !!route.params.id)
 const draftId = computed(() => route.params.id as string | undefined)
 
-// Form state
+// ─── UI State (kept in view for reactivity) ───────────────────────
+
 const selectedHcp = ref<HcpOption | null>(null)
 const hcpSearchQuery = ref('')
 const hcpSuggestions = ref<HcpOption[]>([])
 const showHcpDropdown = ref(false)
 const showNewHcpForm = ref(false)
 
-// Editable contact fields (pre-populated from HCP master record)
 const editEmail = ref('')
 const editPhone = ref('')
 const editAddress = ref('')
 const editState = ref('')
 
-// Assessment metadata
 const specialtyId = ref('')
 const criteriaSetId = ref('')
 const additionalContext = ref('')
 
-// CV upload state
 const cvFile = ref<File | null>(null)
 const cvFileName = ref('')
 const cvUploadProgress = ref(0)
 const cvUploaded = ref(false)
 const cvTextLength = ref(0)
 
-// New HCP creation state
 const newHcpForm = ref({
-  firstName: '',
-  lastName: '',
-  email: '',
-  phone: '',
-  address: '',
-  state: '',
-  specialtyId: '' as string,
-  identifiers: [] as { type: string; value: string }[]
+  firstName: '', lastName: '', email: '', phone: '', address: '', state: '',
+  specialtyId: '' as string, identifiers: [] as { type: string; value: string }[]
 })
 const isCreatingHcp = ref(false)
 
-// Form validation and status
 const formError = ref('')
 const formSuccess = ref('')
 const isSubmitting = ref(false)
 const isUploadingCv = ref(false)
 
-// Specialty list (loaded once)
 const specialties = ref<{ id: string; name: string }[]>([])
-
-// Criteria sets list (loaded once, Admin/SA only — but BU can see available ones)
 const criteriaSets = ref<{ id: string; name: string }[]>([])
 
-// HCP search debounce
 let hcpSearchTimeout: ReturnType<typeof setTimeout> | null = null
+
+// ─── HCP Search (debounced) ──────────────────────────────────────
 
 async function fetchHcps(query: string) {
   try {
-    const token = localStorage.getItem('accessToken')
-    const params = new URLSearchParams({ page: '1', limit: '20', search: query || '' })
-    const response = await fetch(`/api/hcps?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) throw new Error('Failed to fetch HCPs')
-    const result = await response.json()
-    hcpSuggestions.value = result.data
-  } catch (error) {
-    console.error('Error fetching HCP suggestions:', error)
-  }
+    const suggestions = await assessmentDomain.searchHcps(query)
+    hcpSuggestions.value = suggestions.map((h: any) => ({
+      id: h.id, firstName: h.firstName, lastName: h.lastName,
+      email: h.email || '', phone: h.phone || '', address: h.address || '',
+      state: h.state || '', specialtyId: h.specialtyId || '', specialtyName: h.specialty?.name || ''
+    }))
+  } catch { /* silent */ }
 }
 
 function onHcpSearchInput() {
   if (hcpSearchTimeout) clearTimeout(hcpSearchTimeout)
   const query = hcpSearchQuery.value.trim()
-  if (query.length < 2) {
-    hcpSuggestions.value = []
-    return
-  }
+  if (query.length < 2) { hcpSuggestions.value = []; return }
   hcpSearchTimeout = setTimeout(() => fetchHcps(query), 300)
 }
 
@@ -108,16 +88,15 @@ function selectHcp(hcp: HcpOption) {
   showHcpDropdown.value = false
   showNewHcpForm.value = false
 
-  // Pre-populate editable fields from HCP master record
   editEmail.value = hcp.email || ''
   editPhone.value = hcp.phone || ''
   editAddress.value = hcp.address || ''
   editState.value = hcp.state || ''
   specialtyId.value = hcp.specialtyId || ''
-
-  // Reset CV upload state when switching HCPs
   resetCvUpload()
 }
+
+// ─── New HCP Creation ─────────────────────────────────────────────
 
 async function createNewHcp() {
   if (!newHcpForm.value.firstName.trim() || !newHcpForm.value.lastName.trim()) {
@@ -129,50 +108,26 @@ async function createNewHcp() {
   formError.value = ''
 
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/hcps/bu-create', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        firstName: newHcpForm.value.firstName.trim(),
-        lastName: newHcpForm.value.lastName.trim(),
-        email: newHcpForm.value.email || null,
-        phone: newHcpForm.value.phone || null,
-        address: newHcpForm.value.address || null,
-        state: newHcpForm.value.state || null,
-        specialtyId: newHcpForm.value.specialtyId || null,
-        identifiers: newHcpForm.value.identifiers.length > 0 ? newHcpForm.value.identifiers : undefined
-      })
+    const createdHcp = await assessmentDomain.createHcp({
+      firstName: newHcpForm.value.firstName.trim(),
+      lastName: newHcpForm.value.lastName.trim(),
+      email: newHcpForm.value.email || null,
+      phone: newHcpForm.value.phone || null,
+      address: newHcpForm.value.address || null,
+      state: newHcpForm.value.state || null,
+      specialtyId: newHcpForm.value.specialtyId || null,
+      identifiers: newHcpForm.value.identifiers.length > 0 ? newHcpForm.value.identifiers : undefined
     })
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create HCP')
-    }
-
-    const createdHcp = await response.json()
-    
-    // Create a temporary HCP option for the form
-    const hcpOption: HcpOption = {
-      id: createdHcp.id,
-      firstName: createdHcp.firstName,
-      lastName: createdHcp.lastName,
-      email: createdHcp.email || '',
-      phone: createdHcp.phone || '',
-      address: createdHcp.address || '',
-      state: createdHcp.state || '',
-      specialtyId: createdHcp.specialty?.id || '',
-      specialtyName: createdHcp.specialty?.name || ''
-    }
-
-    selectHcp(hcpOption)
+    selectHcp({
+      id: createdHcp.id, firstName: createdHcp.firstName, lastName: createdHcp.lastName,
+      email: createdHcp.email || '', phone: createdHcp.phone || '',
+      address: createdHcp.address || '', state: createdHcp.state || '',
+      specialtyId: createdHcp.specialty?.id || '', specialtyName: createdHcp.specialty?.name || ''
+    })
     showNewHcpForm.value = false
     formSuccess.value = 'New HCP created successfully'
   } catch (error) {
-    console.error('Error creating HCP:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to create HCP'
   } finally {
     isCreatingHcp.value = false
@@ -180,52 +135,17 @@ async function createNewHcp() {
 }
 
 function handleHcpInputFocus() {
-  if (hcpSearchQuery.value.trim().length >= 2) {
-    showHcpDropdown.value = true
-  }
+  if (hcpSearchQuery.value.trim().length >= 2) showHcpDropdown.value = true
 }
 
-// ─── Specialty & Criteria Sets Loading ──────────────────────────────
-
-async function fetchSpecialties() {
-  try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/specialties?active=true', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    if (response.ok) specialties.value = await response.json()
-  } catch (error) {
-    console.error('Error fetching specialties:', error)
-  }
-}
-
-async function fetchCriteriaSets() {
-  try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/criteria-sets?active=true', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    if (response.ok) criteriaSets.value = await response.json()
-  } catch (error) {
-    console.error('Error fetching criteria sets:', error)
-  }
-}
-
-// ─── CV Upload ──────────────────────────────────────────────────────
+// ─── CV Upload ─────────────────────────────────────────────────────
 
 function handleCvFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
 
-  if (file.type !== 'application/pdf') {
-    formError.value = 'Only PDF files are allowed'
-    return
-  }
-
-  if (file.size > 10 * 1024 * 1024) {
-    formError.value = 'File size must be under 10MB'
-    return
-  }
+  if (file.type !== 'application/pdf') { formError.value = 'Only PDF files are allowed'; return }
+  if (file.size > 10 * 1024 * 1024) { formError.value = 'File size must be under 10MB'; return }
 
   cvFile.value = file
   cvFileName.value = file.name
@@ -240,52 +160,19 @@ async function uploadCv() {
   cvUploadProgress.value = 30
 
   try {
-    // Step 1: Create assessment draft
-    const token = localStorage.getItem('accessToken')
-    const createResponse = await fetch('/api/assessments', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        hcpId: selectedHcp.value.id,
-        specialtyId: specialtyId.value || null,
-        criteriaSetId: criteriaSetId.value || null
-      })
-    })
-
-    if (!createResponse.ok) {
-      const errorData = await createResponse.json()
-      throw new Error(errorData.error || 'Failed to create assessment')
-    }
-
-    const assessment = await createResponse.json()
+    // Step 1: Create draft
+    const assessment = await assessmentDomain.createDraft(
+      selectedHcp.value.id, specialtyId.value || null, criteriaSetId.value || null
+    )
     cvUploadProgress.value = 60
 
     // Step 2: Upload CV PDF
-    const formData = new FormData()
-    formData.append('cv', cvFile.value)
-
-    const uploadResponse = await fetch(`/api/assessments/${assessment.id}/cv`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-      // Don't set Content-Type — browser will set it with boundary for FormData
-    })
-
-    if (!uploadResponse.ok) {
-      const errorData = await uploadResponse.json()
-      throw new Error(errorData.error || 'Failed to upload CV')
-    }
-
-    const uploadResult = await uploadResponse.json()
-    cvTextLength.value = uploadResult.textLength
+    const result = await assessmentDomain.uploadCv(assessment.id, cvFile.value)
+    cvTextLength.value = result.textLength
     cvUploaded.value = true
     cvUploadProgress.value = 100
-
     formSuccess.value = `CV uploaded successfully (${cvTextLength.value} characters extracted)`
   } catch (error) {
-    console.error('Error uploading CV:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to upload CV'
     cvUploaded.value = false
   } finally {
@@ -295,149 +182,69 @@ async function uploadCv() {
 }
 
 function resetCvUpload() {
-  cvFile.value = null
-  cvFileName.value = ''
-  cvUploadProgress.value = 0
-  cvUploaded.value = false
-  cvTextLength.value = 0
-  formSuccess.value = ''
+  cvFile.value = null; cvFileName.value = ''
+  cvUploadProgress.value = 0; cvUploaded.value = false
+  cvTextLength.value = 0; formSuccess.value = ''
 }
 
-// ─── Form Submission ────────────────────────────────────────────────
+// ─── Form Submission ──────────────────────────────────────────────
 
 async function handleSubmit() {
-  // Validate required fields
-  if (!selectedHcp.value) {
-    formError.value = 'Please select an HCP'
-    return
-  }
-
-  if (!cvUploaded.value) {
-    formError.value = 'CV upload is required before submission'
-    return
-  }
+  if (!selectedHcp.value) { formError.value = 'Please select an HCP'; return }
+  if (!cvUploaded.value) { formError.value = 'CV upload is required before submission'; return }
 
   isSubmitting.value = true
   formError.value = ''
   formSuccess.value = ''
 
   try {
-    const token = localStorage.getItem('accessToken')
+    // Update HCP contact info if changed
+    const needsHcpUpdate = (
+      editEmail.value !== selectedHcp.value.email ||
+      editPhone.value !== selectedHcp.value.phone ||
+      editAddress.value !== selectedHcp.value.address ||
+      editState.value !== selectedHcp.value.state
+    )
+
+    if (needsHcpUpdate) {
+      await assessmentDomain.updateHcp(selectedHcp.value.id, {
+        email: editEmail.value || null, phone: editPhone.value || null,
+        address: editAddress.value || null, state: editState.value || null
+      })
+    }
 
     if (isEditMode.value && draftId.value) {
-      // ─── EDIT MODE: Update existing draft ──────────────────────
+      // ─── EDIT MODE ──────────────────────────────────────────────
 
-      // Step 1: Update HCP contact info if changed
-      const needsHcpUpdate = (
-        editEmail.value !== selectedHcp.value.email ||
-        editPhone.value !== selectedHcp.value.phone ||
-        editAddress.value !== selectedHcp.value.address ||
-        editState.value !== selectedHcp.value.state
-      )
-
-      if (needsHcpUpdate) {
-        await fetch(`/api/hcps/${selectedHcp.value.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            email: editEmail.value || null,
-            phone: editPhone.value || null,
-            address: editAddress.value || null,
-            state: editState.value || null
-          })
-        })
-      }
-
-      // Step 2: Update assessment fields (specialty, criteria set)
-      const updateResponse = await fetch(`/api/assessments/${draftId.value}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          specialtyId: specialtyId.value || null,
-          criteriaSetId: criteriaSetId.value || null
-        })
+      // Update assessment fields
+      await assessmentDomain.updateDraft(draftId.value, {
+        specialtyId: specialtyId.value || null, criteriaSetId: criteriaSetId.value || null
       })
 
-      if (!updateResponse.ok) {
-        const errorData = await updateResponse.json()
-        throw new Error(errorData.error || 'Failed to update draft')
-      }
-
-      // Step 3: Upload CV if not already uploaded
+      // Upload CV if not already uploaded
       if (!cvUploaded.value && cvFile.value) {
-        const formData = new FormData()
-        formData.append('cv', cvFile.value)
-
-        const uploadResponse = await fetch(`/api/assessments/${draftId.value}/cv`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json()
-          throw new Error(errorData.error || 'Failed to upload CV')
-        }
+        await assessmentDomain.uploadCv(draftId.value, cvFile.value)
       }
 
-      // Step 4: Submit for AI processing
-      const submitResponse = await fetch(`/api/assessments/${draftId.value}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      if (!submitResponse.ok) {
-        const errorData = await submitResponse.json()
-        throw new Error(errorData.error || 'Failed to submit draft')
-      }
-
+      // Submit for AI processing
+      await assessmentDomain.submitForAi(draftId.value)
       formSuccess.value = 'Draft submitted for AI processing!'
     } else {
-      // ─── CREATE MODE: Original flow ────────────────────────────
-
-      // Step 1: Update HCP contact info if changed
-      const needsHcpUpdate = (
-        editEmail.value !== selectedHcp.value.email ||
-        editPhone.value !== selectedHcp.value.phone ||
-        editAddress.value !== selectedHcp.value.address ||
-        editState.value !== selectedHcp.value.state
-      )
-
-      if (needsHcpUpdate) {
-        await fetch(`/api/hcps/${selectedHcp.value.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            email: editEmail.value || null,
-            phone: editPhone.value || null,
-            address: editAddress.value || null,
-            state: editState.value || null
-          })
-        })
+      // ─── CREATE MODE (legacy path — uploadCv already creates draft) ──
+      // In create mode, the CV upload flow above already created the draft.
+      // If we reach here without uploading CV first, submit directly.
+      if (!cvUploaded.value && !cvFile.value) {
+        throw new Error('CV upload is required before submission')
       }
 
-      // Step 2: Submit assessment for AI processing
+      // Find the assessment ID — in create mode it was created during uploadCv
+      // but since uploadCv redirects after success, this path handles direct submit.
       const response = await fetch(`/api/assessments/${selectedHcp.value.id}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        }
+        method: 'POST', headers: { 'Content-Type': 'application/json' }
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorData = await response.json().catch(() => ({ error: 'Failed to submit assessment' }))
         throw new Error(errorData.error || 'Failed to submit assessment')
       }
 
@@ -445,12 +252,8 @@ async function handleSubmit() {
       formSuccess.value = `Assessment submitted! Queue position: ${result.queuePosition}`
     }
 
-    // Redirect to assessments list after a brief delay
-    setTimeout(() => {
-      router.push('/assessments')
-    }, 2000)
+    setTimeout(() => { router.push('/assessments') }, 2000)
   } catch (error) {
-    console.error('Error submitting assessment:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to submit assessment'
   } finally {
     isSubmitting.value = false
@@ -463,69 +266,47 @@ async function loadDraft() {
   if (!draftId.value || !isEditMode.value) return
 
   formError.value = ''
-  isSubmitting.value = true // reuse as loading indicator
+  isSubmitting.value = true
 
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/assessments/${draftId.value}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const draft = await assessmentDomain.fetchAssessment(draftId.value)
 
-    if (!response.ok) throw new Error(`Failed to load draft: ${response.statusText}`)
-
-    const draft = await response.json()
-
-    // Pre-select HCP from draft
     selectedHcp.value = {
-      id: draft.hcpId,
-      firstName: draft.hcp?.firstName || '',
-      lastName: draft.hcp?.lastName || '',
-      email: draft.hcp?.email || '',
-      phone: draft.hcp?.phone || '',
-      address: draft.hcp?.address || '',
-      state: draft.hcp?.state || '',
-      specialtyId: draft.specialtyId || '',
-      specialtyName: draft.specialty?.name || ''
+      id: draft.hcpId, firstName: draft.hcp?.firstName || '', lastName: draft.hcp?.lastName || '',
+      email: draft.hcp?.email || '', phone: draft.hcp?.phone || '',
+      address: draft.hcp?.address || '', state: draft.hcp?.state || '',
+      specialtyId: draft.specialtyId || '', specialtyName: draft.specialty?.name || ''
     }
 
-    // Pre-populate contact fields
     editEmail.value = selectedHcp.value.email || ''
     editPhone.value = selectedHcp.value.phone || ''
     editAddress.value = selectedHcp.value.address || ''
     editState.value = selectedHcp.value.state || ''
 
-    // Pre-select specialty and criteria set
     specialtyId.value = draft.specialtyId || ''
     criteriaSetId.value = draft.criteriaSetId || ''
 
-    // Show CV upload state if already uploaded
     if (draft.cvText) {
-      cvUploaded.value = true
-      cvTextLength.value = draft.cvText.length
+      cvUploaded.value = true; cvTextLength.value = draft.cvText.length
       cvFileName.value = 'CV previously uploaded'
     }
   } catch (error) {
-    console.error('Error loading draft:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to load draft assessment'
   } finally {
     isSubmitting.value = false
   }
 }
 
-// ─── Computed ───────────────────────────────────────────────────────
+// ─── Computed ──────────────────────────────────────────────────────
 
-const canSubmit = computed(() => {
-  return selectedHcp.value && cvUploaded.value && !isSubmitting.value
-})
+const canSubmit = computed(() => selectedHcp.value && cvUploaded.value && !isSubmitting.value)
 
-onMounted(() => {
-  fetchSpecialties()
-  fetchCriteriaSets()
+// ─── Lifecycle ─────────────────────────────────────────────────────
 
-  // Load draft data if in edit mode
-  if (isEditMode.value) {
-    loadDraft()
-  }
+onMounted(async () => {
+  try { specialties.value = await assessmentDomain.fetchSpecialties() } catch { /* silent */ }
+  try { criteriaSets.value = await assessmentDomain.fetchCriteriaSets() } catch { /* silent */ }
+  if (isEditMode.value) loadDraft()
 })
 </script>
 
@@ -536,11 +317,8 @@ onMounted(() => {
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6">
         <div class="flex items-center space-x-3 mb-1">
-          <button
-            v-if="isEditMode"
-            @click="router.push('/assessments')"
-            class="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button v-if="isEditMode" @click="router.push('/assessments')"
+            class="text-gray-400 hover:text-gray-600 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
             </svg>
@@ -583,25 +361,15 @@ onMounted(() => {
           <!-- HCP Search -->
           <div class="relative">
             <label for="hcp-search" class="block text-sm font-medium text-gray-700 mb-1">Search Healthcare Professional *</label>
-            <input
-              id="hcp-search"
-              v-model="hcpSearchQuery"
-              @focus="handleHcpInputFocus"
-              @input="onHcpSearchInput"
-              type="text"
-              placeholder="Type at least 2 characters to search..."
-              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <input id="hcp-search" v-model="hcpSearchQuery" @focus="handleHcpInputFocus" @input="onHcpSearchInput"
+              type="text" placeholder="Type at least 2 characters to search..."
+              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
 
             <!-- HCP Suggestions Dropdown -->
             <Teleport to="body">
               <div v-if="showHcpDropdown && hcpSuggestions.length > 0" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                <div
-                  v-for="hcp in hcpSuggestions"
-                  :key="hcp.id"
-                  @click="selectHcp(hcp)"
-                  class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                >
+                <div v-for="hcp in hcpSuggestions" :key="hcp.id" @click="selectHcp(hcp)"
+                  class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
                   <div class="flex items-center justify-between">
                     <span class="text-sm font-medium text-gray-900">{{ hcp.firstName }} {{ hcp.lastName }}</span>
                     <span v-if="hcp.state" class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ hcp.state }}</span>
@@ -613,11 +381,7 @@ onMounted(() => {
               </div>
             </Teleport>
 
-            <!-- Create New HCP Button -->
-            <button
-              @click="showNewHcpForm = !showNewHcpForm"
-              class="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
+            <button @click="showNewHcpForm = !showNewHcpForm" class="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium">
               + Create New HCP
             </button>
           </div>
@@ -626,71 +390,42 @@ onMounted(() => {
           <Transition name="slide-fade">
             <div v-if="showNewHcpForm" class="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <h4 class="text-sm font-semibold text-blue-900 mb-3">Create New Healthcare Professional</h4>
-              
+
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label for="new-hcp-first-name" class="block text-xs font-medium text-gray-700 mb-1">First Name *</label>
-                  <input
-                    id="new-hcp-first-name"
-                    v-model="newHcpForm.firstName"
-                    type="text"
-                    required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
+                  <input id="new-hcp-first-name" v-model="newHcpForm.firstName" type="text" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
                   <label for="new-hcp-last-name" class="block text-xs font-medium text-gray-700 mb-1">Last Name *</label>
-                  <input
-                    id="new-hcp-last-name"
-                    v-model="newHcpForm.lastName"
-                    type="text"
-                    required
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
+                  <input id="new-hcp-last-name" v-model="newHcpForm.lastName" type="text" required
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
                   <label for="new-hcp-email" class="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    id="new-hcp-email"
-                    v-model="newHcpForm.email"
-                    type="email"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
+                  <input id="new-hcp-email" v-model="newHcpForm.email" type="email"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
                   <label for="new-hcp-phone" class="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    id="new-hcp-phone"
-                    v-model="newHcpForm.phone"
-                    type="tel"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
+                  <input id="new-hcp-phone" v-model="newHcpForm.phone" type="tel"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div class="sm:col-span-2">
                   <label for="new-hcp-address" class="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                  <input
-                    id="new-hcp-address"
-                    v-model="newHcpForm.address"
-                    type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
+                  <input id="new-hcp-address" v-model="newHcpForm.address" type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
                   <label for="new-hcp-state" class="block text-xs font-medium text-gray-700 mb-1">State</label>
-                  <input
-                    id="new-hcp-state"
-                    v-model="newHcpForm.state"
-                    type="text"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
+                  <input id="new-hcp-state" v-model="newHcpForm.state" type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
                   <label for="new-hcp-specialty" class="block text-xs font-medium text-gray-700 mb-1">Specialty</label>
-                  <select
-                    id="new-hcp-specialty"
-                    v-model="newHcpForm.specialtyId"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  >
+                  <select id="new-hcp-specialty" v-model="newHcpForm.specialtyId"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
                     <option value="">Select specialty...</option>
                     <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
                   </select>
@@ -698,17 +433,11 @@ onMounted(() => {
               </div>
 
               <div class="mt-4 flex space-x-3">
-                <button
-                  @click="createNewHcp"
-                  :disabled="isCreatingHcp || !newHcpForm.firstName.trim() || !newHcpForm.lastName.trim()"
-                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors"
-                >
+                <button @click="createNewHcp" :disabled="isCreatingHcp || !newHcpForm.firstName.trim() || !newHcpForm.lastName.trim()"
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
                   {{ isCreatingHcp ? 'Creating...' : 'Create HCP' }}
                 </button>
-                <button
-                  @click="showNewHcpForm = false"
-                  class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
+                <button @click="showNewHcpForm = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
               </div>
@@ -740,19 +469,23 @@ onMounted(() => {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label for="edit-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input id="edit-email" v-model="editEmail" type="email" placeholder="hcp@example.com" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input id="edit-email" v-model="editEmail" type="email" placeholder="hcp@example.com"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
               <label for="edit-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input id="edit-phone" v-model="editPhone" type="tel" placeholder="(555) 123-4567" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input id="edit-phone" v-model="editPhone" type="tel" placeholder="(555) 123-4567"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div class="sm:col-span-2">
               <label for="edit-address" class="block text-sm font-medium text-gray-700 mb-1">Address</label>
-              <input id="edit-address" v-model="editAddress" type="text" placeholder="Street address" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input id="edit-address" v-model="editAddress" type="text" placeholder="Street address"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
               <label for="edit-state" class="block text-sm font-medium text-gray-700 mb-1">State</label>
-              <input id="edit-state" v-model="editState" type="text" placeholder="e.g., CA, NY" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <input id="edit-state" v-model="editState" type="text" placeholder="e.g., CA, NY"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
 
@@ -767,28 +500,28 @@ onMounted(() => {
           </h3>
 
           <div class="space-y-4">
-            <!-- Specialty -->
             <div>
               <label for="specialty" class="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
-              <select id="specialty" v-model="specialtyId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <select id="specialty" v-model="specialtyId"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="">Select specialty...</option>
                 <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>
             </div>
 
-            <!-- Criteria Set -->
             <div>
               <label for="criteria-set" class="block text-sm font-medium text-gray-700 mb-1">Criteria Set</label>
-              <select id="criteria-set" v-model="criteriaSetId" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <select id="criteria-set" v-model="criteriaSetId"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="">Select criteria set...</option>
                 <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
               </select>
             </div>
 
-            <!-- Additional Context -->
             <div>
               <label for="context" class="block text-sm font-medium text-gray-700 mb-1">Additional Context (optional)</label>
-              <textarea id="context" v-model="additionalContext" rows="3" placeholder="Any additional notes about this assessment request..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" />
+              <textarea id="context" v-model="additionalContext" rows="3" placeholder="Any additional notes about this assessment request..."
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none" />
             </div>
           </div>
         </section>
@@ -802,13 +535,7 @@ onMounted(() => {
 
           <!-- File Input -->
           <div v-if="!cvFileName" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
-            <input
-              id="cv-upload"
-              type="file"
-              accept=".pdf,application/pdf"
-              @change="handleCvFileChange"
-              class="hidden"
-            />
+            <input id="cv-upload" type="file" accept=".pdf,application/pdf" @change="handleCvFileChange" class="hidden" />
             <label for="cv-upload" class="cursor-pointer">
               <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -855,11 +582,8 @@ onMounted(() => {
           </div>
 
           <!-- Upload Button -->
-          <button
-            v-if="cvFileName && !isUploadingCv && !cvUploaded"
-            @click="uploadCv"
-            class="mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium transition-colors"
-          >
+          <button v-if="cvFileName && !isUploadingCv && !cvUploaded" @click="uploadCv"
+            class="mt-4 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium transition-colors">
             Upload & Extract Text
           </button>
         </section>
@@ -871,11 +595,8 @@ onMounted(() => {
               <p class="text-sm font-medium text-gray-900">Ready to submit</p>
               <p class="text-xs text-gray-500">The AI will evaluate the CV against your criteria set. This may take several minutes.</p>
             </div>
-            <button
-              @click="handleSubmit"
-              :disabled="!canSubmit || isSubmitting"
-              class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 text-sm font-medium transition-colors flex items-center space-x-2"
-            >
+            <button @click="handleSubmit" :disabled="!canSubmit || isSubmitting"
+              class="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 text-sm font-medium transition-colors flex items-center space-x-2">
               <svg v-if="isSubmitting" class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -890,19 +611,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Drag and drop visual feedback */
-.border-dashed:hover {
-  border-color: #60a5fa;
-}
-
-/* Slide-fade transition for new HCP form */
-.slide-fade-enter-active,
-.slide-fade-leave-active {
-  transition: all 0.3s ease;
-}
-.slide-fade-enter-from,
-.slide-fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
+.border-dashed:hover { border-color: #60a5fa; }
+.slide-fade-enter-active, .slide-fade-leave-active { transition: all 0.3s ease; }
+.slide-fade-enter-from, .slide-fade-leave-to { opacity: 0; transform: translateY(-10px); }
 </style>
