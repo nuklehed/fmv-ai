@@ -143,9 +143,15 @@ export function getAiResults(assessment: AssessmentListItem): AiResultItem[] {
 
 // ─── API Operations (backend calls) ──────────────────────────────
 
-function authHeaders(extra?: HeadersInit): HeadersInit {
+function authHeaders(extra?: HeadersInit, skipContentType = false): HeadersInit {
+  const h: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+  if (!skipContentType) h['Content-Type'] = 'application/json'
+  return { ...h, ...extra }
+}
+
+function authHeadersFormData(): HeadersInit {
   const token = localStorage.getItem('accessToken')
-  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra }
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 /** Fetch paginated assessments with search and status filter */
@@ -192,8 +198,7 @@ export async function uploadCv(assessmentId: string, file: File): Promise<{ text
 
   const response = await fetch(`/api/assessments/${assessmentId}/cv`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` }
-    // Don't set Content-Type — browser sets it with boundary for FormData
+    headers: authHeadersFormData()
   })
 
   if (!response.ok) {
