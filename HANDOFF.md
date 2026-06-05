@@ -184,41 +184,35 @@
     - Frontend: SpecialtiesView uses `accessToken` consistently with auth store
     - Config: Vite proxy target port 3000 → 3001; removed unused tsconfig.node.json reference
     - All code committed and pushed to main branch
-16. **Draft assessments actionable from list view & detail panel (#18):**
-    - Backend: No changes needed — `PUT /api/assessments/:id`, `POST /api/assessments/:id/cv`, `POST /api/assessments/:id/submit` already exist
-    - Frontend: Add "Continue" (BU) / "Edit" (Admin/SA) action buttons on DRAFT rows in the assessments list view
-    - Frontend: Detail panel shows role-specific actions for DRAFT status — "Continue Assessment" for BUs, "Edit Assessment" + "Delete Draft" for Admin/SA
-    - Frontend: Form reusability — support edit mode via `/assessments/edit/:id` route that loads existing draft data (HCP, specialty, criteria set pre-populated)
-    - Frontend: Show CV upload state in edit mode if `cvText` is already present on the draft
-    - Frontend: Delete draft with confirmation dialog for both BU and Admin/SA
-    - Status: Published to GitHub as Issue #18 — ready-for-agent, fully specified with agent brief
-17. **Remove duplicate 'App Settings' nav link (#19):**
-    - Frontend: Remove the SA-only App Settings router-link from App.vue (to="/settings")
-    - The global Settings link for all users remains unchanged — both links pointed to SettingsView.vue
-    - Note: ApplicationSettingsView.vue exists at route /application-settings but has no nav link; adding one is out of scope
-    - Status: Published to GitHub as Issue #19 — ready-for-agent, single-file change
-18. **Consolidate settings nav links into Settings control center (#20):**
-    - Frontend: Replace individual settings nav links in App.vue with a single "Settings" link for all users
-    - Frontend: Wire up SettingsControlCenterView prototype (at /prototype/settings-control-center) as the production /settings page
-    - Frontend: Use nested routes so each sidebar item loads its existing page component inside the control center layout
-    - Role visibility preserved: BU sees only Notification Settings; Admin/SA see full system settings + notifications
-    - Prototype has three layout variations (GitHub sidebar, wider panel, compact tabs) — one will be selected for implementation
-    - Status: Published to GitHub as Issue #20 — ready-for-agent, fully specified with agent brief
-19. **Enforce role-based access control in router navigation guard (#21):**
-    - Frontend: Add role checks to the `beforeEach` guard in router/index.ts
-    - Enforce `requiresSA`, `requiresAdminOrSA`, and `requiresBUOrHigher` meta fields against user's actual role
-    - Redirect unauthorized users to home dashboard instead of allowing direct URL access
-    - Status: Published to GitHub as Issue #21 — ready-for-agent, straightforward fix (3-4 lines in guard)
-20. **Fix blank Settings page due to Vue Router 4 empty path child route mismatch (#22):**
-    - Frontend: Restructure routes so `/settings` renders SettingsView directly (notification settings)
-    - Frontend: Put control center layout behind `/settings/control-center` for Admin/SA users
-    - Frontend: Add "Switch to Control Center" link in SettingsView visible only to Admin/SA users
-    - Status: Published to GitHub as Issue #22 — ready-for-agent, fully specified with agent brief
-21. **Fix ApplicationSettingsView v-model binding to function call (#23):**
-    - Frontend: Replace `v-model.number="getSettingValue('key')"` with reactive variables (Vue requires member expressions)
-    - Add `approvalValidityPeriod` and `expiryReminderLeadTime` as `ref<number>` initialized from defaults
-    - Populate reactive vars in fetchSettings after API response; handleSave reads directly from them
-    - Status: Published to GitHub as Issue #23 — ready-for-agent, fully specified with agent brief
+16. **Completed Issue #16 — Draft assessments actionable from list view & detail panel:**
+    - Frontend: "Continue" (BU) / "Edit" (Admin/SA) action buttons on DRAFT rows in AssessmentsListView
+    - Detail panel shows role-specific draft actions — "Continue Assessment" for BUs, "Edit Draft" + "Delete Draft" for Admin/SA
+    - Edit mode via `/assessments/edit/:id` route pre-populates existing draft data (HCP, specialty, criteria set)
+    - CV upload state shown in edit mode; delete with confirmation dialog
+    - All code committed and pushed to main branch
+17. **Completed Issue #19 — Remove duplicate 'App Settings' nav link:**
+    - Frontend: Only one "Settings" link exists in App.vue (no duplicate)
+    - ApplicationSettingsView accessible at `/settings/control-center/application-settings` for Admin/SA users
+    - All code committed and pushed to main branch
+18. **Completed Issue #20 — Consolidate settings nav links into Settings control center:**
+    - Frontend: `/settings` renders SettingsView directly (notification settings for all users)
+    - Frontend: `/settings/control-center` renders SettingsControlCenterView with sidebar layout (Admin/SA only)
+    - Control center has nested routes for specialties, criteria-sets, tiers, users, application-settings
+    - "Switch to Control Center" link in SettingsView visible only to Admin/SA users
+    - All code committed and pushed to main branch
+19. **Completed Issue #21 — Enforce role-based access control in router navigation guard:**
+    - Frontend: Added role checks to `beforeEach` guard enforcing `requiresSA`, `requiresAdminOrSA`, `requiresBUOrHigher`
+    - Unauthorized users redirected to home dashboard instead of allowing direct URL access
+    - All code committed and pushed to main branch
+20. **Completed Issue #22 — Fix blank Settings page due to Vue Router 4 empty path child route mismatch:**
+    - Frontend: Restructured routes so `/settings` renders SettingsView directly (notification settings)
+    - Control center layout behind `/settings/control-center` for Admin/SA users
+    - Added "Switch to Control Center" link in SettingsView visible only to Admin/SA users
+    - All code committed and pushed to main branch
+21. **Completed Issue #23 — Fix ApplicationSettingsView v-model binding:**
+    - Frontend: Reactive `ref<number>` variables (`approvalValidityPeriod`, `expiryReminderLeadTime`) bound to v-model
+    - Populated from API response in fetchSettings; handleSave reads directly from them
+    - All code committed and pushed to main branch
 
 The approved breakdown:
 
@@ -234,12 +228,12 @@ The approved breakdown:
 | 8 | Admin review workflow | HITL | 7 | ✅ Done |
 | 9 | Tier/rate assignment & expiry tracking | AFK | 8 | ✅ Done |
 | 10 | BU dashboard & notifications | AFK | 5, 8 | ✅ Done |
-| 16 | Draft assessments actionable from list view & detail panel | Enhancement | None | 🟢 Ready (unblocked) |
-| 17 | Remove duplicate 'App Settings' nav link | Bug | None | 🟢 Ready (unblocked) |
-| 18 | Consolidate settings nav links into Settings control center | Enhancement | None | 🟢 Ready (unblocked) |
-| 19 | Enforce role-based access control in router navigation guard | Bug | None | 🟢 Ready (unblocked) |
-| 20 | Fix blank Settings page due to Vue Router 4 empty path child route mismatch | Bug | None | 🟢 Ready (unblocked) |
-| 21 | Fix ApplicationSettingsView v-model binding to function call | Bug | None | 🟢 Ready (unblocked) |
+| 16 | Draft assessments actionable from list view & detail panel | Enhancement | None | ✅ Done |
+| 19 | Remove duplicate 'App Settings' nav link | Bug | None | ✅ Done |
+| 20 | Consolidate settings nav links into Settings control center | Enhancement | None | ✅ Done |
+| 21 | Enforce role-based access control in router navigation guard | Bug | None | ✅ Done |
+| 22 | Fix blank Settings page due to Vue Router 4 empty path child route mismatch | Bug | None | ✅ Done |
+| 23 | Fix ApplicationSettingsView v-model binding to function call | Bug | None | ✅ Done |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
