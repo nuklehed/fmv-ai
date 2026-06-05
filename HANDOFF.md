@@ -234,6 +234,7 @@ The approved breakdown:
 | 21 | Enforce role-based access control in router navigation guard | Bug | None | ✅ Done |
 | 22 | Fix blank Settings page due to Vue Router 4 empty path child route mismatch | Bug | None | ✅ Done |
 | 23 | Fix ApplicationSettingsView v-model binding to function call | Bug | None | ✅ Done |
+| 24 | UX: Show processing feedback when submitting assessment for AI evaluation | Enhancement | None | ✅ Done |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
@@ -256,6 +257,15 @@ The approved breakdown:
 - **Frontend domain module missing auth headers** — all 15+ fetch() calls were unauthenticated. Added `authHeaders()` helper that reads `accessToken` from localStorage and attaches Bearer token.
 - **FormData upload corrupted by JSON Content-Type** — `authHeaders()` was injecting `'Content-Type': 'application/json'` into every request, breaking the multipart boundary on CV uploads. Created separate `authHeadersFormData()` for file uploads (no Content-Type header, lets browser set boundary).
 - **Backend `.env` pointed at production DB** — `DATABASE_URL` and `REDIS_URL` were still pointing at `diskstation.local:5430` / `6379`. Changed to `localhost:5432` / `6379` for local Docker.
+
+### Session notes — 2026-06-05 (UX improvements)
+#### Completed
+| # | What |
+|---|------|
+| 1 | **Issue #24 — Submission feedback UX**: Replaced inline success message with prominent blue gradient banner on assessment submission. Shows "Assessment Submitted for AI Evaluation" header, processing time explanation, and live countdown timer (4s). User is redirected to `/assessments` where the list auto-refreshes every 30s showing `AI_PROCESSING` status with spinner animation. The existing "Submitting..." loading state on the button during API call remains unchanged. |
+
+#### Known issues
+- **Git repository corruption** — some older commit trees are missing (`aa8961f`, `c7402fd`, etc.). Current HEAD and recent commits work fine, but `git status`/`git add` fail with "unable to read tree" errors. Workaround: use plumbing commands (`git hash-object`, `git mktree`, `git commit-tree`) or do a fresh clone if needed. |
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
