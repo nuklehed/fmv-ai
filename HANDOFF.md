@@ -263,9 +263,23 @@ The approved breakdown:
 | # | What |
 |---|------|
 | 1 | **Issue #24 — Submission feedback UX**: Replaced inline success message with prominent blue gradient banner on assessment submission. Shows "Assessment Submitted for AI Evaluation" header, processing time explanation, and live countdown timer (4s). User is redirected to `/assessments` where the list auto-refreshes every 30s showing `AI_PROCESSING` status with spinner animation. The existing "Submitting..." loading state on the button during API call remains unchanged. |
+| 2 | **Issue #24 follow-up — Submission error handling**: Fixed three bugs in submission flow:
+   - Error messages now render inside the submission banner (not hidden in a small form field)
+   - Non-DRAFT assessments are blocked from editing with a clear warning + redirect
+   - LLM model reference updated to `qwen3.6-35b-a3b` across `.env.example` and `llmClient.ts`
+| 3 | **Issue #24 follow-up — Post-AI workflow**: After AI completes (`AI_COMPLETE`), Admin/SA opens the detail panel to review, override answers, and approve/reject with tier/rate overrides. The list auto-refreshes every 30s while processing.
 
 #### Known issues
 - **Git repository corruption** — some older commit trees are missing (`aa8961f`, `c7402fd`, etc.). Current HEAD and recent commits work fine, but `git status`/`git add` fail with "unable to read tree" errors. Workaround: use plumbing commands (`git hash-object`, `git mktree`, `git commit-tree`) or do a fresh clone if needed. |
+
+
+
+#### Newly discovered issues (2026-06-06)
+| # | GitHub Issue | Description |
+|---|-------------|-------------|
+| 1 | [#25](https://github.com/nuklehed/fmv-ai/issues/25) | **AI_FAILED status not handled in frontend** - Backend worker sets AI_FAILED on LLM errors but frontend has no color, label, retry button, or visual indicator for this status |
+| 2 | [#26](https://github.com/nuklehed/fmv-ai/issues/26) | **Post-AI-completion "Action Required" UX gap** - Admin/SA users have no visual indication that AI_COMPLETE assessments need review; purple badge looks identical to other statuses |
+| 3 | [#27](https://github.com/nuklehed/fmv-ai/issues/27) | **LLM unreachable error handling** - When local LLM (qwen3.6-35b-a3b) is not available on port 11434, submission fails silently or with confusing errors; no pre-flight check, no clear user feedback |
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
