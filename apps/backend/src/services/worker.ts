@@ -80,11 +80,16 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     ])
     llmContent = response.content
   } catch (error) {
-    console.error('LLM call failed:', error instanceof Error ? error.message : 'Unknown error')
-    // Mark as failed but keep in AI_COMPLETE so admin can review partial results
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('LLM call failed:', errorMessage)
+    // Store error context so admin can see what went wrong and retry
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: 'AI_COMPLETE' }
+      data: {
+        status: 'AI_FAILED',
+        aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `LLM call failed: ${errorMessage}` }]),
+        completedAt: new Date()
+      }
     })
     return
   }
@@ -93,7 +98,11 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     console.warn('Empty LLM response')
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: 'AI_COMPLETE' }
+      data: {
+        status: 'AI_FAILED',
+        aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `Empty LLM response` }]),
+        completedAt: new Date()
+      }
     })
     return
   }
@@ -105,7 +114,11 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     console.warn('No valid AI results parsed from LLM response')
     await prisma.assessment.update({
       where: { id: assessmentId },
-      data: { status: 'AI_COMPLETE' }
+      data: {
+        status: 'AI_FAILED',
+        aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `No valid AI results parsed from LLM response` }]),
+        completedAt: new Date()
+      }
     })
     return
   }

@@ -30,7 +30,7 @@ class OllamaLLMClient implements LLMClientInterface {
   private baseUrl: string
   private model: string
 
-  constructor(baseUrl: string = process.env.LLM_BASE_URL || 'http://localhost:11434', model: string = process.env.LLM_MODEL || 'qwen2.5:32b') {
+  constructor(baseUrl: string = process.env.LLM_BASE_URL || 'http://localhost:11434', model: string = process.env.LLM_MODEL || 'qwen3.6-35b-a3b') {
     this.baseUrl = baseUrl.replace(/\/+$/, '')
     this.model = model
   }

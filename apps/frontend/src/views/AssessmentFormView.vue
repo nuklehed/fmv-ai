@@ -59,7 +59,7 @@ const isCreatingHcp = ref(false)
 
 const formError = ref('')
 const formSuccess = ref('')
-const submissionBanner = ref<{ show: boolean; message: string }>({ show: false, message: '' })
+const submissionBanner = ref<{ show: boolean; message: string; isError?: boolean }>({ show: false, message: '', isError: false })
 const countdownSeconds = ref(4)
 let countdownTimer: ReturnType<typeof setInterval> | null = null
 const isSubmitting = ref(false)
@@ -230,6 +230,12 @@ async function handleSubmit() {
     if (isEditMode.value && draftId.value) {
       // ─── EDIT MODE ──────────────────────────────────────────────
 
+      // Guard: only submit DRAFT assessments
+      const currentDraft = await assessmentDomain.fetchAssessment(draftId.value)
+      if (currentDraft.status !== 'DRAFT') {
+        throw new Error(`This assessment is already ${assessmentDomain.StatusLabels[currentDraft.status] || currentDraft.status}. It cannot be submitted again.`)
+      }
+
       // Update assessment fields
       await assessmentDomain.updateDraft(draftId.value, {
         specialtyId: specialtyId.value || null, criteriaSetId: criteriaSetId.value || null
@@ -242,6 +248,7 @@ async function handleSubmit() {
 
       // Submit for AI processing
       await assessmentDomain.submitForAi(draftId.value)
+      submissionBanner.value.isError = false
       countdownSeconds.value = 4
       if (countdownTimer) clearInterval(countdownTimer)
       countdownTimer = setInterval(() => {
@@ -273,6 +280,7 @@ async function handleSubmit() {
         throw new Error(errorData.error || 'Failed to submit assessment')
       }
 
+      submissionBanner.value.isError = false
       countdownSeconds.value = 4
       if (countdownTimer) clearInterval(countdownTimer)
       countdownTimer = setInterval(() => {
@@ -286,12 +294,23 @@ async function handleSubmit() {
     }
 
     // Redirect after showing banner — list auto-refreshes for AI_PROCESSING
+    const redirectDelay = submissionBanner.value.isError ? 8000 : 4000
     setTimeout(() => {
       if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
       router.push('/assessments')
-    }, 4000)
+    }, redirectDelay)
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'Failed to submit assessment'
+    const errorMsg = error instanceof Error ? error.message : 'Failed to submit assessment'
+    // Show errors in the banner so they're visible before redirect
+    submissionBanner.value.isError = true
+    submissionBanner.value.show = true
+    submissionBanner.value.message = `Submission failed: ${errorMsg}`
+    countdownSeconds.value = 8
+    if (countdownTimer) clearInterval(countdownTimer)
+    countdownTimer = setInterval(() => {
+      countdownSeconds.value--
+      if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
+    }, 1000)
   } finally {
     isSubmitting.value = false
   }
@@ -307,6 +326,27 @@ async function loadDraft() {
 
   try {
     const draft = await assessmentDomain.fetchAssessment(draftId.value)
+
+    // Guard: only allow editing DRAFT assessments. Redirect away for others.
+    if (draft.status !== 'DRAFT') {
+      const statusLabel = assessmentDomain.StatusLabels[draft.status] || draft.status
+      formError.value = `This assessment is ${statusLabel} and cannot be edited.`
+      // Show banner with redirect
+      submissionBanner.value.isError = true
+      submissionBanner.value.show = true
+      submissionBanner.value.message = `Cannot edit — this assessment is ${statusLabel}. Redirecting to assessments list…`
+      countdownSeconds.value = 5
+      if (countdownTimer) clearInterval(countdownTimer)
+      countdownTimer = setInterval(() => {
+        countdownSeconds.value--
+        if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
+      }, 1000)
+      setTimeout(() => {
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
+        router.push('/assessments')
+      }, 5000)
+      return
+    }
 
     selectedHcp.value = {
       id: draft.hcpId, firstName: draft.hcp?.firstName || '', lastName: draft.hcp?.lastName || '',
@@ -336,7 +376,15 @@ async function loadDraft() {
 
 // ─── Computed ──────────────────────────────────────────────────────
 
-const canSubmit = computed(() => selectedHcp.value && cvUploaded.value && !isSubmitting.value)
+const canSubmit = computed(() => {
+  if (!selectedHcp.value || !cvUploaded.value || isSubmitting.value) return false
+  // In edit mode, only allow submit for DRAFT assessments
+  if (isEditMode.value && draftId.value) {
+    // We check status in handleSubmit; this computed just gates the button
+    return true
+  }
+  return true
+})
 
 // ─── Lifecycle ─────────────────────────────────────────────────────
 
@@ -352,9 +400,26 @@ onMounted(async () => {
     <!-- Header -->
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="mb-6">
+      <!-- Non-DRAFT Assessment Warning -->
+      <Transition name="slide-fade">
+        <div v-if="isEditMode && draftId && !selectedHcp" class="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-5 flex items-start shadow-sm">
+          <svg class="h-6 w-6 text-yellow-500 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+          </svg>
+          <div class="flex-1">
+            <p class="text-sm font-semibold text-yellow-900 mb-1">Assessment Cannot Be Edited</p>
+            <p class="text-sm text-yellow-700">{{ formError }}</p>
+            <p class="text-xs text-yellow-500 mt-2">
+              Redirecting to assessments list in {{ countdownSeconds }}s…
+            </p>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- Header -->
+      <div v-if="selectedHcp || !isEditMode" class="mb-6">
         <div class="flex items-center space-x-3 mb-1">
-          <button v-if="isEditMode" @click="router.push('/assessments')"
+          <button v-if="isEditMode && selectedHcp" @click="router.push('/assessments')"
             class="text-gray-400 hover:text-gray-600 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
@@ -388,15 +453,34 @@ onMounted(async () => {
 
       <!-- Submission Confirmation Banner -->
       <Transition name="slide-fade">
-        <div v-if="submissionBanner.show" class="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-5 flex items-start shadow-sm">
-          <svg class="h-6 w-6 text-blue-500 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+        <div v-if="submissionBanner.show" :class="[
+          'mb-4 rounded-lg p-5 flex items-start shadow-sm border',
+          submissionBanner.isError
+            ? 'bg-gradient-to-r from-red-50 to-orange-50 border-red-200'
+            : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200'
+        ]">
+          <svg v-if="submissionBanner.isError" class="h-6 w-6 text-red-500 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+          </svg>
+          <svg v-else class="h-6 w-6 text-blue-500 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
           </svg>
           <div class="flex-1">
-            <p class="text-sm font-semibold text-blue-900 mb-1">Assessment Submitted for AI Evaluation</p>
-            <p class="text-sm text-blue-700">{{ submissionBanner.message }}</p>
-            <p class="text-xs text-blue-500 mt-2">
-              Redirecting to assessments list in {{ countdownSeconds }}s…
+            <p :class="[
+              'text-sm font-semibold mb-1',
+              submissionBanner.isError ? 'text-red-900' : 'text-blue-900'
+            ]">{{ submissionBanner.isError ? 'Submission Failed' : 'Assessment Submitted for AI Evaluation' }}</p>
+            <p :class="[
+              'text-sm',
+              submissionBanner.isError ? 'text-red-700' : 'text-blue-700'
+            ]">{{ submissionBanner.message }}</p>
+            <p :class="[
+              'text-xs mt-2',
+              submissionBanner.isError ? 'text-red-500' : 'text-blue-500'
+            ]">
+              {{ submissionBanner.isError
+                ? 'Redirecting to assessments list in ' + countdownSeconds + 's… (you can also go back and fix the issue)'
+                : 'Redirecting to assessments list in ' + countdownSeconds + 's…' }}
             </p>
           </div>
         </div>

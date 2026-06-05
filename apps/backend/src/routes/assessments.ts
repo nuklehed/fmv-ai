@@ -150,6 +150,23 @@ router.post('/:id/submit', async (req: AuthenticatedRequest, res: Response): Pro
   }
 })
 
+/** POST /api/assessments/:id/retry — Retry AI processing for failed assessments (Admin/SA only) */
+router.post('/:id/retry', authenticate, requireAdminOrSA, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const result = await domain.retryAIProcessing(req.params.id, req.userId!, req.tenantId!)
+    res.json(result)
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('not found')) {
+      res.status(404).json({ error: 'Assessment not found' })
+    } else if (error instanceof Error && (error.message.includes('Cannot retry') || error.message.includes('missing required'))) {
+      res.status(400).json({ error: error.message })
+    } else {
+      console.error('Error retrying assessment:', error)
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  }
+})
+
 /** DELETE /api/assessments/:id — Delete assessment */
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {

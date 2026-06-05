@@ -21,7 +21,7 @@ async function ensureRedis(): Promise<boolean> {
 }
 
 export async function getAIQueue() {
-  if (!process.env.REDIS_URL || process.env.REDIS_URL === 'redis://localhost:6379') {
+  if (!process.env.REDIS_URL) {
     return null
   }
   const available = await ensureRedis()
@@ -34,7 +34,7 @@ export async function getAIQueue() {
 }
 
 export async function getAIWorker() {
-  if (!process.env.REDIS_URL || process.env.REDIS_URL === 'redis://localhost:6379') {
+  if (!process.env.REDIS_URL) {
     return null
   }
   const available = await ensureRedis()
