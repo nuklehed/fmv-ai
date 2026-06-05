@@ -51,18 +51,29 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/TierManagementView.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
-  // ─── Settings Control Center (sidebar layout) ─────────────────────
+  // ─── Settings (notification settings for all users) ───────────────
   {
     path: '/settings',
     name: 'settingsHome',
+    component: () => import('@/views/SettingsView.vue'),
+    meta: { requiresAuth: true }
+  },
+  // ─── Settings Control Center (Admin/SA only, sidebar layout) ──────
+  {
+    path: '/settings/control-center',
+    name: 'settingsControlCenter',
     component: () => import('@/views/SettingsControlCenterView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresAdminOrSA: true },
     children: [
       {
         path: '',
+        redirect: { name: 'settingsNotifications' }
+      },
+      {
+        path: 'notifications',
         name: 'settingsNotifications',
         component: () => import('@/views/SettingsView.vue'),
-        meta: { requiresAuth: true }
+        meta: { requiresAuth: true, requiresAdminOrSA: true }
       },
       {
         path: 'specialties',
@@ -134,7 +145,22 @@ router.beforeEach(async (to, _from) => {
       return { name: 'login' }
     }
 
-    // Token valid — allow navigation
+    // Token valid — enforce role-based access control
+    const userRole = profile.role
+    const requiresBUOrHigher = to.meta.requiresBUOrHigher === true
+    const requiresAdminOrSA = to.meta.requiresAdminOrSA === true
+    const requiresSA = to.meta.requiresSA === true
+
+    if (requiresSA && userRole !== 'SA') {
+      return { name: 'home' }
+    }
+    if (requiresAdminOrSA && !['ADMIN', 'SA'].includes(userRole)) {
+      return { name: 'home' }
+    }
+    if (requiresBUOrHigher && !['BU', 'ADMIN', 'SA'].includes(userRole)) {
+      return { name: 'home' }
+    }
+
     return true
   } catch (error) {
     console.error('Auth check error:', error)

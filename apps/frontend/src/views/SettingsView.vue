@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const formError = ref('')
@@ -62,6 +64,11 @@ async function saveSettings() {
   } finally {
     saving.value = false
   }
+}
+
+function isAdminOrSA(): boolean {
+  const role = localStorage.getItem('userRole')
+  return role === 'ADMIN' || role === 'SA'
 }
 
 onMounted(() => {
@@ -133,6 +140,16 @@ onMounted(() => {
           </button>
         </div>
       </form>
+
+      <!-- Switch to Control Center (Admin/SA only) -->
+      <div v-if="isAdminOrSA()" class="mt-4">
+        <router-link
+          to="/settings/control-center"
+          class="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 font-medium"
+        >
+          Switch to Control Center →
+        </router-link>
+      </div>
 
       <!-- Info Card -->
       <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
