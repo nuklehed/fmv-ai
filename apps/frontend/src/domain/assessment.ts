@@ -143,6 +143,11 @@ export function getAiResults(assessment: AssessmentListItem): AiResultItem[] {
 
 // ─── API Operations (backend calls) ──────────────────────────────
 
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = localStorage.getItem('accessToken')
+  return { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extra }
+}
+
 /** Fetch paginated assessments with search and status filter */
 export async function fetchAssessments(params: ListParams): Promise<ListResult> {
   const queryParams = new URLSearchParams({
@@ -152,14 +157,14 @@ export async function fetchAssessments(params: ListParams): Promise<ListResult> 
     ...(params.statusFilter ? { status: params.statusFilter } : {})
   })
 
-  const response = await fetch(`/api/assessments?${queryParams}`)
+  const response = await fetch(`/api/assessments?${queryParams}`, { headers: authHeaders() })
   if (!response.ok) throw new Error(`Failed to fetch assessments: ${response.statusText}`)
   return response.json() as Promise<ListResult>
 }
 
 /** Fetch a single assessment by ID */
 export async function fetchAssessment(id: string): Promise<AssessmentDetail> {
-  const response = await fetch(`/api/assessments/${id}`)
+  const response = await fetch(`/api/assessments/${id}`, { headers: authHeaders() })
   if (!response.ok) throw new Error(`Failed to load assessment: ${response.statusText}`)
   return response.json() as Promise<AssessmentDetail>
 }
@@ -168,7 +173,7 @@ export async function fetchAssessment(id: string): Promise<AssessmentDetail> {
 export async function createDraft(hcpId: string, specialtyId?: string | null, criteriaSetId?: string | null): Promise<any> {
   const response = await fetch('/api/assessments', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ hcpId, specialtyId, criteriaSetId })
   })
 
@@ -203,7 +208,7 @@ export async function uploadCv(assessmentId: string, file: File): Promise<{ text
 export async function submitForAi(assessmentId: string): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}/submit`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' }
+    headers: authHeaders()
   })
 
   if (!response.ok) {
@@ -218,7 +223,7 @@ export async function submitForAi(assessmentId: string): Promise<any> {
 export async function updateDraft(assessmentId: string, updates: { specialtyId?: string | null; criteriaSetId?: string | null }): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(updates)
   })
 
@@ -232,7 +237,7 @@ export async function updateDraft(assessmentId: string, updates: { specialtyId?:
 
 /** Delete a draft assessment */
 export async function deleteDraft(assessmentId: string): Promise<void> {
-  const response = await fetch(`/api/assessments/${assessmentId}`, { method: 'DELETE' })
+  const response = await fetch(`/api/assessments/${assessmentId}`, { method: 'DELETE', headers: authHeaders() })
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Failed to delete draft' }))
     throw new Error(errorData.error || 'Failed to delete draft')
@@ -243,7 +248,7 @@ export async function deleteDraft(assessmentId: string): Promise<void> {
 export async function submitReview(assessmentId: string, overrides: ReviewOverride[], rejectionReason?: string | null): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}/review`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ overrides, rejectionReason })
   })
 
@@ -263,7 +268,7 @@ export async function approveAssessment(assessmentId: string, options: {
 }): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}/approve`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(options)
   })
 
@@ -279,7 +284,7 @@ export async function approveAssessment(assessmentId: string, options: {
 export async function rejectAssessment(assessmentId: string, reason: string): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}/reject`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ reason })
   })
 
@@ -293,21 +298,21 @@ export async function rejectAssessment(assessmentId: string, reason: string): Pr
 
 /** Fetch available tiers */
 export async function fetchTiers(): Promise<Array<{ id: string; name: string; lowRate: number; highRate: number }>> {
-  const response = await fetch('/api/tiers?active=true')
+  const response = await fetch('/api/tiers?active=true', { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to fetch tiers')
   return response.json()
 }
 
 /** Fetch available specialties */
 export async function fetchSpecialties(): Promise<Array<{ id: string; name: string }>> {
-  const response = await fetch('/api/specialties?active=true')
+  const response = await fetch('/api/specialties?active=true', { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to fetch specialties')
   return response.json()
 }
 
 /** Fetch available criteria sets */
 export async function fetchCriteriaSets(): Promise<Array<{ id: string; name: string }>> {
-  const response = await fetch('/api/criteria-sets?active=true')
+  const response = await fetch('/api/criteria-sets?active=true', { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to fetch criteria sets')
   return response.json()
 }
@@ -315,7 +320,7 @@ export async function fetchCriteriaSets(): Promise<Array<{ id: string; name: str
 /** Search HCPs by query */
 export async function searchHcps(query: string, page = 1, limit = 20): Promise<any[]> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit), search: query })
-  const response = await fetch(`/api/hcps?${params}`)
+  const response = await fetch(`/api/hcps?${params}`, { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to search HCPs')
   const result = await response.json() as { data: any[] }
   return result.data
@@ -329,7 +334,7 @@ export async function createHcp(data: {
 }): Promise<any> {
   const response = await fetch('/api/hcps/bu-create', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data)
   })
 
@@ -345,7 +350,7 @@ export async function createHcp(data: {
 export async function updateHcp(hcpId: string, data: { email?: string | null; phone?: string | null; address?: string | null; state?: string | null }): Promise<void> {
   const response = await fetch(`/api/hcps/${hcpId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify(data)
   })
 
