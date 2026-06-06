@@ -150,6 +150,25 @@ async function rejectAssessment() {
   finally { isRejecting.value = false }
 }
 
+// ─── Retry Failed Assessment ─────────────────────────────────────
+
+const retryLoading = ref(false)
+const retrySuccess = ref('')
+
+async function retryFailedAssessment(assessment: assessmentDomain.AssessmentListItem) {
+  if (!confirm(`Retry AI processing for ${assessment.hcp.firstName} ${assessment.hcp.lastName}?`)) return
+  retryLoading.value = true; retrySuccess.value = ''
+  try {
+    await assessmentDomain.retryAssessment(assessment.id)
+    retrySuccess.value = 'Retrying... Status will update to AI_PROCESSING'
+    await fetchAssessments()
+    setTimeout(() => { retrySuccess.value = '' }, 5000)
+  } catch (error) {
+    formError.value = error instanceof Error ? error.message : 'Failed to retry assessment'
+    setTimeout(() => { formError.value = '' }, 5000)
+  } finally { retryLoading.value = false }
+}
+
 // ─── Lifecycle ─────────────────────────────────────────────────────
 
 onMounted(() => { fetchAssessments(); startAutoRefresh() })
@@ -240,6 +259,12 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                 </template>
                 <!-- Non-DRAFT status actions -->
                 <template v-else>
+                  <!-- AI_FAILED: show retry button + view -->
+                  <template v-if="assessmentDomain.isFailed(assessment) && assessmentDomain.canRetry(assessment)">
+                    <button @click.stop="retryFailedAssessment(assessment)" :disabled="retryLoading" class="text-orange-600 hover:text-orange-900 font-medium mr-3">
+                      {{ retryLoading ? 'Retrying...' : 'Retry' }}
+                    </button>
+                  </template>
                   <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
                 </template>
               </td>
@@ -298,6 +323,21 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     <div v-if="selectedAssessment.totalScore !== null">
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Total Score</h4>
                       <p class="text-2xl font-bold text-gray-900">{{ selectedAssessment.totalScore }}</p>
+                    </div>
+
+                    <!-- AI Failed Error Display -->
+                    <div v-if="assessmentDomain.isFailed(selectedAssessment)">
+                      <h4 class="text-sm font-medium text-red-700 mb-2 flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        AI Processing Failed
+                      </h4>
+                      <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p v-if="typeof selectedAssessment.aiResults === 'string'" class="text-sm text-red-700">{{ selectedAssessment.aiResults }}</p>
+                        <p v-else-if="selectedAssessment.aiResults && typeof selectedAssessment.aiResults === 'object'" class="text-sm text-red-700">
+                          {{ (selectedAssessment.aiResults as any).error || (selectedAssessment.aiResults as any).message || 'The LLM returned an invalid or empty response. Check that Ollama is running with qwen3.6-35b-a3b loaded.' }}
+                        </p>
+                        <p v-else class="text-sm text-red-700">The LLM returned an invalid or empty response. Check that Ollama is running with qwen3.6-35b-a3b loaded.</p>
+                      </div>
                     </div>
 
                     <!-- AI Results -->

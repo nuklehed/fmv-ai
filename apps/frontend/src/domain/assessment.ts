@@ -70,7 +70,8 @@ const STATUS_COLORS: Record<string, string> = {
   AI_COMPLETE: 'bg-purple-100 text-purple-800',
   UNDER_REVIEW: 'bg-orange-100 text-orange-800',
   APPROVED: 'bg-green-100 text-green-800',
-  REJECTED: 'bg-red-100 text-red-800'
+  REJECTED: 'bg-red-100 text-red-800',
+  AI_FAILED: 'bg-red-100 text-red-800'
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -80,7 +81,8 @@ const STATUS_LABELS: Record<string, string> = {
   AI_COMPLETE: 'AI Complete',
   UNDER_REVIEW: 'Under Review',
   APPROVED: 'Approved',
-  REJECTED: 'Rejected'
+  REJECTED: 'Rejected',
+  AI_FAILED: 'AI Failed'
 }
 
 export const StatusColors = STATUS_COLORS
@@ -135,6 +137,20 @@ export function isAdminOrSAUser(): boolean {
 /** Check if assessment needs admin/SA review (AI_COMPLETE) */
 export function isActionRequired(assessment: AssessmentListItem): boolean {
   return assessment.status === 'AI_COMPLETE'
+}
+
+/** Check if assessment has failed AI processing */
+export function isFailed(assessment: AssessmentListItem): boolean {
+  return assessment.status === 'AI_FAILED'
+}
+
+/** Check if assessment can be retried (AI_FAILED + submitted by current user or admin/SA) */
+export function canRetry(assessment: AssessmentListItem): boolean {
+  if (!isFailed(assessment)) return false
+  const role = localStorage.getItem('userRole')
+  // Admin/SA can retry any; BU can only retry their own
+  if (role === 'ADMIN' || role === 'SA') return true
+  return isCurrentUser(assessment.submittedByUser.id)
 }
 
 // ─── Date Formatting ──────────────────────────────────────────────
@@ -348,6 +364,21 @@ export async function fetchSpecialties(): Promise<Array<{ id: string; name: stri
 export async function fetchCriteriaSets(): Promise<Array<{ id: string; name: string }>> {
   const response = await fetch('/api/criteria-sets?active=true', { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to fetch criteria sets')
+  return response.json()
+}
+
+/** Retry AI processing for a failed assessment */
+export async function retryAssessment(assessmentId: string): Promise<any> {
+  const response = await fetch(`/api/assessments/${assessmentId}/retry`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Failed to retry assessment' }))
+    throw new Error(errorData.error || 'Failed to retry assessment')
+  }
+
   return response.json()
 }
 
