@@ -289,7 +289,11 @@ The approved breakdown:
    - Frontend detail panel shows parsed error messages instead of raw JSON
    - Added "Show diagnostic info" toggle to view raw LLM output for debugging
    - Added retry button directly in detail panel footer (no need to go back to list)
-   - Improved system prompt with explicit field validation rules to reduce parsing failures |
+| 5 | **LLM response parsing fix** (`152cf6a`) — Model was returning wrong field names:
+   - `question` instead of `questionId`, `selected_answer` instead of `selectedAnswerId`
+   - Answer IDs wrapped in brackets: `[a2]` instead of `a2`
+   - Fixed responseParser to handle these aliases + strip bracket wrappers
+   - Strengthened prompt with explicit WRONG examples showing the exact pattern to avoid
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
