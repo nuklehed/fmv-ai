@@ -28,11 +28,15 @@ RULES:
 
 OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE:
 You MUST return ONLY a valid JSON array. No markdown code blocks (no \`\`\`). No extra text before or after the JSON.
-Use these EXACT field names: questionId, selectedAnswerId, rationale (camelCase).
+
+FIELD NAMES — USE THESE EXACT camelCase NAMES (NOT snake_case, NOT shortened):
+- "questionId"  (NOT "question", NOT "question_id")
+- "selectedAnswerId"  (NOT "selected_answer", NOT "answerId", NOT "id")
+- "rationale"
 
 CRITICAL: Every answer in the array MUST have all three fields populated with valid values:
-- "questionId": must match one of the question IDs listed below exactly
-- "selectedAnswerId": must be a valid answer ID from that question's options
+- "questionId": must match one of the question IDs listed below exactly (e.g., "abc-123")
+- "selectedAnswerId": must be a valid answer ID from that question's options (e.g., "def-456", NOT "[a2]")
 - "rationale": must be a non-empty string explaining your choice
 
 EXAMPLE OUTPUT:
@@ -47,7 +51,12 @@ EXAMPLE OUTPUT:
     "selectedAnswerId": "jkl-012",
     "rationale": "Insufficient data in the CV to determine this criterion."
   }
-]`
+]
+
+WRONG — DO NOT USE THESE:
+- {"question": "abc", "selected_answer": "[a2]"} ← wrong field names, bracket-wrapped IDs
+- {"question_id": "abc", "answerId": "def"} ← snake_case or mixed case
+- Any output wrapped in \`\`\`json code blocks
 }
 
 /**

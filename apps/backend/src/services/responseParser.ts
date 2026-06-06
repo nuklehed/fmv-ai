@@ -18,20 +18,34 @@ interface CriteriaQuestion {
  * Normalize a raw LLM response item by mapping all known field name aliases to canonical names.
  * The model is inconsistent — it may use questionId/question_id, selectedAnswerId/answerId/option_id/id, etc.
  */
+/** Strip optional bracket wrappers from answer IDs (e.g., '[a2]' → 'a2') */
+function stripBrackets(val: string): string {
+  return val.replace(/^\[([^]]+)\]$/, '$1').trim()
+}
+
 export function normalizeItem(item: Record<string, unknown>): { questionId?: string; selectedAnswerId?: string; rationale?: string } {
   const normalized: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(item)) {
     if (typeof key !== 'string' || typeof value === 'undefined') continue
-    const lowerKey = key.toLowerCase()
+    const lowerKey = key.toLowerCase().replace(/[_\s]/g, '')
 
-    if (lowerKey === 'questionid' || lowerKey === 'question_id') normalized.questionId = String(value)
-    else if (lowerKey === 'selectedanswerid' || lowerKey === 'answerid' || lowerKey === 'answer_id' || lowerKey === 'option_id' || lowerKey === 'id') {
-      // Only map 'id' to selectedAnswerId if we already have a questionId
-      if (!normalized.questionId) continue
-      normalized.selectedAnswerId = String(value)
+    // questionId aliases: questionid, question_id, question
+    if (lowerKey === 'questionid' || lowerKey === 'question_id' || lowerKey === 'question') {
+      normalized.questionId = stripBrackets(String(value))
     }
-    else if (lowerKey === 'rationale' || lowerKey === 'reasoning' || lowerKey === 'explanation') normalized.rationale = String(value)
+    // selectedAnswerId aliases: selectedanswerid, answerid, answer_id, option_id, id,
+    //   selectedanswer, selected_answer, selected_answer_id
+    else if (lowerKey === 'selectedanswerid' || lowerKey === 'answerid' || lowerKey === 'answer_id'
+      || lowerKey === 'optionid' || lowerKey === 'option_id' || lowerKey === 'id'
+      || lowerKey === 'selectedanswer' || lowerKey === 'selected_answer') {
+      // Only map bare 'id' to selectedAnswerId if we already have a questionId
+      if (lowerKey === 'id' && !normalized.questionId) continue
+      normalized.selectedAnswerId = stripBrackets(String(value))
+    }
+    else if (lowerKey === 'rationale' || lowerKey === 'reasoning' || lowerKey === 'explanation') {
+      normalized.rationale = String(value)
+    }
   }
 
   return normalized as { questionId?: string; selectedAnswerId?: string; rationale?: string }
