@@ -284,6 +284,12 @@ The approved breakdown:
    - Phase 2: Editable answer dropdowns (with rationale when different from AI), live score counter, tier/rate selection, approve button
    - Nav improvement: Clicking the Action Required badge OR any AI_COMPLETE row navigates directly to `/assessments/:id/review` (reduced from 3 clicks → 1 click)
 | 3 | ~~[#27](https://github.com/nuklehed/fmv-ai/issues/27)~~ ✅ **COMPLETED** (`78288f9`) - Added `GET /api/llm/health` endpoint (checks Ollama + model loaded status), pre-flight check in frontend before submission, clear error messages with actionable guidance (e.g., "ollama pull qwen3.6-35b-a3b") |
+| 4 | **AI_FAILED retry UX improvement** (`ef39b4a`) — When retry fails due to unparsable LLM output:
+   - Backend worker now stores raw LLM output snippet (first 300 chars) in aiResults as `_diagnostic` entry
+   - Frontend detail panel shows parsed error messages instead of raw JSON
+   - Added "Show diagnostic info" toggle to view raw LLM output for debugging
+   - Added retry button directly in detail panel footer (no need to go back to list)
+   - Improved system prompt with explicit field validation rules to reduce parsing failures |
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
