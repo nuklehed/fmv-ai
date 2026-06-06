@@ -12,6 +12,7 @@ import tierRoutes from './routes/tiers'
 import notificationRoutes from './routes/notifications'
 import userSettingsRoutes from './routes/userSettings'
 import applicationSettingsRoutes from './routes/applicationSettings'
+import llmRoutes from './routes/llm'
 import { getAIWorker, closeConnection } from './services/queue'
 import { startExpiryChecker } from './services/expiryChecker'
 
@@ -25,6 +26,7 @@ app.use(express.json())
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/users', userRoutes)
+app.use('/api/llm', llmRoutes)
 app.use('/api/assessments', assessmentRoutes)
 app.use('/api/specialties', specialtyRoutes)
 app.use('/api/criteria-sets', criteriaSetRoutes)

@@ -382,6 +382,12 @@ export async function retryAssessment(assessmentId: string): Promise<any> {
   return response.json()
 }
 
+/** Check Ollama/LLM health before submitting for AI processing */
+export async function checkLlmHealth(): Promise<{ ok: boolean; model?: string; error?: string }> {
+  const response = await fetch('/api/llm/health')
+  return response.json() as Promise<{ ok: boolean; model?: string; error?: string }>
+}
+
 /** Search HCPs by query */
 export async function searchHcps(query: string, page = 1, limit = 20): Promise<any[]> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit), search: query })

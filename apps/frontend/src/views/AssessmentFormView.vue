@@ -207,6 +207,17 @@ async function handleSubmit() {
   if (!selectedHcp.value) { formError.value = 'Please select an HCP'; return }
   if (!cvUploaded.value) { formError.value = 'CV upload is required before submission'; return }
 
+  // Pre-flight: check LLM availability
+  try {
+    const health = await assessmentDomain.checkLlmHealth()
+    if (!health.ok) {
+      throw new Error(health.error || 'The local AI model (Ollama) is not available. Please ensure Ollama is running with qwen3.6-35b-a3b loaded.')
+    }
+  } catch (err) {
+    formError.value = err instanceof Error ? err.message : 'Failed to check LLM availability'
+    return
+  }
+
   isSubmitting.value = true
   formError.value = ''
   formSuccess.value = ''
