@@ -277,7 +277,7 @@ The approved breakdown:
 #### Newly discovered issues (2026-06-06)
 | # | GitHub Issue | Description |
 |---|-------------|-------------|
-| 1 | [#25](https://github.com/nuklehed/fmv-ai/issues/25) | **AI_FAILED status not handled in frontend** - Backend worker sets AI_FAILED on LLM errors but frontend has no color, label, retry button, or visual indicator for this status |
+| 1 | ~~[#25](https://github.com/nuklehed/fmv-ai/issues/25)~~ ✅ **COMPLETED** (`1b1b58e`) - Added AI_FAILED red badge + "AI Failed" label, `isFailed()`/`canRetry()` helpers, retry button in list view (BU for own, Admin/SA for any), and error reason display in detail panel with Ollama guidance |
 | 2 | ~~[#26](https://github.com/nuklehed/fmv-ai/issues/26)~~ ✅ **COMPLETED** (`ba919b7` + `4f1da09` + `f90fdce`) - Added ⚠️ Action Required badge, Needs Review filter, AND dedicated `/assessments/:id/review` page with two-phase workflow:
    - Phase 1: Read-only AI results display
    - Start Review → transitions AI_COMPLETE → UNDER_REVIEW
