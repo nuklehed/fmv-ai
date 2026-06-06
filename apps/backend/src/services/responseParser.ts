@@ -35,10 +35,12 @@ export function normalizeItem(item: Record<string, unknown>): { questionId?: str
       normalized.questionId = stripBrackets(String(value))
     }
     // selectedAnswerId aliases: selectedanswerid, answerid, answer_id, option_id, id,
-    //   selectedanswer, selected_answer, selected_answer_id, answer, option
+    //   selectedanswer, selected_answer, selected_answer_id, answer, option,
+    //   selected_option, selectedoption
     else if (lowerKey === 'selectedanswerid' || lowerKey === 'answerid' || lowerKey === 'answer_id'
       || lowerKey === 'optionid' || lowerKey === 'option_id' || lowerKey === 'id'
       || lowerKey === 'selectedanswer' || lowerKey === 'selected_answer'
+      || lowerKey === 'selected_option' || lowerKey === 'selectedoption'
       || lowerKey === 'answer' || lowerKey === 'option') {
       // Only map bare 'id' to selectedAnswerId if we already have a questionId
       if (lowerKey === 'id' && !normalized.questionId) continue
