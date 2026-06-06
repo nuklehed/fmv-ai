@@ -293,7 +293,12 @@ The approved breakdown:
    - `question` instead of `questionId`, `selected_answer` instead of `selectedAnswerId`
    - Answer IDs wrapped in brackets: `[a2]` instead of `a2`
    - Fixed responseParser to handle these aliases + strip bracket wrappers
-   - Strengthened prompt with explicit WRONG examples showing the exact pattern to avoid
+   - Strengthened prompt with explicit WRONG examples showing the exact pattern to avoid |
+| 6 | **LLM positional ID fallback** (`bc64ebc`) — Model now uses completely different format `{"q1": "a2"}`:
+   - Added `tryMatchPositionalId()` in responseParser: handles q1, a2, q1a2 patterns → maps to real DB UUIDs
+   - Three-tier fallback: exact match → positional matching → reject
+   - Strengthened system prompt with explicit 36-char UUID examples and "DO NOT" section
+   - Changed user prompt format from `[${answer.id}]` to `ID: ${answer.id} | Score: ...` to avoid bracket confusion |
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
