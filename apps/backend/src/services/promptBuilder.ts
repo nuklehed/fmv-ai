@@ -30,6 +30,11 @@ OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE:
 You MUST return ONLY a valid JSON array. No markdown code blocks (no \`\`\`). No extra text before or after the JSON.
 Use these EXACT field names: questionId, selectedAnswerId, rationale (camelCase).
 
+CRITICAL: Every answer in the array MUST have all three fields populated with valid values:
+- "questionId": must match one of the question IDs listed below exactly
+- "selectedAnswerId": must be a valid answer ID from that question's options
+- "rationale": must be a non-empty string explaining your choice
+
 EXAMPLE OUTPUT:
 [
   {

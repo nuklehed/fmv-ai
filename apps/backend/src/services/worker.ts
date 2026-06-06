@@ -100,7 +100,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
       where: { id: assessmentId },
       data: {
         status: 'AI_FAILED',
-        aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `Empty LLM response` }]),
+        aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `Empty LLM response — model returned no content` }]),
         completedAt: new Date()
       }
     })
@@ -112,11 +112,25 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
 
   if (aiResults.length === 0) {
     console.warn('No valid AI results parsed from LLM response')
+    // Store diagnostic info for debugging — include raw snippet and count of extracted items
+    const snippet = llmContent.length > 300 ? llmContent.substring(0, 300) + '...' : llmContent
+    console.warn(`LLM response (first 300 chars): ${snippet}`)
     await prisma.assessment.update({
       where: { id: assessmentId },
       data: {
         status: 'AI_FAILED',
-        aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `No valid AI results parsed from LLM response` }]),
+        aiResults: JSON.stringify([
+          {
+            questionId: 'error',
+            selectedAnswerId: null,
+            rationale: `No valid AI results parsed. The model may have returned malformed JSON, missing fields (questionId/selectedAnswerId), or invalid answer IDs.`
+          },
+          {
+            questionId: '_diagnostic',
+            selectedAnswerId: null,
+            rationale: `Raw output snippet: ${snippet}`
+          }
+        ]),
         completedAt: new Date()
       }
     })

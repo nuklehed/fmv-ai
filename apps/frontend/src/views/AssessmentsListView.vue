@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as assessmentDomain from '@/domain/assessment'
 
@@ -154,6 +154,7 @@ async function rejectAssessment() {
 
 const retryLoading = ref(false)
 const retrySuccess = ref('')
+const showDiagnosticInfo = ref(false)
 
 async function retryFailedAssessment(assessment: assessmentDomain.AssessmentListItem) {
   if (!confirm(`Retry AI processing for ${assessment.hcp.firstName} ${assessment.hcp.lastName}?`)) return
@@ -168,6 +169,25 @@ async function retryFailedAssessment(assessment: assessmentDomain.AssessmentList
     setTimeout(() => { formError.value = '' }, 5000)
   } finally { retryLoading.value = false }
 }
+
+// ─── Diagnostic Info Helpers ─────────────────────────────────────
+
+function getAiResultsArray(): any[] {
+  if (!selectedAssessment.value?.aiResults) return []
+  if (Array.isArray(selectedAssessment.value.aiResults)) return selectedAssessment.value.aiResults as any[]
+  if (typeof selectedAssessment.value.aiResults === 'string' && selectedAssessment.value.aiResults.startsWith('[')) {
+    try { return JSON.parse(selectedAssessment.value.aiResults) }
+    catch { return [] }
+  }
+  return []
+}
+
+const hasDiagnosticInfo = computed(() => getAiResultsArray().some((r: any) => r.questionId === '_diagnostic'))
+const diagnosticSnippet = computed(() => {
+  const results = getAiResultsArray()
+  const diag = results.find((r: any) => r.questionId === '_diagnostic')
+  return diag?.rationale || ''
+})
 
 // ─── Lifecycle ─────────────────────────────────────────────────────
 
@@ -332,10 +352,17 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                         AI Processing Failed
                       </h4>
                       <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p v-if="typeof selectedAssessment.aiResults === 'string'" class="text-sm text-red-700">{{ selectedAssessment.aiResults }}</p>
-                        <p v-else-if="selectedAssessment.aiResults && typeof selectedAssessment.aiResults === 'object'" class="text-sm text-red-700">
-                          {{ (selectedAssessment.aiResults as any).error || (selectedAssessment.aiResults as any).message || 'The LLM returned an invalid or empty response. Check that Ollama is running with qwen3.6-35b-a3b loaded.' }}
-                        </p>
+                        <!-- Show error messages (filter out diagnostic entries) -->
+                        <template v-if="getAiResultsArray().length > 0">
+                          <p v-for="(err, idx) in getAiResultsArray().filter((r: any) => r.questionId !== '_diagnostic')" :key="idx" class="text-sm text-red-700">
+                            {{ err.rationale || err.error || JSON.stringify(err) }}
+                          </p>
+                          <!-- Diagnostic toggle -->
+                          <button v-if="hasDiagnosticInfo" @click="showDiagnosticInfo = !showDiagnosticInfo" class="mt-2 text-xs text-red-600 hover:text-red-800 underline">
+                            {{ showDiagnosticInfo ? 'Hide' : 'Show' }} diagnostic info (raw LLM output)
+                          </button>
+                          <pre v-if="showDiagnosticInfo && hasDiagnosticInfo" class="mt-2 p-2 bg-white border border-red-200 rounded text-xs text-gray-700 whitespace-pre-wrap max-h-48 overflow-y-auto">{{ diagnosticSnippet }}</pre>
+                        </template>
                         <p v-else class="text-sm text-red-700">The LLM returned an invalid or empty response. Check that Ollama is running with qwen3.6-35b-a3b loaded.</p>
                       </div>
                     </div>
@@ -467,7 +494,11 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   </div>
 
                   <!-- Panel Footer -->
-                  <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 space-y-2">
+                    <!-- Retry button for AI_FAILED assessments -->
+                    <button v-if="assessmentDomain.isFailed(selectedAssessment) && assessmentDomain.canRetry(selectedAssessment)" @click.stop="retryFailedAssessment(selectedAssessment); closeDetailPanel()" :disabled="retryLoading" class="block w-full text-center px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm font-medium">
+                      {{ retryLoading ? 'Retrying...' : 'Retry AI Processing' }}
+                    </button>
                     <a href="/assessments/new" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</a>
                   </div>
                 </div>
