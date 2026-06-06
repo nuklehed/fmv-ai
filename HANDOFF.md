@@ -283,7 +283,7 @@ The approved breakdown:
    - Start Review → transitions AI_COMPLETE → UNDER_REVIEW
    - Phase 2: Editable answer dropdowns (with rationale when different from AI), live score counter, tier/rate selection, approve button
    - Nav improvement: Clicking the Action Required badge OR any AI_COMPLETE row navigates directly to `/assessments/:id/review` (reduced from 3 clicks → 1 click)
-| 3 | [#27](https://github.com/nuklehed/fmv-ai/issues/27) | **LLM unreachable error handling** - When local LLM (qwen3.6-35b-a3b) is not available on port 11434, submission fails silently or with confusing errors; no pre-flight check, no clear user feedback |
+| 3 | ~~[#27](https://github.com/nuklehed/fmv-ai/issues/27)~~ ✅ **COMPLETED** (`78288f9`) - Added `GET /api/llm/health` endpoint (checks Ollama + model loaded status), pre-flight check in frontend before submission, clear error messages with actionable guidance (e.g., "ollama pull qwen3.6-35b-a3b") |
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
