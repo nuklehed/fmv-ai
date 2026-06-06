@@ -88,8 +88,45 @@ export function extractJSONFromResponse(text: string): unknown[] {
 }
 
 /**
+ * Try to match a synthetic positional ID (e.g., 'q1', 'a2') to actual DB IDs.
+ * Returns null if not a positional pattern, or the matched real ID.
+ */
+function tryMatchPositionalId(synthetic: string, questions: CriteriaQuestion[]): { questionId?: string; answerId?: string } {
+  // Match q1/q2/... → question index
+  const qMatch = synthetic.match(/^q(\d+)$/i)
+  if (qMatch) {
+    const idx = parseInt(qMatch[1]) - 1
+    if (idx >= 0 && idx < questions.length) {
+      return { questionId: questions[idx].id }
+    }
+  }
+
+  // Match a1/a2/... → answer index for first question
+  const aMatch = synthetic.match(/^a(\d+)$/i)
+  if (aMatch) {
+    const idx = parseInt(aMatch[1]) - 1
+    if (idx >= 0 && questions.length > 0 && idx < questions[0].answers.length) {
+      return { answerId: questions[0].answers[idx].id }
+    }
+  }
+
+  // Match q1a2 pattern
+  const qaMatch = synthetic.match(/^q(\d+)a(\d+)$/i)
+  if (qaMatch) {
+    const qIdx = parseInt(qaMatch[1]) - 1
+    const aIdx = parseInt(qaMatch[2]) - 1
+    if (qIdx >= 0 && qIdx < questions.length && aIdx >= 0 && aIdx < questions[qIdx].answers.length) {
+      return { questionId: questions[qIdx].id, answerId: questions[qIdx].answers[aIdx].id }
+    }
+  }
+
+  return {}
+}
+
+/**
  * Parse the LLM JSON response into structured AI results.
  * Validates each result against the criteria questions and their valid answers.
+ * Uses positional fallback matching when the model generates synthetic IDs (q1, a2).
  */
 export function parseLLMResponse(response: string, questions: CriteriaQuestion[]): AIResult[] {
   const extracted = extractJSONFromResponse(response)
@@ -110,8 +147,33 @@ export function parseLLMResponse(response: string, questions: CriteriaQuestion[]
     if (!item || typeof item !== 'object') continue
 
     const normalized = normalizeItem(item as Record<string, unknown>)
-    const { questionId, selectedAnswerId, rationale } = normalized
+    let { questionId, selectedAnswerId, rationale } = normalized
 
+    // If normalization didn't produce valid fields, try positional matching
+    if (!selectedAnswerId || !questionId) {
+      // Check if this is a shorthand like {"q1": "a2"}
+      const entries = Object.entries(item as Record<string, unknown>)
+      for (const [key, value] of entries) {
+        if (typeof key !== 'string' || typeof value === 'undefined') continue
+        const positional = tryMatchPositionalId(key, questions)
+        if (positional.questionId && !questionId) questionId = positional.questionId
+        if (positional.answerId && !selectedAnswerId) selectedAnswerId = positional.answerId
+      }
+    }
+
+    // If still no match via normalization, try treating the whole item as positional shorthand
+    if (!selectedAnswerId || !questionId) {
+      const entries = Object.entries(item as Record<string, unknown>)
+      for (const [key, value] of entries) {
+        if (typeof key !== 'string' || typeof value === 'undefined') continue
+        const positional = tryMatchPositionalId(key, questions)
+        if (!positional.questionId && !positional.answerId) continue
+        if (!questionId) questionId = positional.questionId
+        if (!selectedAnswerId) selectedAnswerId = positional.answerId || stripBrackets(String(value))
+      }
+    }
+
+    // Final validation: check against actual DB IDs
     if (!selectedAnswerId || !questionId) continue
     if (!questionIds.has(questionId)) continue
     const validAnswers = answerMap.get(questionId)

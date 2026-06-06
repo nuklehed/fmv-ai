@@ -29,34 +29,41 @@ RULES:
 OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE:
 You MUST return ONLY a valid JSON array. No markdown code blocks (no \`\`\`). No extra text before or after the JSON.
 
-FIELD NAMES — USE THESE EXACT camelCase NAMES (NOT snake_case, NOT shortened):
-- "questionId"  (NOT "question", NOT "question_id")
-- "selectedAnswerId"  (NOT "selected_answer", NOT "answerId", NOT "id")
+FIELD NAMES — USE THESE EXACT camelCase NAMES:
+- "questionId"  (NOT "question", NOT "q1", NOT "question_id")
+- "selectedAnswerId"  (NOT "answer", NOT "a2", NOT "selected_answer", NOT "option")
 - "rationale"
 
+CRITICAL — ANSWER IDS ARE LONG UUID STRINGS, NOT SHORT CODES:
+- Question IDs look like: "550e8400-e29b-41d4-a716-446655440000" (36 chars with dashes)
+- Answer IDs look like: "6ba7b810-9dad-11d1-80b4-00c04fd430c8" (36 chars with dashes)
+- NEVER use short codes like "q1", "a2", "q1a2", or any abbreviated form
+- NEVER wrap IDs in brackets — use plain strings: "550e8400-e29b..."
+
 CRITICAL: Every answer in the array MUST have all three fields populated with valid values:
-- "questionId": must match one of the question IDs listed below exactly (e.g., "abc-123")
-- "selectedAnswerId": must be a valid answer ID from that question's options (e.g., "def-456", NOT "[a2]")
+- "questionId": must be the EXACT UUID from the question list below (36 characters)
+- "selectedAnswerId": must be the EXACT UUID from that question's answer options (36 characters)
 - "rationale": must be a non-empty string explaining your choice
 
 EXAMPLE OUTPUT:
 [
   {
-    "questionId": "abc-123",
-    "selectedAnswerId": "def-456",
+    "questionId": "550e8400-e29b-41d4-a716-446655440000",
+    "selectedAnswerId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     "rationale": "The CV shows 8 years of experience which meets the 5+ years criterion."
   },
   {
-    "questionId": "ghi-789",
-    "selectedAnswerId": "jkl-012",
+    "questionId": "7c9e6679-7122-4daa-b4ee-ef0f3b8d1a2c",
+    "selectedAnswerId": "8d1e5503-f4ab-4c2d-a9e1-2b3c4d5e6f7a",
     "rationale": "Insufficient data in the CV to determine this criterion."
   }
 ]
 
 WRONG — DO NOT USE THESE:
+- {"q1": "a2"} ← completely wrong format, short codes not accepted
 - {"question": "abc", "selected_answer": "[a2]"} ← wrong field names, bracket-wrapped IDs
 - {"question_id": "abc", "answerId": "def"} ← snake_case or mixed case
-- Any output wrapped in \`\`\`json code blocks
+- Any output wrapped in \`\`\`json code blocks`
 }
 
 /**
@@ -80,11 +87,11 @@ function buildUserPrompt(assessment: Assessment & { hcp: Hcp; specialty?: Specia
     prompt += `\n### Question ${question.id}: ${question.text}\n`
     const sortedAnswers = [...question.answers].sort((a, b) => a.score - b.score)
     for (const answer of sortedAnswers) {
-      prompt += `- [${answer.id}] (${answer.score} pts): ${answer.text}\n`
+      prompt += `- ID: ${answer.id} | Score: ${answer.score} pts | ${answer.text}\n`
     }
   }
 
-  prompt += `\nPlease return your evaluation as a JSON array.`
+  prompt += `\nIMPORTANT: When returning your evaluation, use the EXACT UUID strings shown above for questionId and selectedAnswerId. Do NOT abbreviate or modify them in any way.`
 
   return prompt
 }
