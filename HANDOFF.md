@@ -237,6 +237,7 @@ The approved breakdown:
 | 24 | UX: Show processing feedback when submitting assessment for AI evaluation | Enhancement | None | ✅ Done |
 | 25 | Remove unused dependencies (axios, ioredis, pdf-parse, pdfkit, @primevue/themes) | Cleanup | None | ✅ Done (`c371943`) — fallow confirmed zero unused deps remaining |
 | 26 | Remove 14 unused exports + 5 unused types via fallow fix | Cleanup | None | ✅ Done (`1dc0012`) — dead-code now shows only 1 issue (mock-server.ts) |
+| 27 | Delete dead mock-server.ts (279 lines, zero imports) | Cleanup | None | ✅ Done (`a8f7a54`) — fallow confirms **zero** dead code issues across entire monorepo |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
