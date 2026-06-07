@@ -96,9 +96,17 @@ async function fetchAssessment() {
     const result = await assessmentDomain.fetchAssessment(id)
     assessment.value = result as unknown as assessmentDomain.AssessmentListItem
 
-    // If already in UNDER_REVIEW, skip straight to Phase 2
+    // If already in UNDER_REVIEW, skip straight to Phase 2 and restore overrides from AI results
     if (assessment.value.status === 'UNDER_REVIEW') {
       isReviewing.value = true
+      const aiResults = assessmentDomain.getAiResults(assessment.value)
+      const aiByQuestionId = new Map(aiResults.map((r: any) => [r.questionId, r]))
+      const questions = assessment.value.criteriaSet?.questions || []
+      // Build overrides for ALL questions — use AI result as default when available
+      overrides.value = questions.map((q: any) => {
+        const ai = aiByQuestionId.get(q.id)
+        return ai ? { questionId: q.id, selectedAnswerId: ai.selectedAnswerId, rationale: '' } : { questionId: q.id, selectedAnswerId: '', rationale: '' }
+      })
     }
 
     await loadTiers()
@@ -122,13 +130,14 @@ async function startReview() {
   formError.value = ''
 
   try {
-    // Initialize overrides from AI results
     const aiResults = assessmentDomain.getAiResults(assessment.value)
-    overrides.value = aiResults.map((r: any) => ({
-      questionId: r.questionId,
-      selectedAnswerId: r.selectedAnswerId,
-      rationale: ''
-    }))
+    const aiByQuestionId = new Map(aiResults.map((r: any) => [r.questionId, r]))
+    const questions = assessment.value.criteriaSet?.questions || []
+    // Initialize overrides for EVERY question — use AI result as default when available
+    overrides.value = questions.map((q: any) => {
+      const ai = aiByQuestionId.get(q.id)
+      return ai ? { questionId: q.id, selectedAnswerId: ai.selectedAnswerId, rationale: '' } : { questionId: q.id, selectedAnswerId: '', rationale: '' }
+    })
 
     // Call backend to transition status to UNDER_REVIEW
     await assessmentDomain.startReview(assessment.value.id)
