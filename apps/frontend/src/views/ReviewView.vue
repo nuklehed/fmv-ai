@@ -39,18 +39,22 @@ const approveRationale = ref('')
 
 // ─── Computed ──────────────────────────────────────────────────
 
-/** AI's original total score */
+/** AI's original total score — look up scores from criteria set since stored AI results don't include a score field */
 const aiScore = computed(() => {
-  if (!assessment.value?.aiResults) return null
+  if (!assessment.value?.criteriaSet || !assessment.value.aiResults) return null
   const results = assessmentDomain.getAiResults(assessment.value)
   let score = 0
   for (const r of results) {
-    score += r.score ?? 0
+    const question = assessment.value!.criteriaSet.questions.find((q: any) => q.id === r.questionId)
+    if (question) {
+      const answer = question.answers.find((a: any) => a.id === r.selectedAnswerId)
+      if (answer) score += answer.score
+    }
   }
   return score
 })
 
-/** Live admin-calculated total score */
+/** Admin's selected total score — computed from overrides */
 const adminScore = computed(() => {
   if (!assessment.value?.criteriaSet || overrides.value.length === 0) return null
   let score = 0
@@ -259,12 +263,12 @@ onMounted(() => { fetchAssessment() })
           <div class="flex items-center space-x-8">
             <div>
               <p class="text-sm text-gray-500">AI Score</p>
-              <p class="text-3xl font-bold text-purple-700">{{ aiScore ?? '—' }}</p>
+              <p class="text-3xl font-bold text-purple-700">{{ adminScore ?? '—' }}</p>
             </div>
             <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
             <div>
               <p class="text-sm text-gray-500">Admin Score</p>
-              <p class="text-3xl font-bold text-blue-700">{{ adminScore ?? '—' }}</p>
+              <p class="text-3xl font-bold text-blue-700">{{ aiScore ?? '—' }}</p>
             </div>
           </div>
         </div>
