@@ -236,6 +236,7 @@ The approved breakdown:
 | 23 | Fix ApplicationSettingsView v-model binding to function call | Bug | None | ✅ Done |
 | 24 | UX: Show processing feedback when submitting assessment for AI evaluation | Enhancement | None | ✅ Done |
 | 25 | Remove unused dependencies (axios, ioredis, pdf-parse, pdfkit, @primevue/themes) | Cleanup | None | ✅ Done (`c371943`) — fallow confirmed zero unused deps remaining |
+| 26 | Remove 14 unused exports + 5 unused types via fallow fix | Cleanup | None | ✅ Done (`1dc0012`) — dead-code now shows only 1 issue (mock-server.ts) |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
