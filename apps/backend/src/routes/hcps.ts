@@ -160,6 +160,17 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     // Multi-tenant isolation
     const tenantId = req.tenantId!
 
+    // Validate specialtyId if provided — must have a linked criteria set
+    if (specialtyId) {
+      const specialty = await prisma.specialty.findFirst({
+        where: { id: specialtyId, tenantId, isActive: true, criteriaSetId: { not: null } }
+      })
+      if (!specialty) {
+        res.status(400).json({ error: 'Invalid specialty. Must be active and linked to a criteria set.' })
+        return
+      }
+    }
+
     // Fuzzy duplicate detection — check for matching name + any provided external identifiers
     if (identifiers && Array.isArray(identifiers) && identifiers.length > 0) {
       for (const identifier of identifiers) {
@@ -250,6 +261,17 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
   try {
     const { id } = req.params
     const { firstName, lastName, email, phone, address, state, specialtyId, identifiers } = req.body
+
+    // Validate specialtyId if provided — must have a linked criteria set
+    if (specialtyId) {
+      const specialty = await prisma.specialty.findFirst({
+        where: { id: specialtyId, tenantId: req.tenantId!, isActive: true, criteriaSetId: { not: null } }
+      })
+      if (!specialty) {
+        res.status(400).json({ error: 'Invalid specialty. Must be active and linked to a criteria set.' })
+        return
+      }
+    }
 
     // Multi-tenant isolation — verify HCP belongs to user's tenant
     const existing = await prisma.hcp.findFirst({
@@ -388,6 +410,17 @@ router.post('/bu-create', authenticate, requireBUOrHigher, async (req: Authentic
 
     // Multi-tenant isolation
     const tenantId = req.tenantId!
+
+    // Validate specialtyId if provided — must have a linked criteria set
+    if (specialtyId) {
+      const specialty = await prisma.specialty.findFirst({
+        where: { id: specialtyId, tenantId, isActive: true, criteriaSetId: { not: null } }
+      })
+      if (!specialty) {
+        res.status(400).json({ error: 'Invalid specialty. Must be active and linked to a criteria set.' })
+        return
+      }
+    }
 
     // Fuzzy duplicate detection — check for matching name + any provided external identifiers
     if (identifiers && Array.isArray(identifiers) && identifiers.length > 0) {

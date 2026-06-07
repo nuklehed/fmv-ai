@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { Specialty } from '@/types'
+import type { Specialty, CriteriaSet } from '@/types'
 import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
+interface FormCriteriaSet {
+  id: string
+  name: string
+}
+
 const specialties = ref<Specialty[]>([])
+const criteriaSets = ref<FormCriteriaSet[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
 const showAddModal = ref(false)
@@ -13,11 +19,13 @@ const editingSpecialty = ref<Specialty | null>(null)
 // Form state for add/edit
 const formName = ref('')
 const formDescription = ref('')
+const formCriteriaSetId = ref<string>('')
 const formError = ref('')
 
 function resetForm() {
   formName.value = ''
   formDescription.value = ''
+  formCriteriaSetId.value = ''
   formError.value = ''
 }
 
@@ -36,6 +44,16 @@ async function fetchSpecialties() {
   }
 }
 
+async function fetchCriteriaSets() {
+  try {
+    const response = await apiFetch('/api/criteria-sets?active=true', { headers: getAuthHeaders() })
+    const data = await response.json()
+    criteriaSets.value = data.map((cs: CriteriaSet) => ({ id: cs.id, name: cs.name }))
+  } catch {
+    // Non-critical — dropdown will be empty
+  }
+}
+
 async function handleAdd() {
   if (!formName.value.trim()) {
     formError.value = 'Specialty name is required'
@@ -45,7 +63,7 @@ async function handleAdd() {
     await apiFetch('/api/specialties', {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ name: formName.value, description: formDescription.value || null })
+      body: JSON.stringify({ name: formName.value, description: formDescription.value || null, criteriaSetId: formCriteriaSetId.value || null })
     })
     showAddModal.value = false
     resetForm()
@@ -59,6 +77,7 @@ async function openEditModal(specialty: Specialty) {
   editingSpecialty.value = specialty
   formName.value = specialty.name
   formDescription.value = specialty.description || ''
+  formCriteriaSetId.value = specialty.criteriaSetId || ''
   formError.value = ''
   showEditModal.value = true
 }
@@ -72,7 +91,7 @@ async function handleUpdate() {
     await apiFetch(`/api/specialties/${editingSpecialty.value.id}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ name: formName.value, description: formDescription.value || null })
+      body: JSON.stringify({ name: formName.value, description: formDescription.value || null, criteriaSetId: formCriteriaSetId.value || null })
     })
     showEditModal.value = false
     resetForm()
@@ -99,7 +118,10 @@ function handleSearch() {
   searchTimeout = setTimeout(() => fetchSpecialties(), 300)
 }
 
-onMounted(fetchSpecialties)
+onMounted(() => {
+  fetchSpecialties()
+  fetchCriteriaSets()
+})
 </script>
 
 <template>
@@ -147,6 +169,7 @@ onMounted(fetchSpecialties)
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criteria Set</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</th>
@@ -155,12 +178,16 @@ onMounted(fetchSpecialties)
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-if="specialties.length === 0">
-              <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
+              <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">
                 No specialties found. Click "Add Specialty" to create one.
               </td>
             </tr>
             <tr v-for="specialty in specialties" :key="specialty.id" class="hover:bg-gray-50">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ specialty.name }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span v-if="specialty.criteriaSet" class="text-purple-700 font-medium">{{ specialty.criteriaSet.name }}</span>
+                <span v-else class="text-red-500 italic">Not assigned</span>
+              </td>
               <td class="px-6 py-4 text-sm text-gray-500">{{ specialty.description || '—' }}</td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span
@@ -236,6 +263,19 @@ onMounted(fetchSpecialties)
                       />
                     </div>
 
+                    <div>
+                      <label for="add-criteria-set" class="block text-sm font-medium text-gray-700 mb-1">Criteria Set *</label>
+                      <select
+                        id="add-criteria-set"
+                        v-model="formCriteriaSetId"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select a criteria set...</option>
+                        <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
+                      </select>
+                    </div>
+
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
@@ -300,6 +340,19 @@ onMounted(fetchSpecialties)
                         placeholder="Optional description..."
                         class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
+                    </div>
+
+                    <div>
+                      <label for="edit-criteria-set" class="block text-sm font-medium text-gray-700 mb-1">Criteria Set *</label>
+                      <select
+                        id="edit-criteria-set"
+                        v-model="formCriteriaSetId"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Select a criteria set...</option>
+                        <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
+                      </select>
                     </div>
 
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>

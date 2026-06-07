@@ -59,10 +59,20 @@ export interface Assessment {
   completedAt?: string | null
 }
 
+export interface CriteriaSet {
+  id: string
+  name: string
+  description?: string | null
+  isActive: boolean
+  tenantId: string
+}
+
 export interface Specialty {
   id: string
   name: string
   description?: string
+  criteriaSetId?: string
+  criteriaSet?: { id: string; name: string } | null
   isActive: boolean
   tenantId: string
   createdAt: string

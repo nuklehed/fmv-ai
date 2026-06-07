@@ -59,32 +59,36 @@ model HcpIdentifier {
 }
 
 model Specialty {
-  id          String       @id @default(uuid())
-  name        String
-  description String?
-  isActive    Boolean      @default(true)
-  tenantId    String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  assessments Assessment[] @relation("AssessmentSpecialty")
-  hcps        Hcp[]
-  tiers       Tier[]
+  id            String        @id @default(uuid())
+  name          String
+  description   String?
+  criteriaSetId String?
+  isActive      Boolean       @default(true)
+  tenantId      String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  assessments   Assessment[]  @relation("AssessmentSpecialty")
+  hcps          Hcp[]
+  tiers         Tier[]
+  criteriaSet   CriteriaSet?  @relation("SpecialtyCriteriaSet", fields: [criteriaSetId], references: [id])
 
   @@unique([name, tenantId])
   @@index([tenantId, isActive])
+  @@index([criteriaSetId])
 }
 
 model CriteriaSet {
-  id           String       @id @default(uuid())
+  id           String        @id @default(uuid())
   name         String
   description  String?
   systemPrompt String?
-  isActive     Boolean      @default(true)
+  isActive     Boolean       @default(true)
   tenantId     String
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  assessments  Assessment[] @relation("CriteriaSetAssessments")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  assessments  Assessment[]  @relation("CriteriaSetAssessments")
   questions    Question[]
+  specialties  Specialty[]   @relation("SpecialtyCriteriaSet")
 
   @@index([tenantId, isActive])
 }

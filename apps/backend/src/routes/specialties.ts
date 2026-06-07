@@ -43,10 +43,17 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
         id: true,
         name: true,
         description: true,
+        criteriaSetId: true,
         isActive: true,
         tenantId: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        criteriaSet: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
     })
 
@@ -63,7 +70,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
  */
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { name, description } = req.body
+    const { name, description, criteriaSetId } = req.body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       res.status(400).json({ error: 'Specialty name is required' })
@@ -72,6 +79,17 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
 
     // Multi-tenant isolation — use tenant from authenticated user
     const tenantId = req.tenantId!
+
+    // Validate criteriaSetId if provided — must exist and belong to same tenant
+    if (criteriaSetId) {
+      const criteriaSet = await prisma.criteriaSet.findFirst({
+        where: { id: criteriaSetId, tenantId, isActive: true }
+      })
+      if (!criteriaSet) {
+        res.status(400).json({ error: 'Invalid criteria set. Must be active and belong to your organization.' })
+        return
+      }
+    }
 
     // Check for duplicate name within the same tenant
     const existing = await prisma.specialty.findFirst({
@@ -91,16 +109,24 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
       data: {
         name: name.trim(),
         description: description || null,
+        criteriaSetId: criteriaSetId || null,
         tenantId
       },
       select: {
         id: true,
         name: true,
         description: true,
+        criteriaSetId: true,
         isActive: true,
         tenantId: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        criteriaSet: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
     })
 
@@ -123,7 +149,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
 router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { name, description, isActive } = req.body
+    const { name, description, criteriaSetId, isActive } = req.body
 
     // Multi-tenant isolation — verify specialty belongs to user's tenant
     const existing = await prisma.specialty.findFirst({
@@ -135,6 +161,24 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 
     if (!existing) {
       res.status(404).json({ error: 'Specialty not found' })
+      return
+    }
+
+    // Validate criteriaSetId if provided — must exist and belong to same tenant
+    if (criteriaSetId) {
+      const criteriaSet = await prisma.criteriaSet.findFirst({
+        where: { id: criteriaSetId, tenantId: req.tenantId!, isActive: true }
+      })
+      if (!criteriaSet) {
+        res.status(400).json({ error: 'Invalid criteria set. Must be active and belong to your organization.' })
+        return
+      }
+    }
+
+    // Cannot activate a specialty without a linked criteria set
+    const shouldActivate = isActive === true || (isActive !== false && !('isActive' in req.body))
+    if (shouldActivate && existing.criteriaSetId !== criteriaSetId) {
+      res.status(400).json({ error: 'Cannot activate specialty without linking a criteria set. Assign a criteria set first.' })
       return
     }
 
@@ -160,16 +204,24 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       data: {
         ...(name && { name: name.trim() }),
         ...(description !== undefined && { description: description || null }),
+        ...(criteriaSetId !== undefined && { criteriaSetId: criteriaSetId || null }),
         ...(isActive !== undefined && { isActive })
       },
       select: {
         id: true,
         name: true,
         description: true,
+        criteriaSetId: true,
         isActive: true,
         tenantId: true,
         createdAt: true,
-        updatedAt: true
+        updatedAt: true,
+        criteriaSet: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
     })
 
