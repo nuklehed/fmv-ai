@@ -235,6 +235,7 @@ The approved breakdown:
 | 22 | Fix blank Settings page due to Vue Router 4 empty path child route mismatch | Bug | None | ✅ Done |
 | 23 | Fix ApplicationSettingsView v-model binding to function call | Bug | None | ✅ Done |
 | 24 | UX: Show processing feedback when submitting assessment for AI evaluation | Enhancement | None | ✅ Done |
+| 25 | Remove unused dependencies (axios, ioredis, pdf-parse, pdfkit, @primevue/themes) | Cleanup | None | ✅ Done (`c371943`) — fallow confirmed zero unused deps remaining |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
