@@ -238,7 +238,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HCP</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Score</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
               <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -261,9 +261,8 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   </svg>
                   {{ assessmentDomain.getStatusLabel(assessment.status) }}
                 </span>
-                <button v-if="assessmentDomain.isActionRequired(assessment) && assessmentDomain.isAdminOrSAUser()" @click.stop="navigateToReview(assessment)" class="ml-1.5 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-red-600 text-white animate-pulse hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-red-500">
-                  <svg class="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-                  Action Required
+                <button v-if="assessmentDomain.isActionRequired(assessment) && assessmentDomain.isAdminOrSAUser()" @click.stop="navigateToReview(assessment)" class="ml-1.5 px-2 py-0.5 animate-pulse inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-600 text-white">
+                  !
                 </button>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ assessment.totalScore !== null ? assessment.totalScore : '—' }}</td>
@@ -279,6 +278,12 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                 </template>
                 <!-- Non-DRAFT status actions -->
                 <template v-else>
+                  <!-- UNDER_REVIEW: show review + view buttons -->
+                  <template v-if="assessment.status === 'UNDER_REVIEW' && assessmentDomain.isAdminOrSAUser()">
+                    <router-link :to="`/assessments/${assessment.id}/review`" class="text-purple-600 hover:text-purple-900 font-medium mr-3">
+                      Review
+                    </router-link>
+                  </template>
                   <!-- AI_FAILED: show retry button + view -->
                   <template v-if="assessmentDomain.isFailed(assessment) && assessmentDomain.canRetry(assessment)">
                     <button @click.stop="retryFailedAssessment(assessment)" :disabled="retryLoading" class="text-orange-600 hover:text-orange-900 font-medium mr-3">
@@ -429,9 +434,11 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   <!-- Submitted By -->
                   <div class="p-6"><h4 class="text-sm font-medium text-gray-500 mb-2">Submitted By</h4><p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p></div>
 
-                  <!-- Start Review Button (navigate to dedicated review page) -->
-                  <div v-if="assessmentDomain.canReview(selectedAssessment)" class="border-t border-gray-200 pt-4">
-                    <router-link :to="`/assessments/${selectedAssessment.id}/review`" class="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">Start Review</router-link>
+                  <!-- Start Review / Continue Review Button (navigate to dedicated review page) -->
+                  <div v-if="assessmentDomain.canReview(selectedAssessment) || selectedAssessment.status === 'UNDER_REVIEW'" class="border-t border-gray-200 pt-4">
+                    <router-link :to="`/assessments/${selectedAssessment.id}/review`" class="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">
+                      {{ selectedAssessment.status === 'UNDER_REVIEW' ? 'Continue Review' : 'Start Review' }}
+                    </router-link>
                   </div>
 
                   <!-- Approve Section -->
