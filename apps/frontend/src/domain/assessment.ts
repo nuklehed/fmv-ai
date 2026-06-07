@@ -99,12 +99,12 @@ export function getStatusLabel(status: string): string {
 // ─── Status Transition Rules ──────────────────────────────────────
 
 /** Check if assessment is in DRAFT state */
-function isDraft(assessment: AssessmentListItem): boolean {
+export function isDraft(assessment: AssessmentListItem): boolean {
   return assessment.status === 'DRAFT'
 }
 
 /** Check if assessment can be reviewed (AI_COMPLETE + admin/SA) */
-function canReview(assessment: AssessmentListItem, userRole?: string): boolean {
+export function canReview(assessment: AssessmentListItem, userRole?: string): boolean {
   return assessment.status === 'AI_COMPLETE' && isAdminOrSA(userRole)
 }
 
@@ -114,7 +114,7 @@ export function canApprove(assessment: AssessmentListItem, userRole?: string): b
 }
 
 /** Check if assessment can be rejected (UNDER_REVIEW + admin/SA) */
-function canReject(assessment: AssessmentListItem, userRole?: string): boolean {
+export function canReject(assessment: AssessmentListItem, userRole?: string): boolean {
   return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(userRole)
 }
 
@@ -135,7 +135,7 @@ export function isAdminOrSAUser(): boolean {
 }
 
 /** Check if assessment needs admin/SA review (AI_COMPLETE) */
-function isActionRequired(assessment: AssessmentListItem): boolean {
+export function isActionRequired(assessment: AssessmentListItem): boolean {
   return assessment.status === 'AI_COMPLETE'
 }
 
@@ -155,7 +155,7 @@ export function canRetry(assessment: AssessmentListItem): boolean {
 
 // ─── Date Formatting ──────────────────────────────────────────────
 
-function formatDate(dateStr?: string | null): string {
+export function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString()
 }
