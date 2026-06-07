@@ -1,15 +1,10 @@
-import { Router } from 'express'
 import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { authenticate, requireSA } from '../middleware/auth'
+import { createSaRouter } from './saRouter'
 
-const router = Router()
+const router = createSaRouter()
 const prisma = new PrismaClient()
-
-// All specialty routes require authentication and SA role
-router.use(authenticate)
-router.use(requireSA)
 
 /**
  * GET /api/specialties

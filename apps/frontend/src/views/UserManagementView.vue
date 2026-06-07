@@ -1,210 +1,90 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
 interface UserListItem {
-  id: string
-  email: string
-  role: 'BU' | 'ADMIN' | 'SA'
-  tenantId: string
-  isActive: boolean
-  emailVerified: boolean
-  createdAt: string
-  updatedAt: string
+  id: string; email: string; role: 'BU' | 'ADMIN' | 'SA'; tenantId: string
+  isActive: boolean; emailVerified: boolean; createdAt: string; updatedAt: string
 }
 
 const users = ref<UserListItem[]>([])
-const loading = ref(false)
-const searchQuery = ref('')
-const currentPage = ref(1)
-const pageSize = ref(25)
-const totalPages = ref(0)
-const totalCount = ref(0)
-const formError = ref('')
+const loading = ref(false); const searchQuery = ref('')
+const currentPage = ref(1); const pageSize = ref(25)
+const totalPages = ref(0); const totalCount = ref(0); const formError = ref('')
 
-// Modal states
-const showAddModal = ref(false)
-const showEditModal = ref(false)
+const showAddModal = ref(false); const showEditModal = ref(false)
 const editingUser = ref<UserListItem | null>(null)
 
-// Add form state
-const addEmail = ref('')
-const addPassword = ref('')
-const addRole = ref<'BU' | 'ADMIN'>('BU')
-const addEmailVerified = ref(false)
+const addEmail = ref(''); const addPassword = ref('')
+const addRole = ref<'BU' | 'ADMIN'>('BU'); const addEmailVerified = ref(false)
 
-// Edit form state
-const editEmail = ref('')
-const editPassword = ref('')
-const editRole = ref<'BU' | 'ADMIN' | 'SA'>('BU')
-const editIsActive = ref(true)
-const editEmailVerified = ref(false)
+const editEmail = ref(''); const editPassword = ref('')
+const editRole = ref<'BU' | 'ADMIN' | 'SA'>('BU'); const editIsActive = ref(true); const editEmailVerified = ref(false)
 
 async function fetchUsers() {
   loading.value = true
   try {
-    const token = localStorage.getItem('accessToken')
-    const params = new URLSearchParams({
-      page: String(currentPage.value),
-      limit: String(pageSize.value),
-      search: searchQuery.value || ''
-    })
-
-    const response = await fetch(`/api/users?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) throw new Error(`Failed to fetch users: ${response.statusText}`)
-
-    const result = await response.json()
-    users.value = result.data
-    totalPages.value = result.pagination.totalPages
+    const params = new URLSearchParams({ page: String(currentPage.value), limit: String(pageSize.value), search: searchQuery.value || '' })
+    const result = await (await apiFetch(`/api/users?${params}`, { headers: getAuthHeaders() })).json()
+    users.value = result.data; totalPages.value = result.pagination.totalPages
     totalCount.value = result.pagination.totalCount
-  } catch (error) {
-    console.error('Error fetching users:', error)
-    formError.value = 'Failed to load users'
-  } finally {
-    loading.value = false
-  }
+  } catch { formError.value = 'Failed to load users' }
+  finally { loading.value = false }
 }
 
 function resetAddForm() {
-  addEmail.value = ''
-  addPassword.value = ''
-  addRole.value = 'BU'
-  addEmailVerified.value = false
-  formError.value = ''
+  addEmail.value = ''; addPassword.value = ''; addRole.value = 'BU'; addEmailVerified.value = false; formError.value = ''
 }
 
 async function handleAdd() {
-  if (!addEmail.value.trim()) {
-    formError.value = 'Email is required'
-    return
-  }
-
+  if (!addEmail.value.trim()) { formError.value = 'Email is required'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/users', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        email: addEmail.value,
-        password: addPassword.value || undefined,
-        role: addRole.value,
-        emailVerified: addEmailVerified.value
-      })
+    await apiFetch('/api/users', {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ email: addEmail.value, password: addPassword.value || undefined,
+        role: addRole.value, emailVerified: addEmailVerified.value })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create user')
-    }
-
-    showAddModal.value = false
-    resetAddForm()
-    await fetchUsers()
-  } catch (error) {
-    console.error('Error creating user:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to create user'
-  }
+    showAddModal.value = false; resetAddForm(); await fetchUsers()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to create user' }
 }
 
 function openEditModal(user: UserListItem) {
-  editingUser.value = user
-  editEmail.value = user.email
-  editPassword.value = '' // Leave blank unless changing
-  editRole.value = user.role
-  editIsActive.value = user.isActive
-  editEmailVerified.value = user.emailVerified
-  formError.value = ''
-  showEditModal.value = true
+  editingUser.value = user; editEmail.value = user.email; editPassword.value = ''
+  editRole.value = user.role; editIsActive.value = user.isActive; editEmailVerified.value = user.emailVerified
+  formError.value = ''; showEditModal.value = true
 }
 
 async function handleUpdate() {
   if (!editingUser.value) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/users/${editingUser.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        role: editRole.value,
-        isActive: editIsActive.value,
-        emailVerified: editEmailVerified.value,
-        password: editPassword.value || undefined // Only update if provided
-      })
+    await apiFetch(`/api/users/${editingUser.value.id}`, {
+      method: 'PUT', headers: getAuthHeaders(),
+      body: JSON.stringify({ role: editRole.value, isActive: editIsActive.value,
+        emailVerified: editEmailVerified.value, password: editPassword.value || undefined })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update user')
-    }
-
-    showEditModal.value = false
-    editingUser.value = null
-    await fetchUsers()
-  } catch (error) {
-    console.error('Error updating user:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update user'
-  }
+    showEditModal.value = false; editingUser.value = null; await fetchUsers()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update user' }
 }
 
 async function handleDeactivate(user: UserListItem) {
   if (!confirm(`Are you sure you want to deactivate "${user.email}"?`)) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/users/${user.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) throw new Error(`Failed to deactivate user`)
-
+    await apiFetch(`/api/users/${user.id}`, { method: 'DELETE', headers: getAuthHeaders() })
     await fetchUsers()
-  } catch (error) {
-    console.error('Error deactivating user:', error)
-    formError.value = 'Failed to deactivate user'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to deactivate user' }
 }
 
-function handleSearch() {
-  currentPage.value = 1
-  fetchUsers()
-}
-
+function handleSearch() { currentPage.value = 1; fetchUsers() }
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 function onSearchInput() {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => handleSearch(), 300)
 }
 
-function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-    fetchUsers()
-  }
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString()
-}
-
-const roleColors: Record<string, string> = {
-  BU: 'bg-blue-100 text-blue-800',
-  ADMIN: 'bg-purple-100 text-purple-800',
-  SA: 'bg-red-100 text-red-800'
-}
-
-onMounted(() => {
-  fetchUsers()
-})
+function goToPage(page: number) { if (page >= 1 && page <= totalPages.value) { currentPage.value = page; fetchUsers() } }
+const formatDate = (d: string) => new Date(d).toLocaleDateString()
+const roleColors: Record<string, string> = { BU: 'bg-blue-100 text-blue-800', ADMIN: 'bg-purple-100 text-purple-800', SA: 'bg-red-100 text-red-800' }
+onMounted(fetchUsers)
 </script>
 
 <template>

@@ -1,32 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
 interface Answer {
-  id: string
-  text: string
-  score: number
-  order: number
-  isActive: boolean
+  id: string; text: string; score: number; order: number; isActive: boolean
 }
-
 interface Question {
-  id: string
-  text: string
-  order: number
-  isActive: boolean
-  answers: Answer[]
+  id: string; text: string; order: number; isActive: boolean; answers: Answer[]
 }
-
 interface CriteriaSet {
-  id: string
-  name: string
-  description?: string | null
-  systemPrompt?: string | null
-  isActive: boolean
-  tenantId: string
-  createdAt: string
-  updatedAt: string
-  questions: Question[]
+  id: string; name: string; description?: string | null; systemPrompt?: string | null
+  isActive: boolean; tenantId: string; createdAt: string; updatedAt: string; questions: Question[]
 }
 
 const criteriaSets = ref<CriteriaSet[]>([])
@@ -81,21 +65,12 @@ function toggleExpand(id: string) {
 async function fetchCriteriaSets() {
   loading.value = true
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
+    criteriaSets.value = await (await apiFetch(
       `/api/criteria-sets?active=true&search=${encodeURIComponent(searchQuery.value)}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-
-    if (!response.ok) throw new Error(`Failed to fetch criteria sets: ${response.statusText}`)
-
-    criteriaSets.value = await response.json()
-  } catch (error) {
-    console.error('Error fetching criteria sets:', error)
-    formError.value = 'Failed to load criteria sets'
-  } finally {
-    loading.value = false
-  }
+      { headers: getAuthHeaders() }
+    )).json()
+  } catch { formError.value = 'Failed to load criteria sets' }
+  finally { loading.value = false }
 }
 
 function resetForm() {
@@ -110,34 +85,14 @@ function resetForm() {
 // ─── Criteria Set CRUD ──────────────────────────────────────────────
 
 async function handleAdd() {
-  if (!formName.value.trim()) {
-    formError.value = 'Criteria set name is required'
-    return
-  }
-
+  if (!formName.value.trim()) { formError.value = 'Criteria set name is required'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/criteria-sets', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
+    await apiFetch('/api/criteria-sets', {
+      method: 'POST', headers: getAuthHeaders(),
       body: JSON.stringify({ name: formName.value, description: formDescription.value || null })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create criteria set')
-    }
-
-    showAddModal.value = false
-    resetForm()
-    await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error creating criteria set:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to create criteria set'
-  }
+    showAddModal.value = false; resetForm(); await fetchCriteriaSets()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to create criteria set' }
 }
 
 async function openEditModal(cs: CriteriaSet) {
@@ -149,35 +104,14 @@ async function openEditModal(cs: CriteriaSet) {
 }
 
 async function handleUpdate() {
-  if (!editingItem.value || !formName.value.trim()) {
-    formError.value = 'Criteria set name is required'
-    return
-  }
-
+  if (!editingItem.value || !formName.value.trim()) { formError.value = 'Criteria set name is required'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/criteria-sets/${editingItem.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
+    await apiFetch(`/api/criteria-sets/${editingItem.value.id}`, {
+      method: 'PUT', headers: getAuthHeaders(),
       body: JSON.stringify({ name: formName.value, description: formDescription.value || null })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update criteria set')
-    }
-
-    showEditModal.value = false
-    resetForm()
-    editingItem.value = null
-    await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error updating criteria set:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update criteria set'
-  }
+    showEditModal.value = false; resetForm(); editingItem.value = null; await fetchCriteriaSets()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update criteria set' }
 }
 
 async function openPromptModal(cs: CriteriaSet) {
@@ -190,49 +124,21 @@ async function openPromptModal(cs: CriteriaSet) {
 
 async function handleUpdatePrompt() {
   if (!editingItem.value) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/criteria-sets/${editingItem.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
+    await apiFetch(`/api/criteria-sets/${editingItem.value.id}`, {
+      method: 'PUT', headers: getAuthHeaders(),
       body: JSON.stringify({ systemPrompt: newSystemPrompt.value || null })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update system prompt')
-    }
-
-    showPromptModal.value = false
-    editingItem.value = null
-    await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error updating system prompt:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update system prompt'
-  }
+    showPromptModal.value = false; editingItem.value = null; await fetchCriteriaSets()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update system prompt' }
 }
 
 async function handleDeactivate(cs: CriteriaSet) {
   if (!confirm(`Are you sure you want to deactivate "${cs.name}"?`)) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/criteria-sets/${cs.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) throw new Error(`Failed to deactivate: ${response.statusText}`)
-
+    await apiFetch(`/api/criteria-sets/${cs.id}`, { method: 'DELETE', headers: getAuthHeaders() })
     await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error deactivating criteria set:', error)
-    formError.value = 'Failed to deactivate criteria set'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to deactivate criteria set' }
 }
 
 // ─── Question CRUD ──────────────────────────────────────────────────
@@ -246,37 +152,14 @@ async function openAddQuestionModal(csId: string) {
 }
 
 async function handleAddQuestion() {
-  if (!activeCriteriaSetId.value || !questionText.value.trim()) {
-    formError.value = 'Question text is required'
-    return
-  }
-
+  if (!activeCriteriaSetId.value || !questionText.value.trim()) { formError.value = 'Question text is required'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
-      `/api/criteria-sets/${activeCriteriaSetId.value}/questions`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ text: questionText.value, order: questionOrder.value })
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create question')
-    }
-
-    showAddQuestionModal.value = false
-    resetForm()
-    await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error creating question:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to create question'
-  }
+    await apiFetch(`/api/criteria-sets/${activeCriteriaSetId.value}/questions`, {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ text: questionText.value, order: questionOrder.value })
+    })
+    showAddQuestionModal.value = false; resetForm(); await fetchCriteriaSets()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to create question' }
 }
 
 async function openEditQuestionModal(question: Question, csId: string) {
@@ -289,61 +172,24 @@ async function openEditQuestionModal(question: Question, csId: string) {
 }
 
 async function handleUpdateQuestion() {
-  if (!activeCriteriaSetId.value || !activeQuestionIdForEdit.value || !questionText.value.trim()) {
-    formError.value = 'Question text is required'
-    return
-  }
-
+  if (!activeCriteriaSetId.value || !activeQuestionIdForEdit.value || !questionText.value.trim()) { formError.value = 'Question text is required'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
-      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionIdForEdit.value}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ text: questionText.value, order: questionOrder.value })
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update question')
-    }
-
-    showEditQuestionModal.value = false
-    resetForm()
-    activeCriteriaSetId.value = null
-    activeQuestionIdForEdit.value = null
+    await apiFetch(`/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionIdForEdit.value}`, {
+      method: 'PUT', headers: getAuthHeaders(),
+      body: JSON.stringify({ text: questionText.value, order: questionOrder.value })
+    })
+    showEditQuestionModal.value = false; resetForm()
+    activeCriteriaSetId.value = null; activeQuestionIdForEdit.value = null
     await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error updating question:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update question'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update question' }
 }
 
 async function handleDeleteQuestion(csId: string, questionId: string) {
   if (!confirm(`Are you sure you want to delete this question?`)) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
-      `/api/criteria-sets/${csId}/questions/${questionId}`,
-      {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    )
-
-    if (!response.ok) throw new Error(`Failed to delete question`)
-
+    await apiFetch(`/api/criteria-sets/${csId}/questions/${questionId}`, { method: 'DELETE', headers: getAuthHeaders() })
     await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error deleting question:', error)
-    formError.value = 'Failed to delete question'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to delete question' }
 }
 
 // ─── Answer CRUD ────────────────────────────────────────────────────
@@ -359,44 +205,17 @@ async function openAddAnswerModal(questionId: string, csId: string) {
 }
 
 async function handleAddAnswer() {
-  if (!activeQuestionId.value || !answerText.value.trim()) {
-    formError.value = 'Answer text is required'
-    return
-  }
-
-  if (answerScore.value < 0) {
-    formError.value = 'Score must be a non-negative integer'
-    return
-  }
-
+  if (!activeQuestionId.value || !answerText.value.trim()) { formError.value = 'Answer text is required'; return }
+  if (answerScore.value < 0) { formError.value = 'Score must be a non-negative integer'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
-      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ text: answerText.value, score: answerScore.value, order: answerOrder.value })
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create answer')
-    }
-
-    showAddAnswerModal.value = false
-    resetForm()
-    activeQuestionId.value = null
-    activeCriteriaSetId.value = null
+    await apiFetch(`/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers`, {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ text: answerText.value, score: answerScore.value, order: answerOrder.value })
+    })
+    showAddAnswerModal.value = false; resetForm()
+    activeQuestionId.value = null; activeCriteriaSetId.value = null
     await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error creating answer:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to create answer'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to create answer' }
 }
 
 async function openEditAnswerModal(answer: Answer, questionId: string, csId: string) {
@@ -411,67 +230,25 @@ async function openEditAnswerModal(answer: Answer, questionId: string, csId: str
 }
 
 async function handleUpdateAnswer() {
-  if (!activeQuestionId.value || !activeAnswerIdForEdit.value || !answerText.value.trim()) {
-    formError.value = 'Answer text is required'
-    return
-  }
-
-  if (answerScore.value < 0) {
-    formError.value = 'Score must be a non-negative integer'
-    return
-  }
-
+  if (!activeQuestionId.value || !activeAnswerIdForEdit.value || !answerText.value.trim()) { formError.value = 'Answer text is required'; return }
+  if (answerScore.value < 0) { formError.value = 'Score must be a non-negative integer'; return }
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
-      `/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers/${activeAnswerIdForEdit.value}`,
-      {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ text: answerText.value, score: answerScore.value })
-      }
-    )
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update answer')
-    }
-
-    showEditAnswerModal.value = false
-    resetForm()
-    activeQuestionId.value = null
-    activeAnswerIdForEdit.value = null
-    activeCriteriaSetId.value = null
+    await apiFetch(`/api/criteria-sets/${activeCriteriaSetId.value}/questions/${activeQuestionId.value}/answers/${activeAnswerIdForEdit.value}`, {
+      method: 'PUT', headers: getAuthHeaders(),
+      body: JSON.stringify({ text: answerText.value, score: answerScore.value })
+    })
+    showEditAnswerModal.value = false; resetForm()
+    activeQuestionId.value = null; activeAnswerIdForEdit.value = null; activeCriteriaSetId.value = null
     await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error updating answer:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update answer'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update answer' }
 }
 
 async function handleDeleteAnswer(csId: string, questionId: string, answerId: string) {
   if (!confirm(`Are you sure you want to delete this answer?`)) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(
-      `/api/criteria-sets/${csId}/questions/${questionId}/answers/${answerId}`,
-      {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    )
-
-    if (!response.ok) throw new Error('Failed to delete answer')
-
+    await apiFetch(`/api/criteria-sets/${csId}/questions/${questionId}/answers/${answerId}`, { method: 'DELETE', headers: getAuthHeaders() })
     await fetchCriteriaSets()
-  } catch (error) {
-    console.error('Error deleting answer:', error)
-    formError.value = 'Failed to delete answer'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to delete answer' }
 }
 
 // Debounced search

@@ -1,15 +1,10 @@
-import { Router } from 'express'
 import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { authenticate, requireAdminOrSA, requireBUOrHigher } from '../middleware/auth'
+import { createAdminRouter, authenticate, requireBUOrHigher } from './saRouter'
 
-const router = Router()
+const router = createAdminRouter()
 const prisma = new PrismaClient()
-
-// All HCP routes require authentication; write operations require Admin/SA role
-router.use(authenticate)
-router.use(requireAdminOrSA)
 
 /**
  * GET /api/hcps

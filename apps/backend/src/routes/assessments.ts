@@ -1,12 +1,11 @@
-import { Router } from 'express'
 import multer from 'multer'
 import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { authenticate, requireAdminOrSA, requireBUOrHigher } from '../middleware/auth'
+import { createBuRouter, requireAdminOrSA, authenticate } from './saRouter'
 import { AssessmentDomain } from '../domain/assessment'
 
-const router = Router()
+const router = createBuRouter()
 const prisma = new PrismaClient()
 const domain = new AssessmentDomain(prisma)
 
@@ -23,9 +22,7 @@ const upload = multer({
   }
 })
 
-// All assessment routes require authentication and BU role or higher
-router.use(authenticate)
-router.use(requireBUOrHigher)
+
 
 /** GET /api/assessments — List assessments */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {

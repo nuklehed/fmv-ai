@@ -1,15 +1,10 @@
-import { Router } from 'express'
 import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { authenticate, requireAdminOrSA } from '../middleware/auth'
+import { createAdminRouter } from './saRouter'
 
-const router = Router()
+const router = createAdminRouter()
 const prisma = new PrismaClient()
-
-// All application settings routes require authentication and Admin/SA role
-router.use(authenticate)
-router.use(requireAdminOrSA)
 
 /**
  * GET /api/application-settings

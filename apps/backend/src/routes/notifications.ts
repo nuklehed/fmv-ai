@@ -1,14 +1,10 @@
-import { Router } from 'express'
 import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { authenticate } from '../middleware/auth'
+import { createAuthedRouter } from './saRouter'
 
-const router = Router()
+const router = createAuthedRouter()
 const prisma = new PrismaClient()
-
-// All notification routes require authentication
-router.use(authenticate)
 
 /**
  * GET /api/notifications

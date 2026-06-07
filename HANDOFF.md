@@ -238,6 +238,13 @@ The approved breakdown:
 | 25 | Remove unused dependencies (axios, ioredis, pdf-parse, pdfkit, @primevue/themes) | Cleanup | None | ✅ Done (`c371943`) — fallow confirmed zero unused deps remaining |
 | 26 | Remove 14 unused exports + 5 unused types via fallow fix | Cleanup | None | ✅ Done (`1dc0012`) — dead-code now shows only 1 issue (mock-server.ts) |
 | 27 | Delete dead mock-server.ts (279 lines, zero imports) | Cleanup | None | ✅ Done (`a8f7a54`) — fallow confirms **zero** dead code issues across entire monorepo |
+| 28 | **Refactor — eliminate duplicated auth/error patterns in frontend views + backend route middleware:**
+    - Backend: Created `routes/saRouter.ts` with 4 factory functions (`createSaRouter`, `createAdminRouter`, `createAuthedRouter`, `createBuRouter`) that replace the repeated `router.use(authenticate)` / `router.use(requireSA|requireAdminOrSA|requireBUOrHigher)` pattern across all route files
+    - Refactored 9 backend route files to use factories instead of inline middleware chains
+    - Frontend: Created `composables/useCrud.ts` with shared `getAuthHeaders()` and `apiFetch(url, options)` helpers that centralize auth header injection + error handling
+    - Refactored 4 admin views (SpecialtiesView, TierManagementView, UserManagementView, CriteriaSetsView) to use the composables — removed ~600 lines of duplicated fetch/auth/error code
+    - Created `composables/usePagination.ts` generic pagination composable for future list views
+    - All code committed and pushed to main branch |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
@@ -315,6 +322,41 @@ The approved breakdown:
   netstat -ano | findstr :3001   # find PID on port 3001
   taskkill //PID <pid> //F       # kill it
   ```
+
+## Anti-patterns — DO NOT repeat these
+### Backend route middleware
+- ❌ **Never write `router.use(authenticate)` / `router.use(requireSA)` inline in individual route files.**
+  ✅ Use factories from `routes/saRouter.ts`:
+  ```typescript
+  import { createSaRouter, createAdminRouter, createAuthedRouter, createBuRouter } from './saRouter'
+  const router = createSaRouter()   // or createAdminRouter / createAuthedRouter / createBuRouter
+  ```
+  The factories are defined in `apps/backend/src/routes/saRouter.ts` — they encapsulate the middleware chain so you only import once.
+- ❌ **Never add new `router.use(authenticate)` lines** to any route file. Check `saRouter.ts` first for an existing factory that matches your role requirement.
+
+### Frontend API calls
+- ❌ **Never write inline `localStorage.getItem('accessToken')` + fetch() + error handling in view components.**
+  ✅ Use composables from `composables/useCrud.ts`:
+  ```typescript
+  import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
+  // Auth header: getAuthHeaders() → { Authorization: 'Bearer <token>' }
+  // Fetch with auth + throw on non-2xx: await apiFetch('/api/endpoint', { method: 'POST', body: JSON.stringify(data) })
+  ```
+- ❌ **Never duplicate pagination logic** (page, limit, totalPages, totalCount, search debounce). Use `composables/usePagination.ts`.
+
+### General
+- ❌ **Never add new route files without checking if a factory exists in saRouter.ts** — there are now 4: SA, Admin+, Auth-only, BU+.
+- ❌ **Never hardcode role checks (`req.user.role === 'SA'`) in route handlers** — use middleware guards instead.
+
+## Workflow — always run fallow after code changes
+When implementing or refactoring code:
+1. Make your changes and commit
+2. Run `fallow` to check for dead code, unused deps, circular deps, complexity hotspots, architecture violations
+3. Fix any issues fallow reports
+4. Verify with TypeScript type-check: `cd apps/backend && npx tsc --noEmit` (backend) / `cd apps/frontend && npx vue-tsc --noEmit` (frontend)
+5. Only then consider the task done
+
+This prevents accumulating technical debt — unused imports, dead code, and duplicated patterns that AI sessions keep reintroducing.
 
 ## Suggested skills to invoke next
 - **triage** — to label issues as ready for AFK agents once published

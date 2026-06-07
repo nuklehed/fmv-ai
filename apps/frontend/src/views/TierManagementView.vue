@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import type { Tier, Specialty } from '@/types'
+import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
 const tiers = ref<Tier[]>([])
 const specialties = ref<Specialty[]>([])
@@ -11,12 +12,10 @@ const totalPages = ref(0)
 const totalCount = ref(0)
 const formError = ref('')
 
-// Modal state
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editingTier = ref<Tier | null>(null)
 
-// Add/Edit form fields
 const formName = ref('')
 const formMinScore = ref(0)
 const formMaxScore = ref(0)
@@ -28,24 +27,12 @@ const formDefaultPercentile = ref(50)
 async function fetchTiers() {
   loading.value = true
   try {
-    const token = localStorage.getItem('accessToken')
-    const params = new URLSearchParams({
-      page: String(currentPage.value),
-      limit: String(pageSize.value)
-    })
-
-    const response = await fetch(`/api/tiers?${params}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) throw new Error(`Failed to fetch tiers: ${response.statusText}`)
-
-    const result = await response.json()
+    const params = new URLSearchParams({ page: String(currentPage.value), limit: String(pageSize.value) })
+    const result = await (await apiFetch(`/api/tiers?${params}`, { headers: getAuthHeaders() })).json()
     tiers.value = result.data
     totalPages.value = result.pagination.totalPages
     totalCount.value = result.pagination.totalCount
-  } catch (error) {
-    console.error('Error fetching tiers:', error)
+  } catch {
     formError.value = 'Failed to load tiers'
   } finally {
     loading.value = false
@@ -54,175 +41,72 @@ async function fetchTiers() {
 
 async function fetchSpecialties() {
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/specialties?active=true', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    if (response.ok) {
-      specialties.value = await response.json()
-    }
-  } catch (error) {
-    console.error('Error fetching specialties:', error)
-  }
+    specialties.value = await (await apiFetch('/api/specialties?active=true', { headers: getAuthHeaders() })).json()
+  } catch { /* silent */ }
 }
 
-function openAddModal() {
-  resetForm()
-  showAddModal.value = true
-}
+function openAddModal() { resetForm(); showAddModal.value = true }
 
 function openEditModal(tier: Tier) {
   editingTier.value = tier
-  formName.value = tier.name
-  formMinScore.value = tier.minScore
-  formMaxScore.value = tier.maxScore
-  formSpecialtyId.value = tier.specialtyId
-  formLowRate.value = Number(tier.lowRate)
-  formHighRate.value = Number(tier.highRate)
-  formDefaultPercentile.value = tier.defaultPercentile
+  formName.value = tier.name; formMinScore.value = tier.minScore; formMaxScore.value = tier.maxScore
+  formSpecialtyId.value = tier.specialtyId; formLowRate.value = Number(tier.lowRate)
+  formHighRate.value = Number(tier.highRate); formDefaultPercentile.value = tier.defaultPercentile
   showEditModal.value = true
 }
 
 function resetForm() {
-  editingTier.value = null
-  formName.value = ''
-  formMinScore.value = 0
-  formMaxScore.value = 0
-  formSpecialtyId.value = ''
-  formLowRate.value = 0
-  formHighRate.value = 0
-  formDefaultPercentile.value = 50
+  editingTier.value = null; formName.value = ''; formMinScore.value = 0; formMaxScore.value = 0
+  formSpecialtyId.value = ''; formLowRate.value = 0; formHighRate.value = 0; formDefaultPercentile.value = 50
   formError.value = ''
 }
 
+function validateTier() {
+  if (!formName.value.trim()) { formError.value = 'Tier name is required'; return false }
+  if (formMinScore.value > formMaxScore.value) { formError.value = 'Min score must be ≤ max score'; return false }
+  if (formLowRate.value > formHighRate.value) { formError.value = 'Low rate must be ≤ high rate'; return false }
+  return true
+}
+
 async function handleAdd() {
-  if (!formName.value.trim()) {
-    formError.value = 'Tier name is required'
-    return
-  }
-  if (formMinScore.value > formMaxScore.value) {
-    formError.value = 'Min score must be less than or equal to max score'
-    return
-  }
-  if (formLowRate.value > formHighRate.value) {
-    formError.value = 'Low rate must be less than or equal to high rate'
-    return
-  }
-
+  if (!validateTier()) return
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/tiers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: formName.value,
-        minScore: formMinScore.value,
-        maxScore: formMaxScore.value,
-        specialtyId: formSpecialtyId.value,
-        lowRate: formLowRate.value,
-        highRate: formHighRate.value,
-        defaultPercentile: formDefaultPercentile.value
-      })
+    await apiFetch('/api/tiers', {
+      method: 'POST', headers: getAuthHeaders(),
+      body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
+        specialtyId: formSpecialtyId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
+        defaultPercentile: formDefaultPercentile.value })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create tier')
-    }
-
-    showAddModal.value = false
-    resetForm()
-    await fetchTiers()
-  } catch (error) {
-    console.error('Error creating tier:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to create tier'
-  }
+    showAddModal.value = false; resetForm(); await fetchTiers()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to create tier' }
 }
 
 async function handleEdit() {
-  if (!editingTier.value) return
-  if (!formName.value.trim()) {
-    formError.value = 'Tier name is required'
-    return
-  }
-  if (formMinScore.value > formMaxScore.value) {
-    formError.value = 'Min score must be less than or equal to max score'
-    return
-  }
-  if (formLowRate.value > formHighRate.value) {
-    formError.value = 'Low rate must be less than or equal to high rate'
-    return
-  }
-
+  if (!editingTier.value || !validateTier()) return
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/tiers/${editingTier.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: formName.value,
-        minScore: formMinScore.value,
-        maxScore: formMaxScore.value,
-        specialtyId: formSpecialtyId.value,
-        lowRate: formLowRate.value,
-        highRate: formHighRate.value,
-        defaultPercentile: formDefaultPercentile.value
-      })
+    await apiFetch(`/api/tiers/${editingTier.value.id}`, {
+      method: 'PUT', headers: getAuthHeaders(),
+      body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
+        specialtyId: formSpecialtyId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
+        defaultPercentile: formDefaultPercentile.value })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update tier')
-    }
-
-    showEditModal.value = false
-    resetForm()
-    await fetchTiers()
-  } catch (error) {
-    console.error('Error updating tier:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to update tier'
-  }
+    showEditModal.value = false; resetForm(); await fetchTiers()
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update tier' }
 }
 
 async function handleDelete(tier: Tier) {
   if (!confirm(`Are you sure you want to delete "${tier.name}"?`)) return
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/tiers/${tier.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` }
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to delete tier')
-    }
-
+    await apiFetch(`/api/tiers/${tier.id}`, { method: 'DELETE', headers: getAuthHeaders() })
     await fetchTiers()
-  } catch (error) {
-    console.error('Error deleting tier:', error)
-    formError.value = error instanceof Error ? error.message : 'Failed to delete tier'
-  }
+  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to delete tier' }
 }
 
 function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-    fetchTiers()
-  }
+  if (page >= 1 && page <= totalPages.value) { currentPage.value = page; fetchTiers() }
 }
 
-onMounted(() => {
-  fetchTiers()
-  fetchSpecialties()
-})
+onMounted(() => { fetchTiers(); fetchSpecialties() })
 </script>
 
 <template>

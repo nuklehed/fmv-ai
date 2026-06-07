@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import type { Specialty } from '@/types'
+import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
 const specialties = ref<Specialty[]>([])
 const loading = ref(false)
@@ -14,7 +15,6 @@ const formName = ref('')
 const formDescription = ref('')
 const formError = ref('')
 
-// Modal form reset
 function resetForm() {
   formName.value = ''
   formDescription.value = ''
@@ -24,20 +24,12 @@ function resetForm() {
 async function fetchSpecialties() {
   loading.value = true
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/specialties?active=true&search=${encodeURIComponent(searchQuery.value)}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch specialties: ${response.statusText}`)
-    }
-
+    const response = await apiFetch(
+      `/api/specialties?active=true&search=${encodeURIComponent(searchQuery.value)}`,
+      { headers: getAuthHeaders() }
+    )
     specialties.value = await response.json()
   } catch (error) {
-    console.error('Error fetching specialties:', error)
     formError.value = 'Failed to load specialties'
   } finally {
     loading.value = false
@@ -49,31 +41,16 @@ async function handleAdd() {
     formError.value = 'Specialty name is required'
     return
   }
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch('/api/specialties', {
+    await apiFetch('/api/specialties', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: formName.value,
-        description: formDescription.value || null
-      })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name: formName.value, description: formDescription.value || null })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to create specialty')
-    }
-
     showAddModal.value = false
     resetForm()
     await fetchSpecialties()
   } catch (error) {
-    console.error('Error creating specialty:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to create specialty'
   }
 }
@@ -91,76 +68,38 @@ async function handleUpdate() {
     formError.value = 'Specialty name is required'
     return
   }
-
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/specialties/${editingSpecialty.value.id}`, {
+    await apiFetch(`/api/specialties/${editingSpecialty.value.id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        name: formName.value,
-        description: formDescription.value || null
-      })
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ name: formName.value, description: formDescription.value || null })
     })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Failed to update specialty')
-    }
-
     showEditModal.value = false
     resetForm()
     editingSpecialty.value = null
     await fetchSpecialties()
   } catch (error) {
-    console.error('Error updating specialty:', error)
     formError.value = error instanceof Error ? error.message : 'Failed to update specialty'
   }
 }
 
 async function handleDeactivate(id: string, name: string) {
-  if (!confirm(`Are you sure you want to deactivate "${name}"?`)) {
-    return
-  }
-
+  if (!confirm(`Are you sure you want to deactivate "${name}"?`)) return
   try {
-    const token = localStorage.getItem('accessToken')
-    const response = await fetch(`/api/specialties/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
-
-    if (!response.ok) {
-      throw new Error(`Failed to deactivate specialty: ${response.statusText}`)
-    }
-
+    await apiFetch(`/api/specialties/${id}`, { method: 'DELETE', headers: getAuthHeaders() })
     await fetchSpecialties()
   } catch (error) {
-    console.error('Error deactivating specialty:', error)
-    formError.value = 'Failed to deactivate specialty'
+    formError.value = error instanceof Error ? error.message : 'Failed to deactivate specialty'
   }
 }
 
-// Debounced search
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 function handleSearch() {
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-
-  searchTimeout = setTimeout(() => {
-    fetchSpecialties()
-  }, 300)
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => fetchSpecialties(), 300)
 }
 
-onMounted(() => {
-  fetchSpecialties()
-})
+onMounted(fetchSpecialties)
 </script>
 
 <template>
