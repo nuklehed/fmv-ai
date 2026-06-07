@@ -97,7 +97,7 @@ export function requireBUOrHigher(req: AuthenticatedRequest, res: Response, next
 /**
  * Ensures multi-tenant isolation — user can only access their own tenant's data.
  */
-export function requireTenantAccess(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+function requireTenantAccess(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   if (!req.tenantId) {
     res.status(403).json({ error: 'Tenant context missing' })
     return

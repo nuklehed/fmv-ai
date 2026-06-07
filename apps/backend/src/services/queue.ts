@@ -1,7 +1,7 @@
 // BullMQ is optional — only needed when Redis + local LLM are available.
 // In standalone mode (no Redis), assessments can be processed synchronously via the API.
 
-export const AI_QUEUE_NAME = 'ai-processing'
+const AI_QUEUE_NAME = 'ai-processing'
 
 let redisAvailable: boolean | null = null
 let aiQueue: any = null
@@ -68,7 +68,7 @@ export async function getAIWorker() {
 
 // ─── Queue Statistics (Redis-backed, optional) ──────────────────────
 
-export async function getQueueStats() {
+async function getQueueStats() {
   if (!aiQueue) return { waiting: 0, active: 0, completed: 0, failed: 0 }
   const [waiting, active, completed, failed] = await Promise.all([
     aiQueue.getWaitingCount(),

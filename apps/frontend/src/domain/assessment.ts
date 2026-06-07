@@ -43,7 +43,7 @@ export interface AiResultItem {
   score?: number
 }
 
-export interface ReviewOverride {
+interface ReviewOverride {
   questionId: string
   selectedAnswerId: string
   rationale: string
@@ -85,7 +85,7 @@ const STATUS_LABELS: Record<string, string> = {
   AI_FAILED: 'AI Failed'
 }
 
-export const StatusColors = STATUS_COLORS
+const StatusColors = STATUS_COLORS
 export const StatusLabels = STATUS_LABELS
 
 export function getStatusColor(status: string): string {
@@ -99,12 +99,12 @@ export function getStatusLabel(status: string): string {
 // ─── Status Transition Rules ──────────────────────────────────────
 
 /** Check if assessment is in DRAFT state */
-export function isDraft(assessment: AssessmentListItem): boolean {
+function isDraft(assessment: AssessmentListItem): boolean {
   return assessment.status === 'DRAFT'
 }
 
 /** Check if assessment can be reviewed (AI_COMPLETE + admin/SA) */
-export function canReview(assessment: AssessmentListItem, userRole?: string): boolean {
+function canReview(assessment: AssessmentListItem, userRole?: string): boolean {
   return assessment.status === 'AI_COMPLETE' && isAdminOrSA(userRole)
 }
 
@@ -114,7 +114,7 @@ export function canApprove(assessment: AssessmentListItem, userRole?: string): b
 }
 
 /** Check if assessment can be rejected (UNDER_REVIEW + admin/SA) */
-export function canReject(assessment: AssessmentListItem, userRole?: string): boolean {
+function canReject(assessment: AssessmentListItem, userRole?: string): boolean {
   return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(userRole)
 }
 
@@ -135,7 +135,7 @@ export function isAdminOrSAUser(): boolean {
 }
 
 /** Check if assessment needs admin/SA review (AI_COMPLETE) */
-export function isActionRequired(assessment: AssessmentListItem): boolean {
+function isActionRequired(assessment: AssessmentListItem): boolean {
   return assessment.status === 'AI_COMPLETE'
 }
 
@@ -155,7 +155,7 @@ export function canRetry(assessment: AssessmentListItem): boolean {
 
 // ─── Date Formatting ──────────────────────────────────────────────
 
-export function formatDate(dateStr?: string | null): string {
+function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString()
 }
@@ -300,7 +300,7 @@ export async function startReview(assessmentId: string): Promise<any> {
 }
 
 /** Submit admin review with overrides */
-export async function submitReview(assessmentId: string, overrides: ReviewOverride[], rejectionReason?: string | null): Promise<any> {
+async function submitReview(assessmentId: string, overrides: ReviewOverride[], rejectionReason?: string | null): Promise<any> {
   const response = await fetch(`/api/assessments/${assessmentId}/review`, {
     method: 'PUT',
     headers: authHeaders(),

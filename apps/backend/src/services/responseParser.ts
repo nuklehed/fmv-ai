@@ -23,7 +23,7 @@ function stripBrackets(val: string): string {
   return val.replace(/^\[([^]]+)\]$/, '$1').trim()
 }
 
-export function normalizeItem(item: Record<string, unknown>): { questionId?: string; selectedAnswerId?: string; rationale?: string } {
+function normalizeItem(item: Record<string, unknown>): { questionId?: string; selectedAnswerId?: string; rationale?: string } {
   const normalized: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(item)) {
@@ -58,7 +58,7 @@ export function normalizeItem(item: Record<string, unknown>): { questionId?: str
  * Extract JSON array from a potentially messy LLM response.
  * Handles markdown code blocks, extra text, and various formats.
  */
-export function extractJSONFromResponse(text: string): unknown[] {
+function extractJSONFromResponse(text: string): unknown[] {
   // Strip markdown code block wrappers
   let cleaned = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, '$1').trim()
 

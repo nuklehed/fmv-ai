@@ -1,4 +1,4 @@
-export interface Hcp {
+interface Hcp {
   id: string
   firstName: string
   lastName: string
@@ -17,7 +17,7 @@ export interface Hcp {
   updatedAt: string
 }
 
-export interface HcpIdentifier {
+interface HcpIdentifier {
   id: string
   hcpId: string
   type: 'NPI' | 'STATE_LICENSE' | 'DEA' | 'OTHER'
@@ -25,7 +25,7 @@ export interface HcpIdentifier {
   isActive: boolean
 }
 
-export enum AssessmentStatus {
+enum AssessmentStatus {
   DRAFT = 'DRAFT',
   SUBMITTED = 'SUBMITTED',
   AI_PROCESSING = 'AI_PROCESSING',
@@ -69,18 +69,9 @@ export interface Specialty {
   updatedAt: string
 }
 
-export interface User {
-  id: string
-  email: string
-  role: 'BU' | 'ADMIN' | 'SA'
-  tenantId: string
-  isActive: boolean
-  emailVerified: boolean
-  createdAt: string
-  updatedAt: string
-}
 
-export enum NotificationType {
+
+enum NotificationType {
   ASSESSMENT_APPROVED = 'ASSESSMENT_APPROVED',
   ASSESSMENT_REJECTED = 'ASSESSMENT_REJECTED',
   EXPIRY_REMINDER = 'EXPIRY_REMINDER'
