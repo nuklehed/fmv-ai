@@ -124,35 +124,6 @@ function tryMatchPositionalId(synthetic: string, questions: CriteriaQuestion[]):
 }
 
 /**
- * Extract positional IDs from prose text (e.g., "Question q1" → q1, "answer a2" → a2).
- * Returns an array of { questionNum: number, answerNum?: number } pairs.
- */
-function extractPositionalIdsFromProse(text: string): Array<{ questionNum: number; answerNum?: number }> {
-  const results: Array<{ questionNum: number; answerNum?: number }> = []
-
-  // Pattern 1: "Question qN" or "qN:" — standalone question reference
-  const qPattern = /(?:question\s+)?q(\d+)/gi
-  let m
-  while ((m = qPattern.exec(text)) !== null) {
-    const qNum = parseInt(m[1])
-    // Look ahead for an answer reference within the next ~200 chars
-    const context = text.substring(m.index, Math.min(m.index + 300, text.length))
-    const aMatch = context.match(/a(\d+)/i)
-    results.push({ questionNum: qNum, answerNum: aMatch ? parseInt(aMatch[1]) : undefined })
-  }
-
-  // Pattern 2: "qN → aM" or "qN selects aM"
-  const qaPattern = /q(\d+)\s*[→|,]\s*a(\d+)/gi
-  while ((m = qaPattern.exec(text)) !== null) {
-    results.push({ questionNum: parseInt(m[1]), answerNum: parseInt(m[2]) })
-  }
-
-  // Deduplicate by question number (keep first occurrence)
-  const seen = new Set<number>()
-  return results.filter(r => { if (seen.has(r.questionNum)) return false; seen.add(r.questionNum); return true })
-}
-
-/**
  * Parse the LLM JSON response into structured AI results.
  * Validates each result against the criteria questions and their valid answers.
  * Uses positional fallback matching when the model generates synthetic IDs (q1, a2).
@@ -161,37 +132,6 @@ export function parseLLMResponse(response: string, questions: CriteriaQuestion[]
   const extracted = extractJSONFromResponse(response)
 
   if (!extracted.length) {
-    // Fallback: try to extract positional IDs from prose text
-    const proseMatches = extractPositionalIdsFromProse(response)
-    if (proseMatches.length > 0) {
-      return proseMatches.map(({ questionNum, answerNum }) => {
-        let questionId: string | undefined
-        let selectedAnswerId: string | undefined
-
-        // Match qN to actual question
-        const qIdx = questionNum - 1
-        if (qIdx >= 0 && qIdx < questions.length) {
-          questionId = questions[qIdx].id
-        }
-
-        // Match aN to answer within that question
-        if (answerNum !== undefined && questionId) {
-          const aIdx = answerNum - 1
-          const answers = questions.find(q => q.id === questionId)?.answers || []
-          if (aIdx >= 0 && aIdx < answers.length) {
-            selectedAnswerId = answers[aIdx].id
-          }
-        } else if (!answerNum && questionId) {
-          // No answer specified — default to lowest scoring answer
-          const qAnswers = questions.find(q => q.id === questionId)?.answers || []
-          if (qAnswers.length > 0) {
-            selectedAnswerId = qAnswers.reduce((min, a) => a.score < min.score ? a : min, qAnswers[0]).id
-          }
-        }
-
-        return { questionId: questionId!, selectedAnswerId: selectedAnswerId!, rationale: 'Extracted from prose output by positional matching' }
-      }).filter(r => r.questionId && r.selectedAnswerId)
-    }
     return []
   }
 

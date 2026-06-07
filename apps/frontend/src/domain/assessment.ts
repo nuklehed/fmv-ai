@@ -162,10 +162,15 @@ export function formatDate(dateStr?: string | null): string {
 
 // ─── AI Results Helpers ───────────────────────────────────────────
 
-/** Cast aiResults to AiResultItem[] for template use */
+/** Parse aiResults (stored as JSON string in DB) to AiResultItem[] for template use */
 export function getAiResults(assessment: AssessmentListItem): AiResultItem[] {
   if (!assessment.aiResults) return []
-  return assessment.aiResults as unknown as AiResultItem[]
+  if (Array.isArray(assessment.aiResults)) return assessment.aiResults as unknown as AiResultItem[]
+  if (typeof assessment.aiResults === 'string') {
+    try { return JSON.parse(assessment.aiResults) }
+    catch { return [] }
+  }
+  return []
 }
 
 // ─── API Operations (backend calls) ──────────────────────────────
