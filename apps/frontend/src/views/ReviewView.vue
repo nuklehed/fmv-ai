@@ -300,7 +300,7 @@ onMounted(() => { fetchAssessment() })
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">Select answer...</option>
-                <option v-for="answer in question.answers" :key="answer.id" :value="answer.id">
+                <option v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" :value="answer.id">
                   {{ answer.text }} ({{ answer.score }} pts)
                   <span v-if="isAnswerSameAsAI(question.id, answer.id)" class="text-gray-400 text-xs"> ← AI choice</span>
                 </option>
@@ -384,5 +384,9 @@ function getAiScore(question: any, assessment: any): number {
   const answers = question.answers || []
   const answer = answers.find((a: any) => a.id === result.selectedAnswerId)
   return answer?.score ?? 0
+}
+
+function getSortedAnswers(answers: any[]): any[] {
+  return [...(answers || [])].sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
 }
 </script>

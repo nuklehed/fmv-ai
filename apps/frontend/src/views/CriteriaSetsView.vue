@@ -253,6 +253,10 @@ async function handleDeleteAnswer(csId: string, questionId: string, answerId: st
 
 // Debounced search
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
+function getSortedAnswers(answers: Answer[]): Answer[] {
+  return [...(answers || [])].sort((a, b) => a.score - b.score)
+}
+
 function handleSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => fetchCriteriaSets(), 300)
@@ -385,7 +389,7 @@ onMounted(() => {
                   </div>
 
                   <!-- Answer items -->
-                  <div v-for="answer in question.answers" :key="answer.id" class="flex items-center justify-between bg-gray-50 rounded px-3 py-2 ml-2">
+                  <div v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" class="flex items-center justify-between bg-gray-50 rounded px-3 py-2 ml-2">
                     <div class="flex items-center space-x-3 flex-1">
                       <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{{ answer.score }}</span>
                       <span class="text-sm text-gray-700">{{ answer.text }}</span>
