@@ -478,7 +478,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   </div>
 
                   <!-- DRAFT Assessment Actions -->
-                  <div v-if="assessmentDomain.isDraft(selectedAssessment)" class="border-t border-gray-200 pt-4">
+                  <div v-if="assessmentDomain.isDraft(selectedAssessment)" class="px-6 border-t border-gray-200 pt-4 pb-4 mb-4">
                     <h4 class="text-sm font-medium text-gray-900 mb-3">Draft Assessment</h4>
                     <div class="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <p class="text-xs text-blue-700 font-medium mb-1">Draft Status</p>

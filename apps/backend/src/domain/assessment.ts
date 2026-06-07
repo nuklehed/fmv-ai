@@ -298,7 +298,8 @@ export class AssessmentDomain {
     }
 
     // Extract text from PDF using pdfjs-dist
-    const { getDocument } = await import('pdfjs-dist')
+    const pdfjsDist = await import('pdfjs-dist')
+    const { getDocument } = (pdfjsDist as any).default || pdfjsDist
     const uint8Array = new Uint8Array(fileBuffer)
     const pdfDoc = await getDocument({ data: uint8Array }).promise
     let cvText = ''
@@ -381,6 +382,84 @@ export class AssessmentDomain {
           message: 'Assessment queued for synchronous processing',
           assessment: updatedAssessment as any,
           note: 'AI worker not available — process manually via POST /api/assessments/:id/process'
+        }
+      }
+    }
+  }
+
+  async retryAIProcessing(
+    id: string,
+    userId: string,
+    tenantId: string
+  ): Promise<SubmitResult> {
+    const existing = await this.prisma.assessment.findFirst({
+      where: { id, tenantId },
+      include: { hcp: true }
+    })
+
+    if (!existing) throw new Error('Assessment not found')
+    if (existing.status !== 'AI_FAILED') {
+      throw new Error(`Cannot retry — assessment is in ${existing.status} status, only AI_FAILED assessments can be retried`)
+    }
+
+    // Validate required data exists
+    const missing: string[] = []
+    if (!existing.cvText) missing.push('CV text')
+    if (!existing.criteriaSetId) missing.push('criteria set')
+    if (missing.length > 0) {
+      throw new Error(`Cannot retry — missing required data: ${missing.join(', ')}`)
+    }
+
+    // Transition back to AI_PROCESSING
+    const updatedAssessment = await this.prisma.assessment.update({
+      where: { id },
+      data: { status: 'AI_PROCESSING', submittedAt: new Date() },
+      include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
+    })
+
+    // Enqueue job in BullMQ — worker will process sequentially
+    const { getAIQueue } = await import('../services/queue')
+    const queue = await getAIQueue()
+
+    if (queue) {
+      await queue.add('process-assessment', { assessmentId: id, userId }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 }
+      })
+
+      return {
+        message: 'Assessment re-queued for AI processing',
+        assessment: updatedAssessment as any,
+        queuePosition: await queue.getWaitingCount() + 1
+      }
+    } else {
+      // Fallback: synchronous processing when Redis is not available
+      const { processAssessmentJob } = await import('../services/worker')
+      try {
+        await processAssessmentJob(id, userId)
+        const refreshed = await this.prisma.assessment.findUnique({
+          where: { id },
+          include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
+        })
+        return { message: 'Assessment processed synchronously (no Redis queue)', assessment: refreshed as any }
+      } catch (err) {
+        console.error('Synchronous retry processing failed:', err)
+        await this.prisma.assessment.update({
+          where: { id },
+          data: {
+            status: 'AI_FAILED',
+            aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `Retry failed: ${err instanceof Error ? err.message : 'Unknown error'}` }]),
+            completedAt: new Date()
+          }
+        })
+        const failed = await this.prisma.assessment.findUnique({
+          where: { id },
+          include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
+        })
+        return {
+          message: 'Retry failed — assessment marked as AI_FAILED',
+          assessment: failed as any,
+          note: 'AI worker not available — retry later via POST /api/assessments/:id/retry'
         }
       }
     }
