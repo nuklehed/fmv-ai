@@ -16,6 +16,7 @@ const savingKey = ref<string | null>(null)
 // Reactive variables for editable settings (v-model requires member expressions, not function calls)
 const approvalValidityPeriod = ref<number>(defaultValues.approvalValidityPeriod as number)
 const expiryReminderLeadTime = ref<number>(defaultValues.expiryReminderLeadTime as number)
+const defaultTierPercentile = ref<number>(50)
 const numberOfTiers = ref<number>(3)
 
 async function fetchSettings() {
@@ -35,6 +36,7 @@ async function fetchSettings() {
     fetchedSettings.forEach((s: ApplicationSetting) => {
       if (s.key === 'approvalValidityPeriod') approvalValidityPeriod.value = Number(s.value ?? defaultValues.approvalValidityPeriod)
       if (s.key === 'expiryReminderLeadTime') expiryReminderLeadTime.value = Number(s.value ?? defaultValues.expiryReminderLeadTime)
+      if (s.key === 'defaultTierPercentile') defaultTierPercentile.value = Number(s.value ?? 50)
     })
 
     // Fetch tier config separately
@@ -77,6 +79,8 @@ async function handleSave(key: string) {
       value = approvalValidityPeriod.value
     } else if (key === 'expiryReminderLeadTime') {
       value = expiryReminderLeadTime.value
+    } else if (key === 'defaultTierPercentile') {
+      value = defaultTierPercentile.value
     }
 
     const response = await fetch(`/api/application-settings/${key}`, {
@@ -208,6 +212,35 @@ onMounted(() => {
               class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
             >
               {{ savingKey === 'expiryReminderLeadTime' ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Default Tier Percentile -->
+        <div class="bg-white shadow rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <h3 class="text-base font-medium text-gray-900">Default Tier Percentile</h3>
+              <p class="text-sm text-gray-500 mt-1">Business decision for rate calculation when approving assessments. Used to interpolate a rate between lowRate and highRate (default: 50th percentile).</p>
+            </div>
+          </div>
+          <div class="mt-4 flex items-center space-x-3">
+            <input
+              v-model.number="defaultTierPercentile"
+              type="number"
+              min="0"
+              max="100"
+              :disabled="savingKey === 'defaultTierPercentile'"
+              @blur="handleSave('defaultTierPercentile')"
+              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span class="text-sm text-gray-500">percentile</span>
+            <button
+              @click="handleSave('defaultTierPercentile')"
+              :disabled="savingKey === 'defaultTierPercentile'"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {{ savingKey === 'defaultTierPercentile' ? 'Saving...' : 'Save' }}
             </button>
           </div>
         </div>

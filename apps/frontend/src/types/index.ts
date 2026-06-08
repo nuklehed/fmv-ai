@@ -102,7 +102,7 @@ export interface Tier {
   name: string
   minScore: number
   maxScore: number
-  criteriaSetId: string
+  specialtyId: string | null
   lowRate: number
   highRate: number
   defaultPercentile: number
@@ -110,7 +110,7 @@ export interface Tier {
   isActive: boolean
   createdAt: string
   updatedAt: string
-  criteriaSet?: { id: string; name: string } | null
+  specialty?: { id: string; name: string } | null
 }
 
 export interface ApplicationSetting {

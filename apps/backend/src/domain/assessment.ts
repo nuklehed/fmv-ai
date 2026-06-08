@@ -638,9 +638,9 @@ export class AssessmentDomain {
     let finalRate: number | null = existing.rate as number | null
 
     if (!assignedTierId) {
-      // Auto-assign tier based on score
+      // Auto-assign tier based on score — filter by specialtyId if assessment has one
       const tiers = await this.prisma.tier.findMany({
-        where: { tenantId, criteriaSetId: (existing as any).criteriaSetId || undefined },
+        where: { tenantId, specialtyId: (existing as any).specialtyId || undefined },
         orderBy: { maxScore: 'desc' }
       }) as any[]
 

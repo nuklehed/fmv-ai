@@ -69,6 +69,7 @@ model Specialty {
   updatedAt     DateTime      @updatedAt
   assessments   Assessment[]  @relation("AssessmentSpecialty")
   hcps          Hcp[]
+  tiers         Tier[]
   criteriaSet   CriteriaSet?  @relation("SpecialtyCriteriaSet", fields: [criteriaSetId], references: [id])
 
   @@unique([name, tenantId])
@@ -88,8 +89,6 @@ model CriteriaSet {
   assessments  Assessment[]  @relation("CriteriaSetAssessments")
   questions    Question[]
   specialties  Specialty[]   @relation("SpecialtyCriteriaSet")
-  tiers        Tier[]
-
   @@index([tenantId, isActive])
 }
 
@@ -159,7 +158,7 @@ model Tier {
   name              String
   minScore          Int
   maxScore          Int
-  criteriaSetId     String
+  specialtyId       String?
   lowRate           String
   highRate          String
   defaultPercentile Int          @default(50)
@@ -168,9 +167,9 @@ model Tier {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
   assessments       Assessment[]
-  criteriaSet       CriteriaSet  @relation(fields: [criteriaSetId], references: [id])
+  specialty         Specialty?   @relation(fields: [specialtyId], references: [id])
 
-  @@index([tenantId, criteriaSetId])
+  @@index([tenantId, specialtyId])
   @@index([tenantId, isActive])
 }
 

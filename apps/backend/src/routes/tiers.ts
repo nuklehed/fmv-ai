@@ -6,38 +6,23 @@ import { createAdminRouter } from './saRouter'
 const router = createAdminRouter()
 const prisma = new PrismaClient()
 
-/** Compute total possible score for a criteria set (sum of all answer scores) */
-async function getTotalPossibleScore(csId: string): Promise<number> {
-  const questions = await prisma.question.findMany({
-    where: { criteriaSetId: csId, isActive: true },
-    select: { answers: { where: { isActive: true }, select: { score: true } } }
-  })
-  let total = 0
-  for (const q of questions) {
-    for (const a of q.answers) {
-      total += a.score
-    }
-  }
-  return total
-}
-
 /**
  * GET /api/tiers
- * List tiers with pagination, optional active filter and criteriaSet filter
+ * List tiers with pagination, optional active filter and specialtyId filter
  */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
     const activeOnly = req.query.active === 'true'
-    const criteriaSetId = req.query.criteriaSetId as string | undefined
+    const specialtyId = req.query.specialtyId as string | undefined
 
     const where: Record<string, unknown> = { tenantId: req.tenantId!, isActive: true }
     if (!activeOnly) {
       delete (where as any).isActive
     }
-    if (criteriaSetId) {
-      where.criteriaSetId = criteriaSetId
+    if (specialtyId) {
+      where.specialtyId = specialtyId
     }
 
     const totalCount = await prisma.tier.count({ where })
@@ -46,7 +31,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     const tiers = await prisma.tier.findMany({
       where,
       include: {
-        criteriaSet: { select: { id: true, name: true } }
+        specialty: { select: { id: true, name: true } }
       },
       orderBy: { maxScore: 'desc' },
       skip: (page - 1) * limit,
@@ -73,7 +58,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 
     const tier = await prisma.tier.findFirst({
       where: { id, tenantId: req.tenantId! },
-      include: { criteriaSet: { select: { id: true, name: true } } }
+      include: { specialty: { select: { id: true, name: true } } }
     })
 
     if (!tier) { res.status(404).json({ error: 'Tier not found' }); return }
@@ -86,14 +71,20 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 
 /**
  * POST /api/tiers
- * Create a new tier — SA enters only maxScore; minScore is auto-calculated
+ * Create a new tier — SA enters minScore and maxScore manually
  */
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { name, maxScore, criteriaSetId, lowRate, highRate, defaultPercentile } = req.body
+    const { name, minScore, maxScore, specialtyId, lowRate, highRate, defaultPercentile } = req.body
 
-    if (!name || maxScore === undefined || !criteriaSetId || lowRate === undefined || highRate === undefined) {
+    if (!name || minScore === undefined || maxScore === undefined || lowRate === undefined || highRate === undefined) {
       res.status(400).json({ error: 'All fields are required' })
+      return
+    }
+
+    // Validate score range
+    if (minScore > maxScore) {
+      res.status(400).json({ error: 'Min score must be less than or equal to max score' })
       return
     }
 
@@ -109,64 +100,29 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
       return
     }
 
-    // Verify criteriaSet belongs to tenant
-    const criteriaSet = await prisma.criteriaSet.findFirst({
-      where: { id: criteriaSetId, tenantId: req.tenantId! }
-    })
-    if (!criteriaSet) {
-      res.status(404).json({ error: 'Criteria set not found in your organization' })
-      return
-    }
-
-    // Fetch existing active tiers for this criteria set (highest first)
-    const existingTiers = await prisma.tier.findMany({
-      where: { criteriaSetId, tenantId: req.tenantId!, isActive: true },
-      orderBy: { maxScore: 'desc' }
-    })
-
-    // Auto-calculate minScore from next higher tier's maxScore + 1
-    let calculatedMin = 1
-    const nextHigherTier = existingTiers.find(t => t.maxScore >= maxScore)
-    if (nextHigherTier) {
-      calculatedMin = nextHigherTier.maxScore + 1
-    }
-
-    // Validate no overlap: maxScore must be ≥ minScore
-    if (maxScore < calculatedMin) {
-      res.status(400).json({ error: 'Max score must be greater than or equal to minimum score.' })
-      return
-    }
-
-    // Validate contiguous range: if there's a higher tier, new tier starts right after it
-    if (nextHigherTier && calculatedMin !== nextHigherTier.maxScore + 1) {
-      res.status(400).json({
-        error: `Tiers must form contiguous ranges. This tier starts at ${calculatedMin} but should start at ${nextHigherTier.maxScore + 1} (previous tier ends at ${nextHigherTier.maxScore}).`
+    // Validate specialtyId if provided — must belong to tenant
+    if (specialtyId) {
+      const specialty = await prisma.specialty.findFirst({
+        where: { id: specialtyId, tenantId: req.tenantId! }
       })
-      return
-    }
-
-    // Validate last-tier constraint: highest max across all tiers must equal total possible score
-    const newMax = Math.max(maxScore, ...existingTiers.map(t => t.maxScore))
-    const totalPossibleScore = await getTotalPossibleScore(criteriaSetId)
-    if (newMax !== totalPossibleScore && totalPossibleScore > 0) {
-      res.status(400).json({
-        error: `The highest tier max-score must equal the total possible score (${totalPossibleScore}). Current highest is ${newMax}.`
-      })
-      return
+      if (!specialty) {
+        res.status(404).json({ error: 'Specialty not found in your organization' })
+        return
+      }
     }
 
     const tier = await prisma.tier.create({
       data: {
         name,
-        minScore: calculatedMin,
+        minScore,
         maxScore,
-        criteriaSetId,
+        specialtyId: specialtyId || null,
         lowRate: String(lowRate),
         highRate: String(highRate),
-        defaultPercentile: defaultPercentile || 50,
+        defaultPercentile: defaultPercentile ?? 50,
         tenantId: req.tenantId!
       },
-      include: { criteriaSet: { select: { id: true, name: true } } }
+      include: { specialty: { select: { id: true, name: true } } }
     })
 
     res.status(201).json(tier)
@@ -178,18 +134,24 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
 
 /**
  * PUT /api/tiers/:id
- * Update a tier — SA enters only maxScore; minScore is auto-calculated
+ * Update a tier — SA edits minScore and maxScore manually
  */
 router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { name, maxScore, criteriaSetId, lowRate, highRate, defaultPercentile, isActive } = req.body
+    const { name, minScore, maxScore, specialtyId, lowRate, highRate, defaultPercentile, isActive } = req.body
 
     // Verify tier belongs to tenant
     const existingTier = await prisma.tier.findFirst({
       where: { id, tenantId: req.tenantId! }
     })
     if (!existingTier) { res.status(404).json({ error: 'Tier not found' }); return }
+
+    // Validate score range if both provided
+    if (minScore !== undefined && maxScore !== undefined && minScore > maxScore) {
+      res.status(400).json({ error: 'Min score must be less than or equal to max score' })
+      return
+    }
 
     // Validate rate range if provided
     if (lowRate !== undefined && highRate !== undefined && lowRate > highRate) {
@@ -203,63 +165,23 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       return
     }
 
-    // Verify criteriaSet if provided
-    let criteriaSetIdToUse = existingTier.criteriaSetId as string
-    if (criteriaSetId && criteriaSetId !== criteriaSetIdToUse) {
-      const cs = await prisma.criteriaSet.findFirst({
-        where: { id: criteriaSetId, tenantId: req.tenantId! }
-      })
-      if (!cs) { res.status(404).json({ error: 'Criteria set not found in your organization' }); return }
-      criteriaSetIdToUse = criteriaSetId
-    }
-
-    // Auto-calculate minScore only if maxScore changed or was provided
-    let calculatedMin = (existingTier as any).minScore
-    if (maxScore !== undefined) {
-      const existingTiers = await prisma.tier.findMany({
-        where: { criteriaSetId: criteriaSetIdToUse, tenantId: req.tenantId!, isActive: true },
-        orderBy: { maxScore: 'desc' }
-      })
-
-      // Exclude the current tier from comparison if it's still active
-      const otherTiers = existingTiers.filter(t => t.id !== id)
-      const nextHigherTier = otherTiers.find(t => t.maxScore >= maxScore)
-
-      calculatedMin = 1
-      if (nextHigherTier) {
-        calculatedMin = nextHigherTier.maxScore + 1
-      }
-
-      // Validate no overlap
-      if (maxScore < calculatedMin) {
-        res.status(400).json({ error: 'Max score must be greater than or equal to minimum score.' })
-        return
-      }
-
-      // Validate contiguous range
-      if (nextHigherTier && calculatedMin !== nextHigherTier.maxScore + 1) {
-        res.status(400).json({
-          error: `Tiers must form contiguous ranges. This tier starts at ${calculatedMin} but should start at ${nextHigherTier.maxScore + 1} (previous tier ends at ${nextHigherTier.maxScore}).`
+    // Validate specialtyId if provided
+    let specialtyIdToUse = (existingTier as any).specialtyId
+    if (specialtyId !== undefined && specialtyId !== specialtyIdToUse) {
+      if (specialtyId) {
+        const specialty = await prisma.specialty.findFirst({
+          where: { id: specialtyId, tenantId: req.tenantId! }
         })
-        return
+        if (!specialty) { res.status(404).json({ error: 'Specialty not found in your organization' }); return }
       }
-
-      // Validate last-tier constraint
-      const newMax = Math.max(maxScore, ...otherTiers.map(t => t.maxScore))
-      const totalPossibleScore = await getTotalPossibleScore(criteriaSetIdToUse)
-      if (newMax !== totalPossibleScore && totalPossibleScore > 0) {
-        res.status(400).json({
-          error: `The highest tier max-score must equal the total possible score (${totalPossibleScore}). Current highest is ${newMax}.`
-        })
-        return
-      }
+      specialtyIdToUse = specialtyId
     }
 
     const updateData: Record<string, unknown> = {}
     if (name !== undefined) updateData.name = name
+    if (minScore !== undefined) updateData.minScore = minScore
     if (maxScore !== undefined) updateData.maxScore = maxScore
-    updateData.minScore = calculatedMin
-    if (criteriaSetIdToUse !== existingTier.criteriaSetId) updateData.criteriaSetId = criteriaSetIdToUse
+    if (specialtyIdToUse !== (existingTier as any).specialtyId) updateData.specialtyId = specialtyIdToUse
     if (lowRate !== undefined) updateData.lowRate = String(lowRate)
     if (highRate !== undefined) updateData.highRate = String(highRate)
     if (defaultPercentile !== undefined) updateData.defaultPercentile = defaultPercentile
@@ -268,7 +190,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     const updatedTier = await prisma.tier.update({
       where: { id },
       data: updateData,
-      include: { criteriaSet: { select: { id: true, name: true } } }
+      include: { specialty: { select: { id: true, name: true } } }
     })
 
     res.json(updatedTier)
