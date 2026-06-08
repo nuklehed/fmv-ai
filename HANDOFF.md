@@ -238,6 +238,7 @@ The approved breakdown:
 | 25 | Remove unused dependencies (axios, ioredis, pdf-parse, pdfkit, @primevue/themes) | Cleanup | None | ✅ Done (`c371943`) — fallow confirmed zero unused deps remaining |
 | 26 | Remove 14 unused exports + 5 unused types via fallow fix | Cleanup | None | ✅ Done (`1dc0012`) — dead-code now shows only 1 issue (mock-server.ts) |
 | 27 | Delete dead mock-server.ts (279 lines, zero imports) | Cleanup | None | ✅ Done (`a8f7a54`) — fallow confirms **zero** dead code issues across entire monorepo |
+| 33 | Fix AI review failures: LLM prose output, prompt date injection, placeholder filtering | Bug | None | ✅ Done (`1489e3c`) — UUID prose fallback + simplified prompt + evaluation date injection |
 | 28 | **Refactor — eliminate duplicated auth/error patterns in frontend views + backend route middleware:**
     - Backend: Created `routes/saRouter.ts` with 4 factory functions (`createSaRouter`, `createAdminRouter`, `createAuthedRouter`, `createBuRouter`) that replace the repeated `router.use(authenticate)` / `router.use(requireSA|requireAdminOrSA|requireBUOrHigher)` pattern across all route files
     - Refactored 9 backend route files to use factories instead of inline middleware chains
@@ -254,6 +255,20 @@ The approved breakdown:
     - ⚠️ Requires database migration: `npx prisma migrate dev` when DB is available (Prisma client still has old types until migration runs)
     - All code committed and pushed to main branch |
 
+22. **Completed Issue #33 — Fix AI review failures: LLM prose output, prompt date injection, placeholder filtering:**
+    - **Root cause**: qwen3.6-35b-a3b was returning markdown bullet-point prose (e.g., `**Question UUID**: \`answerUUID\``) instead of raw JSON. The `response_format: { type: "json_object" }` parameter was tried but causes 400 Bad Request with this model via Ollama's OpenAI-compatible endpoint.
+    - **Fix — responseParser.ts**: Added `extractUuidPairsFromProse()` fallback that runs *before* the positional ID fallback. Parses 4 prose patterns:
+      - Bullet-point with bold question label and backtick answer: `- **Question <UUID> (Label)**: \`<UUID>\``
+      - "Question UUID: UUID" or "UUID → UUID" pairs
+      - Line-by-line two-UUID lines
+      - Multi-line: "Question <UUID>" header followed by answer UUID within ~300 chars
+    - **Fix — promptBuilder.ts**: Simplified the output format section (removed verbose example block that may have been teaching prose formatting). Injected evaluation date: static "June 2026" anchor in system prompt, dynamic `new Date()` ISO string in user prompt header so time-based criteria like "past 7 years" evaluate correctly.
+    - **Fix — llmClient.ts**: Added `temperature: 0.1` for more deterministic output.
+    - **Fix — ReviewView.vue**: Filtered placeholder rationales (`Extracted from prose`, `default rationale`) from Phase 2 display via `PLACEHOLDER_PATTERNS` check in `getAiRationale()`.
+    - **Seed data**: Created `prisma/seed-fmv-tiers.ts` with FMV HCP Tiers criteria set — 10 questions, 51 answers, max possible score = 35. Deterministic UUIDs, idempotent upsert logic. Added `db:seed-fmv-tiers` npm script.
+    - **Frontend**: Assessment domain refactor (`domain/assessment.ts`), AssessmentsListView detail panel fixes, SettingsControlCenterView cleanup, removed unused `usePagination.ts` composable.
+    - ⚠️ If the model still returns prose, the UUID prose fallback will parse it — but the ideal is raw JSON output. Consider switching to a model that supports `response_format: json_object` (e.g., gpt-4o, claude) for guaranteed parsing.
+
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
 - Assessment lifecycle: DRAFT → SUBMITTED → AI_PROCESSING → AI_COMPLETE → UNDER_REVIEW → APPROVED/REJECTED/EXPIRED
@@ -263,6 +278,33 @@ The approved breakdown:
 - Single-worker async AI processing against local LLM (qwen2.5:32b via Ollama)
 - Logical multi-tenancy via `tenant_id` on every record
 - Notifications: in-app + email by default, active for all users
+
+## Session notes — 2026-06-08 (AI review fix)
+### What was done
+| # | What |
+|---|------|
+| 1 | **Root cause identified**: qwen3.6-35b-a3b returns markdown bullet-point prose (`**Question UUID**: \`answerUUID\``) instead of raw JSON. Tried `response_format: { type: "json_object" }` but Ollama rejects it with 400 for this model |
+| 2 | **Added UUID prose fallback** in `responseParser.ts`: `extractUuidPairsFromProse()` parses 4 patterns — bullet-point bold+backtick, "Question UUID: UUID", two-UUID lines, multi-line header+answer — runs *before* positional fallback |
+| 3 | **Simplified system prompt** in `promptBuilder.ts`: removed verbose example block (may have been teaching prose formatting), replaced with concise instruction. Added evaluation date injection: static "June 2026" anchor in system prompt, dynamic ISO date in user prompt |
+| 4 | **Added temperature: 0.1** in `llmClient.ts` for more deterministic output |
+| 5 | **Filtered placeholder rationales** in `ReviewView.vue`: `getAiRationale()` now checks against `PLACEHOLDER_PATTERNS` (`Extracted from prose`, `default rationale`) to hide UI noise from fallback parsing |
+| 6 | **Created FMV HCP Tiers seed**: `seed-fmv-tiers.ts` with 10 questions, 51 answers, max score 35. Deterministic UUIDs, idempotent upsert. Added `db:seed-fmv-tiers` npm script |
+| 7 | **Frontend cleanup**: assessment domain refactor, AssessmentsListView detail panel fixes, SettingsControlCenterView updates, removed unused `usePagination.ts` |
+
+### Current blockers (user-side)
+- **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
+  ```bash
+  docker compose up -d          # start postgres + redis
+  npm run db:seed               # create default users
+  npm run db:seed-fmv-tiers     # seed FMV HCP Tiers criteria set
+  npm run dev                   # start backend + frontend
+  ```
+- **Port conflicts** — old node processes can linger. If ports are in use:
+  ```bash
+  netstat -ano | findstr :3001   # find PID on port 3001
+  taskkill //PID <pid> //F       # kill it
+  ```
+- **AI review still shows "Working..."** — if the frontend gets stuck in a loading state, check that the worker is actually processing. The detail panel `loading` ref may not be resetting if the API call fails silently. Verify the assessment transitions from `AI_PROCESSING` → `AI_COMPLETE` (or `AI_FAILED`).
 
 ## Session notes — 2026-06-05 (architecture deepening)
 ### Completed refactors
