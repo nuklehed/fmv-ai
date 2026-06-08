@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { Tier, Specialty } from '@/types'
+import type { Tier, CriteriaSet } from '@/types'
 import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
 const tiers = ref<Tier[]>([])
-const specialties = ref<Specialty[]>([])
+const criteriaSets = ref<CriteriaSet[]>([])
 const loading = ref(false)
 const currentPage = ref(1)
 const pageSize = ref(25)
@@ -19,7 +19,7 @@ const editingTier = ref<Tier | null>(null)
 const formName = ref('')
 const formMinScore = ref(0)
 const formMaxScore = ref(0)
-const formSpecialtyId = ref('')
+const formCriteriaSetId = ref('')
 const formLowRate = ref(0)
 const formHighRate = ref(0)
 const formDefaultPercentile = ref(50)
@@ -39,9 +39,9 @@ async function fetchTiers() {
   }
 }
 
-async function fetchSpecialties() {
+async function fetchCriteriaSets() {
   try {
-    specialties.value = await (await apiFetch('/api/specialties?active=true', { headers: getAuthHeaders() })).json()
+    criteriaSets.value = await (await apiFetch('/api/criteria-sets?active=true', { headers: getAuthHeaders() })).json()
   } catch { /* silent */ }
 }
 
@@ -50,14 +50,14 @@ function openAddModal() { resetForm(); showAddModal.value = true }
 function openEditModal(tier: Tier) {
   editingTier.value = tier
   formName.value = tier.name; formMinScore.value = tier.minScore; formMaxScore.value = tier.maxScore
-  formSpecialtyId.value = tier.specialtyId; formLowRate.value = Number(tier.lowRate)
+  formCriteriaSetId.value = tier.criteriaSetId; formLowRate.value = Number(tier.lowRate)
   formHighRate.value = Number(tier.highRate); formDefaultPercentile.value = tier.defaultPercentile
   showEditModal.value = true
 }
 
 function resetForm() {
   editingTier.value = null; formName.value = ''; formMinScore.value = 0; formMaxScore.value = 0
-  formSpecialtyId.value = ''; formLowRate.value = 0; formHighRate.value = 0; formDefaultPercentile.value = 50
+  formCriteriaSetId.value = ''; formLowRate.value = 0; formHighRate.value = 0; formDefaultPercentile.value = 50
   formError.value = ''
 }
 
@@ -74,7 +74,7 @@ async function handleAdd() {
     await apiFetch('/api/tiers', {
       method: 'POST', headers: getAuthHeaders(),
       body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
-        specialtyId: formSpecialtyId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
+        criteriaSetId: formCriteriaSetId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
         defaultPercentile: formDefaultPercentile.value })
     })
     showAddModal.value = false; resetForm(); await fetchTiers()
@@ -87,7 +87,7 @@ async function handleEdit() {
     await apiFetch(`/api/tiers/${editingTier.value.id}`, {
       method: 'PUT', headers: getAuthHeaders(),
       body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
-        specialtyId: formSpecialtyId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
+        criteriaSetId: formCriteriaSetId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
         defaultPercentile: formDefaultPercentile.value })
     })
     showEditModal.value = false; resetForm(); await fetchTiers()
@@ -106,7 +106,7 @@ function goToPage(page: number) {
   if (page >= 1 && page <= totalPages.value) { currentPage.value = page; fetchTiers() }
 }
 
-onMounted(() => { fetchTiers(); fetchSpecialties() })
+onMounted(() => { fetchTiers(); fetchCriteriaSets() })
 </script>
 
 <template>
@@ -158,7 +158,7 @@ onMounted(() => { fetchTiers(); fetchSpecialties() })
             </tr>
             <tr v-for="tier in tiers" :key="tier.id" class="hover:bg-gray-50">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ tier.name }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ (tier as any).specialty?.name || '—' }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tier.criteriaSet?.name || '—' }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ tier.minScore }} – {{ tier.maxScore }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ Number(tier.lowRate).toFixed(2) }} – ${{ Number(tier.highRate).toFixed(2) }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tier.defaultPercentile }}%</td>
@@ -201,10 +201,10 @@ onMounted(() => { fetchTiers(); fetchSpecialties() })
                   <form @submit.prevent="handleAdd" class="space-y-4">
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required placeholder="e.g., Tier 1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty *</label>
-                      <select v-model="formSpecialtyId" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select specialty...</option>
-                        <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Criteria Set *</label>
+                      <select v-model="formCriteriaSetId" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select criteria set...</option>
+                        <option v-for="c in criteriaSets" :key="c.id" :value="c.id">{{ c.name }}</option>
                       </select>
                     </div>
 
@@ -245,10 +245,10 @@ onMounted(() => { fetchTiers(); fetchSpecialties() })
                   <form @submit.prevent="handleEdit" class="space-y-4">
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty *</label>
-                      <select v-model="formSpecialtyId" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select specialty...</option>
-                        <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Criteria Set *</label>
+                      <select v-model="formCriteriaSetId" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select criteria set...</option>
+                        <option v-for="c in criteriaSets" :key="c.id" :value="c.id">{{ c.name }}</option>
                       </select>
                     </div>
 

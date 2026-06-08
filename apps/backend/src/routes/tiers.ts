@@ -8,22 +8,22 @@ const prisma = new PrismaClient()
 
 /**
  * GET /api/tiers
- * List tiers with pagination, optional active filter and specialty filter
+ * List tiers with pagination, optional active filter and criteriaSet filter
  */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1)
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
     const activeOnly = req.query.active === 'true'
-    const specialtyId = req.query.specialtyId as string | undefined
+    const criteriaSetId = req.query.criteriaSetId as string | undefined
 
     const where: Record<string, unknown> = { tenantId: req.tenantId!, isActive: true }
     if (!activeOnly) {
       // When not filtering to active only, remove the default filter
       delete (where as any).isActive
     }
-    if (specialtyId) {
-      where.specialtyId = specialtyId
+    if (criteriaSetId) {
+      where.criteriaSetId = criteriaSetId
     }
 
     // Fetch total count for pagination
@@ -32,7 +32,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     const tiers = await prisma.tier.findMany({
       where,
       include: {
-        specialty: { select: { id: true, name: true } }
+        criteriaSet: { select: { id: true, name: true } }
       },
       orderBy: { minScore: 'asc' },
       skip: (page - 1) * limit,
@@ -68,7 +68,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
         tenantId: req.tenantId!
       },
       include: {
-        specialty: { select: { id: true, name: true } }
+        criteriaSet: { select: { id: true, name: true } }
       }
     })
 
@@ -90,9 +90,9 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
  */
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { name, minScore, maxScore, specialtyId, lowRate, highRate, defaultPercentile } = req.body
+    const { name, minScore, maxScore, criteriaSetId, lowRate, highRate, defaultPercentile } = req.body
 
-    if (!name || minScore === undefined || maxScore === undefined || !specialtyId || lowRate === undefined || highRate === undefined) {
+    if (!name || minScore === undefined || maxScore === undefined || !criteriaSetId || lowRate === undefined || highRate === undefined) {
       res.status(400).json({ error: 'All fields are required' })
       return
     }
@@ -115,13 +115,13 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
       return
     }
 
-    // Verify specialty belongs to tenant
-    const specialty = await prisma.specialty.findFirst({
-      where: { id: specialtyId, tenantId: req.tenantId! }
+    // Verify criteriaSet belongs to tenant
+    const criteriaSet = await prisma.criteriaSet.findFirst({
+      where: { id: criteriaSetId, tenantId: req.tenantId! }
     })
 
-    if (!specialty) {
-      res.status(404).json({ error: 'Specialty not found in your organization' })
+    if (!criteriaSet) {
+      res.status(404).json({ error: 'Criteria set not found in your organization' })
       return
     }
 
@@ -130,14 +130,14 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
         name,
         minScore,
         maxScore,
-        specialtyId,
+        criteriaSetId,
         lowRate: String(lowRate),
         highRate: String(highRate),
         defaultPercentile: defaultPercentile || 50,
         tenantId: req.tenantId!
       },
       include: {
-        specialty: { select: { id: true, name: true } }
+        criteriaSet: { select: { id: true, name: true } }
       }
     })
 
@@ -155,7 +155,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
 router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { name, minScore, maxScore, specialtyId, lowRate, highRate, defaultPercentile, isActive } = req.body
+    const { name, minScore, maxScore, criteriaSetId, lowRate, highRate, defaultPercentile, isActive } = req.body
 
     // Verify tier belongs to tenant
     const existingTier = await prisma.tier.findFirst({
@@ -166,6 +166,32 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       res.status(404).json({ error: 'Tier not found' })
       return
     }
+
+    // Verify criteriaSet if provided
+    let criteriaSetIdToUse = (existingTier as any).criteriaSetId
+    if (criteriaSetId) {
+      const cs = await prisma.criteriaSet.findFirst({
+        where: { id: criteriaSetId, tenantId: req.tenantId! }
+      })
+
+      if (!cs) {
+        res.status(404).json({ error: 'Criteria set not found in your organization' })
+        return
+      }
+
+      criteriaSetIdToUse = criteriaSetId
+    }
+
+    const updateData: Record<string, unknown> = {}
+    
+    if (name !== undefined) updateData.name = name
+    if (minScore !== undefined) updateData.minScore = minScore
+    if (maxScore !== undefined) updateData.maxScore = maxScore
+    if (criteriaSetIdToUse !== (existingTier as any).criteriaSetId) updateData.criteriaSetId = criteriaSetIdToUse
+    if (lowRate !== undefined) updateData.lowRate = String(lowRate)
+    if (highRate !== undefined) updateData.highRate = String(highRate)
+    if (defaultPercentile !== undefined) updateData.defaultPercentile = defaultPercentile
+    if (isActive !== undefined) updateData.isActive = isActive
 
     // Validate score range if provided
     if (minScore !== undefined && maxScore !== undefined && minScore > maxScore) {
@@ -185,19 +211,19 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       return
     }
 
-    // Verify specialty if provided
-    let specialtyIdToUse = existingTier.specialtyId
-    if (specialtyId) {
-      const specialty = await prisma.specialty.findFirst({
-        where: { id: specialtyId, tenantId: req.tenantId! }
+    // Verify criteriaSet if provided
+    let criteriaSetIdToUse = (existingTier as any).criteriaSetId
+    if (criteriaSetId) {
+      const cs = await prisma.criteriaSet.findFirst({
+        where: { id: criteriaSetId, tenantId: req.tenantId! }
       })
 
-      if (!specialty) {
-        res.status(404).json({ error: 'Specialty not found in your organization' })
+      if (!cs) {
+        res.status(404).json({ error: 'Criteria set not found in your organization' })
         return
       }
 
-      specialtyIdToUse = specialtyId
+      criteriaSetIdToUse = criteriaSetId
     }
 
     const updateData: Record<string, unknown> = {}
@@ -205,21 +231,21 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     if (name !== undefined) updateData.name = name
     if (minScore !== undefined) updateData.minScore = minScore
     if (maxScore !== undefined) updateData.maxScore = maxScore
-    if (specialtyIdToUse !== existingTier.specialtyId) updateData.specialtyId = specialtyIdToUse
+    if (criteriaSetIdToUse !== (existingTier as any).criteriaSetId) updateData.criteriaSetId = criteriaSetIdToUse
     if (lowRate !== undefined) updateData.lowRate = String(lowRate)
     if (highRate !== undefined) updateData.highRate = String(highRate)
     if (defaultPercentile !== undefined) updateData.defaultPercentile = defaultPercentile
     if (isActive !== undefined) updateData.isActive = isActive
 
-    const tier = await prisma.tier.update({
+    const updatedTier = await prisma.tier.update({
       where: { id },
       data: updateData,
       include: {
-        specialty: { select: { id: true, name: true } }
+        criteriaSet: { select: { id: true, name: true } }
       }
     })
 
-    res.json(tier)
+    res.json(updatedTier)
   } catch (error) {
     console.error('Error updating tier:', error)
     res.status(500).json({ error: 'Internal server error' })

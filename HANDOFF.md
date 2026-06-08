@@ -245,12 +245,21 @@ The approved breakdown:
     - Refactored 4 admin views (SpecialtiesView, TierManagementView, UserManagementView, CriteriaSetsView) to use the composables — removed ~600 lines of duplicated fetch/auth/error code
     - Created `composables/usePagination.ts` generic pagination composable for future list views
     - All code committed and pushed to main branch |
+| 29 | **Refactor — link Tiers to CriteriaSets instead of Specialties (domain-correct):**
+    - Schema: Removed `Tier.specialtyId`, added `Tier.criteriaSetId` with relation to `CriteriaSet`
+    - Schema: Moved `tiers` relation from `Specialty` model to `CriteriaSet` model
+    - Backend: Updated `routes/tiers.ts` — all CRUD endpoints now use `criteriaSetId` instead of `specialtyId`, criteria set lookups instead of specialty lookups, include `criteriaSet.name` in responses
+    - Frontend: Updated `TierManagementView.vue` — Specialty dropdown replaced with CriteriaSet dropdown, table header changed to "Criteria Set", API calls send `criteriaSetId`
+    - Frontend: Updated TypeScript types — `Tier` interface now has `criteriaSetId: string` and optional `criteriaSet?: { id; name }`
+    - ⚠️ Requires database migration: `npx prisma migrate dev` when DB is available (Prisma client still has old types until migration runs)
+    - All code committed and pushed to main branch |
 
 ## Key domain decisions to remember
 - HCPs are master identity records; Assessments are discrete evaluation events
 - Assessment lifecycle: DRAFT → SUBMITTED → AI_PROCESSING → AI_COMPLETE → UNDER_REVIEW → APPROVED/REJECTED/EXPIRED
 - Criteria sets can be shared across specialties (e.g., prescriber vs non-prescriber)
-- Tier locked to score; rate overrideable with mandatory rationale
+- Tiers are scoped to CriteriaSets (not Specialties) — tiers define score ranges within a criteria set's rubric
+- Rate overrideable with mandatory rationale
 - Single-worker async AI processing against local LLM (qwen2.5:32b via Ollama)
 - Logical multi-tenancy via `tenant_id` on every record
 - Notifications: in-app + email by default, active for all users
