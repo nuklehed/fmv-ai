@@ -35,7 +35,7 @@ async function fetchAssessments() {
     if (statusFilter.value) params.status = statusFilter.value
 
     const queryString = new URLSearchParams(params).toString()
-    const result = await api.get<{ data: Assessment[]; pagination: { totalCount: number; totalPages: number } }>(`/assessments?${queryString}`)
+    const result = await api.get<{ data: Assessment[]; pagination: { totalCount: number; totalPages: number } }>(`/api/assessments?${queryString}`)
     
     if (result.data) {
       assessments.value = result.data.data || []
@@ -51,7 +51,7 @@ async function fetchAssessments() {
 
 async function fetchNotifications() {
   try {
-    const result = await api.get<{ data: Notification[]; unreadCount: number }>('/notifications?limit=10&unreadOnly=true')
+    const result = await api.get<{ data: Notification[]; unreadCount: number }>('/api/notifications?limit=10&unreadOnly=true')
     
     if (result.data) {
       notifications.value = result.data.data || []
@@ -64,7 +64,7 @@ async function fetchNotifications() {
 
 async function markNotificationAsRead(id: string) {
   try {
-    await api.put(`/notifications/${id}/read`)
+    await api.put(`/api/notifications/${id}/read`)
     unreadCount.value = Math.max(0, unreadCount.value - 1)
     // Remove from list
     notifications.value = notifications.value.filter(n => n.id !== id)
@@ -75,7 +75,7 @@ async function markNotificationAsRead(id: string) {
 
 async function markAllNotificationsAsRead() {
   try {
-    await api.put('/notifications/mark-all-read')
+    await api.put('/api/notifications/mark-all-read')
     unreadCount.value = 0
     notifications.value = []
   } catch (error) {
