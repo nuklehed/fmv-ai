@@ -12,6 +12,7 @@ import tierRoutes from './routes/tiers'
 import notificationRoutes from './routes/notifications'
 import userSettingsRoutes from './routes/userSettings'
 import applicationSettingsRoutes from './routes/applicationSettings'
+import tierConfigRoutes from './routes/tierConfig'
 import llmRoutes from './routes/llm'
 import { getAIWorker, closeConnection } from './services/queue'
 import { startExpiryChecker } from './services/expiryChecker'
@@ -35,6 +36,7 @@ app.use('/api/tiers', tierRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/userSettings', userSettingsRoutes)
 app.use('/api/application-settings', applicationSettingsRoutes)
+app.use('/api/tier-config', tierConfigRoutes)
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {

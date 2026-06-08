@@ -16,6 +16,7 @@ const savingKey = ref<string | null>(null)
 // Reactive variables for editable settings (v-model requires member expressions, not function calls)
 const approvalValidityPeriod = ref<number>(defaultValues.approvalValidityPeriod as number)
 const expiryReminderLeadTime = ref<number>(defaultValues.expiryReminderLeadTime as number)
+const numberOfTiers = ref<number>(3)
 
 async function fetchSettings() {
   loading.value = true
@@ -35,6 +36,15 @@ async function fetchSettings() {
       if (s.key === 'approvalValidityPeriod') approvalValidityPeriod.value = Number(s.value ?? defaultValues.approvalValidityPeriod)
       if (s.key === 'expiryReminderLeadTime') expiryReminderLeadTime.value = Number(s.value ?? defaultValues.expiryReminderLeadTime)
     })
+
+    // Fetch tier config separately
+    const tierResponse = await fetch('/api/tier-config', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (tierResponse.ok) {
+      const tierConfig = await tierResponse.json()
+      numberOfTiers.value = tierConfig.numberOfTiers ?? 3
+    }
   } catch (error) {
     console.error('Error fetching application settings:', error)
     formError.value = 'Failed to load application settings'
@@ -87,6 +97,35 @@ async function handleSave(key: string) {
   } catch (error) {
     console.error(`Error updating ${key}:`, error)
     formError.value = error instanceof Error ? error.message : `Failed to update ${key}`
+  } finally {
+    savingKey.value = null
+  }
+}
+
+async function handleSaveNumberOfTiers() {
+  savingKey.value = 'numberOfTiers'
+  formError.value = ''
+
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch('/api/tier-config', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ numberOfTiers: numberOfTiers.value })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to update number of tiers')
+    }
+
+    await fetchSettings()
+  } catch (error) {
+    console.error('Error updating number of tiers:', error)
+    formError.value = error instanceof Error ? error.message : 'Failed to update number of tiers'
   } finally {
     savingKey.value = null
   }
@@ -169,6 +208,35 @@ onMounted(() => {
               class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
             >
               {{ savingKey === 'expiryReminderLeadTime' ? 'Saving...' : 'Save' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Number of Tiers -->
+        <div class="bg-white shadow rounded-lg p-6">
+          <div class="flex items-start justify-between">
+            <div class="flex-1">
+              <h3 class="text-base font-medium text-gray-900">Number of Tiers</h3>
+              <p class="text-sm text-gray-500 mt-1">How many tier levels to use for assessment scoring (e.g., 3 = Gold/Silver/Bronze). Each criteria set will have this many tiers with contiguous score ranges.</p>
+            </div>
+          </div>
+          <div class="mt-4 flex items-center space-x-3">
+            <input
+              v-model.number="numberOfTiers"
+              type="number"
+              min="1"
+              max="20"
+              :disabled="savingKey === 'numberOfTiers'"
+              @blur="handleSaveNumberOfTiers()"
+              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <span class="text-sm text-gray-500">tiers</span>
+            <button
+              @click="handleSaveNumberOfTiers()"
+              :disabled="savingKey === 'numberOfTiers'"
+              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+            >
+              {{ savingKey === 'numberOfTiers' ? 'Saving...' : 'Save' }}
             </button>
           </div>
         </div>
