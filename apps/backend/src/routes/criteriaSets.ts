@@ -128,9 +128,9 @@ router.get('/:id/stats', async (req: AuthenticatedRequest, res: Response): Promi
     let totalPossibleScore = 0
     for (const q of questions) {
       totalQuestions++
-      for (const a of q.answers) {
-        totalAnswers++
-        totalPossibleScore += a.score
+      totalAnswers += q.answers.length
+      if (q.answers.length > 0) {
+        totalPossibleScore += Math.max(...q.answers.map(a => a.score))
       }
     }
 
