@@ -177,7 +177,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 
     // Cannot activate a specialty without a linked criteria set
     const shouldActivate = isActive === true || (isActive !== false && !('isActive' in req.body))
-    if (shouldActivate && existing.criteriaSetId !== criteriaSetId) {
+    if (shouldActivate && !criteriaSetId && !existing.criteriaSetId) {
       res.status(400).json({ error: 'Cannot activate specialty without linking a criteria set. Assign a criteria set first.' })
       return
     }
