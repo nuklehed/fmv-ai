@@ -333,11 +333,16 @@ The approved breakdown:
    - CriteriaSetsView: removed tier name badges from answer scores (tiers are specialty-specific now)
    - ReviewView: tier dropdown filters by assessment's specialtyId
    - approveWithTier auto-assign filters by specialtyId instead of criteriaSetId
-| 9 | ~~[#31](https://github.com/nuklehed/fmv-ai/issues/31)~~ 🟡 **PARTIAL** — Auto-resolve criteria set in Assessment form:
-   - ReviewView tier dropdown already filters by assessment's criteria set
-   - ⚠️ Still needs: BU assessment form should remove criteria set dropdown, auto-resolve via HCP→Specialty→CriteriaSet
-| 10 | ~~[#32](https://github.com/nuklehed/fmv-ai/issues/32)~~ 🔴 **NOT STARTED** — Zero-score flag in review workflow:
-   - Detect score=0, red badge "Manual Review Required", prevent auto-approval
+| 9 | ~~[#31](https://github.com/nuklehed/fmv-ai/issues/31)~~ ✅ **COMPLETED** (`e4008be`) — Auto-resolve criteria set in Assessment form:
+   - Removed criteria set dropdown from BU assessment form
+   - When user selects a specialty, criteriaSetId auto-populates via Specialty→CriteriaSet FK
+   - Read-only hint shown below specialty field confirming auto-resolution
+   - fetchSpecialties now returns criteriaSetId alongside id/name
+| 10 | ~~[#32](https://github.com/nuklehed/fmv-ai/issues/32)~~ ✅ **COMPLETED** (`e4008be`) — Zero-score flag in review workflow:
+   - Red badge "Manual Review Required" appears when admin score = 0
+   - Tier auto-assign dropdown disabled for zero-score assessments
+   - Approval rationale becomes mandatory when score is zero
+   - saveAndApprove validates and blocks approval without rationale
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
