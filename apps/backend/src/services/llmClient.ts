@@ -1,4 +1,4 @@
-stop/**
+/**
  * LLM Client — provider interface for AI inference.
  * Swappable: default implementation targets Ollama-compatible endpoints,
  * but any provider implementing this interface can be injected.

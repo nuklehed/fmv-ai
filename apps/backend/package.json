@@ -13,7 +13,8 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-  "db:seed-fmv-tiers": "tsx prisma/seed-fmv-tiers.ts"
+    "db:seed-fmv-tiers": "tsx prisma/seed-fmv-tiers.ts",
+    "db:seed-specialties": "tsx prisma/seed-top-specialties.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",
