@@ -79,7 +79,7 @@ const routes: RouteRecordRaw[] = [
         path: 'notifications',
         name: 'settingsNotifications',
         component: () => import('@/views/SettingsView.vue'),
-        meta: { requiresAuth: true, requiresAdminOrSA: true }
+        meta: { requiresAuth: true }
       },
       {
         path: 'specialties',

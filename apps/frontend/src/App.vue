@@ -67,8 +67,8 @@ onUnmounted(() => {
                 Assessments
               </router-link>
 
-              <!-- All users: Settings (control center) -->
-              <router-link to="/settings" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
+              <!-- All users: Settings (notification settings) -->
+              <router-link to="/settings/control-center/notifications" class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-gray-50 transition-colors">
                 Settings
               </router-link>
             </div>
