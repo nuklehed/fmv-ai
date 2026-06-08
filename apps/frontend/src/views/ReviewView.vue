@@ -123,7 +123,8 @@ async function fetchAssessment() {
 
 async function loadTiers() {
   try {
-    availableTiers.value = await assessmentDomain.fetchTiers()
+    const csId = assessment.value?.criteriaSetId || undefined
+    availableTiers.value = await assessmentDomain.fetchTiers(csId)
   } catch { /* silent */ }
 }
 

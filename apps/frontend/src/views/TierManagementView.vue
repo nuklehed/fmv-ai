@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import type { Tier, CriteriaSet } from '@/types'
 import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
@@ -16,13 +16,26 @@ const showAddModal = ref(false)
 const showEditModal = ref(false)
 const editingTier = ref<Tier | null>(null)
 
+// Form state — minScore is auto-calculated by backend, not user-entered
 const formName = ref('')
-const formMinScore = ref(0)
 const formMaxScore = ref(0)
 const formCriteriaSetId = ref('')
 const formLowRate = ref(0)
 const formHighRate = ref(0)
 const formDefaultPercentile = ref(50)
+
+// Calculated min score for display (read-only)
+const calculatedMinScore = computed(() => {
+  if (!formCriteriaSetId.value) return 1
+  const csTiers = tiers.value.filter(t => t.criteriaSetId === formCriteriaSetId.value && t.isActive !== false)
+  if (csTiers.length === 0) return 1
+  // Find the highest tier for this criteria set
+  const highestTier = csTiers.reduce((max, t) => t.maxScore > max.maxScore ? t : max, csTiers[0])
+  return highestTier.maxScore + 1
+})
+
+// Total possible score for selected criteria set
+const totalPossibleScore = ref<number | null>(null)
 
 async function fetchTiers() {
   loading.value = true
@@ -45,25 +58,47 @@ async function fetchCriteriaSets() {
   } catch { /* silent */ }
 }
 
+// Fetch total possible score when criteria set changes
+async function fetchTotalScore(csId: string) {
+  if (!csId) { totalPossibleScore.value = null; return }
+  try {
+    const resp = await apiFetch(`/api/criteria-sets/${csId}/stats`, { headers: getAuthHeaders() })
+    const data = await resp.json()
+    totalPossibleScore.value = data.totalPossibleScore
+  } catch { /* silent */ }
+}
+
 function openAddModal() { resetForm(); showAddModal.value = true }
 
 function openEditModal(tier: Tier) {
   editingTier.value = tier
-  formName.value = tier.name; formMinScore.value = tier.minScore; formMaxScore.value = tier.maxScore
-  formCriteriaSetId.value = tier.criteriaSetId; formLowRate.value = Number(tier.lowRate)
-  formHighRate.value = Number(tier.highRate); formDefaultPercentile.value = tier.defaultPercentile
+  formName.value = tier.name
+  formMaxScore.value = tier.maxScore
+  formCriteriaSetId.value = tier.criteriaSetId
+  formLowRate.value = Number(tier.lowRate)
+  formHighRate.value = Number(tier.highRate)
+  formDefaultPercentile.value = tier.defaultPercentile
+  fetchTotalScore(formCriteriaSetId.value)
   showEditModal.value = true
 }
 
 function resetForm() {
-  editingTier.value = null; formName.value = ''; formMinScore.value = 0; formMaxScore.value = 0
-  formCriteriaSetId.value = ''; formLowRate.value = 0; formHighRate.value = 0; formDefaultPercentile.value = 50
+  editingTier.value = null
+  formName.value = ''
+  formMaxScore.value = 0
+  formCriteriaSetId.value = ''
+  formLowRate.value = 0
+  formHighRate.value = 0
+  formDefaultPercentile.value = 50
+  totalPossibleScore.value = null
   formError.value = ''
 }
 
 function validateTier() {
   if (!formName.value.trim()) { formError.value = 'Tier name is required'; return false }
-  if (formMinScore.value > formMaxScore.value) { formError.value = 'Min score must be ≤ max score'; return false }
+  // Max score must be ≥ calculated min score
+  if (formMaxScore.value < calculatedMinScore.value) { formError.value = `Max score must be at least ${calculatedMinScore.value}`; return false }
+  if (totalPossibleScore.value !== null && formMaxScore.value > totalPossibleScore.value) { formError.value = `Max score cannot exceed total possible score (${totalPossibleScore.value})`; return false }
   if (formLowRate.value > formHighRate.value) { formError.value = 'Low rate must be ≤ high rate'; return false }
   return true
 }
@@ -73,7 +108,7 @@ async function handleAdd() {
   try {
     await apiFetch('/api/tiers', {
       method: 'POST', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
+      body: JSON.stringify({ name: formName.value, maxScore: formMaxScore.value,
         criteriaSetId: formCriteriaSetId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
         defaultPercentile: formDefaultPercentile.value })
     })
@@ -86,7 +121,7 @@ async function handleEdit() {
   try {
     await apiFetch(`/api/tiers/${editingTier.value.id}`, {
       method: 'PUT', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
+      body: JSON.stringify({ name: formName.value, maxScore: formMaxScore.value,
         criteriaSetId: formCriteriaSetId.value, lowRate: formLowRate.value, highRate: formHighRate.value,
         defaultPercentile: formDefaultPercentile.value })
     })
@@ -111,7 +146,6 @@ onMounted(() => { fetchTiers(); fetchCriteriaSets() })
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Header -->
     <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">
@@ -143,7 +177,7 @@ onMounted(() => { fetchTiers(); fetchCriteriaSets() })
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialty</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Criteria Set</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score Range</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate Range</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Percentile</th>
@@ -159,7 +193,7 @@ onMounted(() => { fetchTiers(); fetchCriteriaSets() })
             <tr v-for="tier in tiers" :key="tier.id" class="hover:bg-gray-50">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ tier.name }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tier.criteriaSet?.name || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ tier.minScore }} – {{ tier.maxScore }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ tier.minScore }}–{{ tier.maxScore }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ Number(tier.lowRate).toFixed(2) }} – ${{ Number(tier.highRate).toFixed(2) }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tier.defaultPercentile }}%</td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
@@ -199,18 +233,25 @@ onMounted(() => { fetchTiers(); fetchCriteriaSets() })
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Tier</h3>
                   <form @submit.prevent="handleAdd" class="space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required placeholder="e.g., Tier 1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required placeholder="e.g., Gold" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Criteria Set *</label>
-                      <select v-model="formCriteriaSetId" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select v-model="formCriteriaSetId" required @change="fetchTotalScore(formCriteriaSetId)" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Select criteria set...</option>
                         <option v-for="c in criteriaSets" :key="c.id" :value="c.id">{{ c.name }}</option>
                       </select>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Min Score *</label><input v-model.number="formMinScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Max Score *</label><input v-model.number="formMaxScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                    <!-- Read-only min score display -->
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Min Score</label>
+                      <input type="text" :value="calculatedMinScore" readonly class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed" />
+                    </div>
+
+                    <!-- Max score input with total possible score hint -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Max Score *</label>
+                      <input v-model.number="formMaxScore" type="number" required min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <p v-if="totalPossibleScore !== null" class="text-xs text-gray-500 mt-1">Max score range: 1 to {{ totalPossibleScore }}</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -244,17 +285,24 @@ onMounted(() => { fetchTiers(); fetchCriteriaSets() })
                   <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Tier</h3>
                   <form @submit.prevent="handleEdit" class="space-y-4">
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    
+
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Criteria Set *</label>
-                      <select v-model="formCriteriaSetId" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select v-model="formCriteriaSetId" required @change="fetchTotalScore(formCriteriaSetId)" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Select criteria set...</option>
                         <option v-for="c in criteriaSets" :key="c.id" :value="c.id">{{ c.name }}</option>
                       </select>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Min Score *</label><input v-model.number="formMinScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Max Score *</label><input v-model.number="formMaxScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                    <!-- Read-only min score display -->
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Min Score</label>
+                      <input type="text" :value="calculatedMinScore" readonly class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed" />
+                    </div>
+
+                    <!-- Max score input with total possible score hint -->
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Max Score *</label>
+                      <input v-model.number="formMaxScore" type="number" required min="1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <p v-if="totalPossibleScore !== null" class="text-xs text-gray-500 mt-1">Max score range: 1 to {{ totalPossibleScore }}</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">

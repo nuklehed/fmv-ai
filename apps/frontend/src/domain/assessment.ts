@@ -351,9 +351,11 @@ export async function rejectAssessment(assessmentId: string, reason: string): Pr
   return response.json()
 }
 
-/** Fetch available tiers */
-export async function fetchTiers(): Promise<Array<{ id: string; name: string; lowRate: number; highRate: number }>> {
-  const response = await fetch('/api/tiers?active=true', { headers: authHeaders() })
+/** Fetch available tiers, optionally filtered by criteriaSetId */
+export async function fetchTiers(criteriaSetId?: string): Promise<Array<{ id: string; name: string; lowRate: number; highRate: number }>> {
+  const params = new URLSearchParams({ active: 'true' })
+  if (criteriaSetId) params.set('criteriaSetId', criteriaSetId)
+  const response = await fetch(`/api/tiers?${params}`, { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to fetch tiers')
   return response.json()
 }

@@ -101,6 +101,47 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 })
 
 /**
+ * GET /api/criteria-sets/:id/stats
+ * Return summary stats for a criteria set (used by tier form to show max range hint)
+ */
+router.get('/:id/stats', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+
+    // Multi-tenant isolation
+    const cs = await prisma.criteriaSet.findFirst({
+      where: { id, tenantId: req.tenantId! },
+      select: { id: true }
+    })
+    if (!cs) {
+      res.status(404).json({ error: 'Criteria set not found' })
+      return
+    }
+
+    const questions = await prisma.question.findMany({
+      where: { criteriaSetId: id, isActive: true },
+      select: { answers: { where: { isActive: true }, select: { score: true } } }
+    })
+
+    let totalQuestions = 0
+    let totalAnswers = 0
+    let totalPossibleScore = 0
+    for (const q of questions) {
+      totalQuestions++
+      for (const a of q.answers) {
+        totalAnswers++
+        totalPossibleScore += a.score
+      }
+    }
+
+    res.json({ totalQuestions, totalAnswers, totalPossibleScore })
+  } catch (error) {
+    console.error('Error fetching criteria set stats:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/**
  * POST /api/criteria-sets
  * Create a new criteria set (SA only for system prompt)
  */

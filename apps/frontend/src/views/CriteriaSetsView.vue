@@ -8,9 +8,12 @@ interface Answer {
 interface Question {
   id: string; text: string; order: number; isActive: boolean; answers: Answer[]
 }
+interface Tier {
+  id: string; name: string; minScore: number; maxScore: number
+}
 interface CriteriaSet {
   id: string; name: string; description?: string | null; systemPrompt?: string | null
-  isActive: boolean; tenantId: string; createdAt: string; updatedAt: string; questions: Question[]
+  isActive: boolean; tenantId: string; createdAt: string; updatedAt: string; questions: Question[]; tiers?: Tier[]
 }
 
 const criteriaSets = ref<CriteriaSet[]>([])
@@ -257,13 +260,39 @@ function getSortedAnswers(answers: Answer[]): Answer[] {
   return [...(answers || [])].sort((a, b) => a.score - b.score)
 }
 
+/** Find the tier name for a given score within a criteria set's tiers */
+function getTierNameForScore(score: number, tiers?: Tier[]): string {
+  if (!tiers || tiers.length === 0) return ''
+  const matching = tiers.find(t => score >= t.minScore && score <= t.maxScore)
+  return matching?.name || ''
+}
+
+/** Fetch tiers for all criteria sets */
+async function fetchTiersForCriteriaSets() {
+  try {
+    const resp = await apiFetch('/api/tiers?active=true', { headers: getAuthHeaders() })
+    const data = await resp.json()
+    // Group tiers by criteriaSetId
+    const tiersByCsId: Record<string, Tier[]> = {}
+    for (const tier of data.data) {
+      if (!tiersByCsId[tier.criteriaSetId]) tiersByCsId[tier.criteriaSetId] = []
+      tiersByCsId[tier.criteriaSetId].push({ id: tier.id, name: tier.name, minScore: tier.minScore, maxScore: tier.maxScore })
+    }
+    // Attach to each criteria set
+    for (const cs of criteriaSets.value) {
+      if (tiersByCsId[cs.id]) cs.tiers = tiersByCsId[cs.id]
+    }
+  } catch { /* silent */ }
+}
+
 function handleSearch() {
   if (searchTimeout) clearTimeout(searchTimeout)
   searchTimeout = setTimeout(() => fetchCriteriaSets(), 300)
 }
 
-onMounted(() => {
-  fetchCriteriaSets()
+onMounted(async () => {
+  await fetchCriteriaSets()
+  await fetchTiersForCriteriaSets()
 })
 </script>
 
@@ -392,6 +421,7 @@ onMounted(() => {
                   <div v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" class="flex items-center justify-between bg-gray-50 rounded px-3 py-2 ml-2">
                     <div class="flex items-center space-x-3 flex-1">
                       <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{{ answer.score }}</span>
+                      <span v-if="getTierNameForScore(answer.score, cs.tiers)" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">{{ getTierNameForScore(answer.score, cs.tiers!) }}</span>
                       <span class="text-sm text-gray-700">{{ answer.text }}</span>
                     </div>
                     <div class="flex items-center space-x-2">
