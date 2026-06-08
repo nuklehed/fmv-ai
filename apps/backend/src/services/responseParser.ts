@@ -11,7 +11,7 @@ export interface AIResult {
 
 interface CriteriaQuestion {
   id: string
-  answers: Array<{ id: string }>
+  answers: Array<{ id: string; score: number }>
 }
 
 /**

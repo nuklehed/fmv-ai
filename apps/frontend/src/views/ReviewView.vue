@@ -68,6 +68,9 @@ const adminScore = computed(() => {
   return score
 })
 
+/** Zero-score flag — prevents auto-approval, requires manual review */
+const isZeroScore = computed(() => adminScore.value !== null && adminScore.value === 0)
+
 /** Handle answer change — clear rationale when reverting to AI's choice */
 function onAnswerChange(_questionId: string, index: number): void {
   const aiResults = assessment.value?.aiResults ? JSON.parse(assessment.value.aiResults as string) : []
@@ -159,6 +162,13 @@ async function saveAndApprove() {
   if (!assessment.value) return
   savingApprove.value = true
   formError.value = ''
+
+  // Zero-score requires manual rationale
+  if (isZeroScore.value && !approveRationale.value.trim()) {
+    formError.value = 'Zero-score assessments require an approval rationale'
+    savingApprove.value = false
+    return
+  }
 
   try {
     await assessmentDomain.approveAssessment(assessment.value.id, {
@@ -325,13 +335,25 @@ onMounted(() => { fetchAssessment() })
         <!-- Tier & Rate Section -->
         <div class="bg-white shadow rounded-lg p-6">
           <h3 class="text-base font-medium text-gray-900 mb-4">Tier & Rate</h3>
+
+          <!-- Zero-score warning -->
+          <div v-if="isZeroScore" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
+            <svg class="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+            <div>
+              <p class="text-sm font-semibold text-red-900">Manual Review Required</p>
+              <p class="text-xs text-red-700 mt-1">Score is zero — auto-approval is disabled. Please provide a rationale before approving.</p>
+            </div>
+          </div>
+
           <div class="space-y-4">
             <div>
               <label for="approve-tier" class="block text-sm font-medium text-gray-700 mb-1">Tier</label>
-              <select id="approve-tier" v-model="approveTierId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <select id="approve-tier" v-model="approveTierId" :disabled="isZeroScore"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed">
                 <option value="">Auto-assign based on score</option>
                 <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">{{ tier.name }} ({{ tier.lowRate }} - {{ tier.highRate }})</option>
               </select>
+              <p v-if="isZeroScore" class="text-xs text-red-600 mt-1">Tier auto-assign disabled for zero-score assessments</p>
             </div>
 
             <div>

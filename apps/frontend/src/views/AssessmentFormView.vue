@@ -65,8 +65,7 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 const isSubmitting = ref(false)
 const isUploadingCv = ref(false)
 
-const specialties = ref<{ id: string; name: string }[]>([])
-const criteriaSets = ref<{ id: string; name: string }[]>([])
+const specialties = ref<{ id: string; name: string; criteriaSetId?: string | null }[]>([])
 
 let hcpSearchTimeout: ReturnType<typeof setTimeout> | null = null
 
@@ -397,11 +396,20 @@ const canSubmit = computed(() => {
   return true
 })
 
+// ─── Auto-resolve criteria set from specialty ──────────────────────
+watch(specialtyId, (newSpecialtyId) => {
+  if (newSpecialtyId) {
+    const specialty = specialties.value.find(s => s.id === newSpecialtyId)
+    criteriaSetId.value = specialty?.criteriaSetId || ''
+  } else {
+    criteriaSetId.value = ''
+  }
+})
+
 // ─── Lifecycle ─────────────────────────────────────────────────────
 
 onMounted(async () => {
   try { specialties.value = await assessmentDomain.fetchSpecialties() } catch { /* silent */ }
-  try { criteriaSets.value = await assessmentDomain.fetchCriteriaSets() } catch { /* silent */ }
   if (isEditMode.value) loadDraft()
 })
 </script>
@@ -657,13 +665,10 @@ onMounted(async () => {
               </select>
             </div>
 
-            <div>
-              <label for="criteria-set" class="block text-sm font-medium text-gray-700 mb-1">Criteria Set</label>
-              <select id="criteria-set" v-model="criteriaSetId"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                <option value="">Select criteria set...</option>
-                <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
-              </select>
+            <!-- Auto-resolved criteria set (read-only hint) -->
+            <div v-if="criteriaSetId" class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p class="text-xs font-medium text-blue-700">Criteria Set</p>
+              <p class="text-sm text-blue-900">{{ specialties.find(s => s.id === specialtyId)?.name ? 'Auto-resolved from specialty' : '' }}</p>
             </div>
 
             <div>

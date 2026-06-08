@@ -362,7 +362,8 @@ export async function fetchTiers(specialtyId?: string): Promise<Array<{ id: stri
 }
 
 /** Fetch available specialties */
-export async function fetchSpecialties(): Promise<Array<{ id: string; name: string }>> {
+/** Fetch active specialties — includes criteriaSetId for auto-resolve */
+export async function fetchSpecialties(): Promise<Array<{ id: string; name: string; criteriaSetId?: string | null }>> {
   const response = await fetch('/api/specialties?active=true', { headers: authHeaders() })
   if (!response.ok) throw new Error('Failed to fetch specialties')
   return response.json()
