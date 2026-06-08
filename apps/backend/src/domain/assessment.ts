@@ -640,8 +640,8 @@ export class AssessmentDomain {
     if (!assignedTierId) {
       // Auto-assign tier based on score
       const tiers = await this.prisma.tier.findMany({
-        where: { tenantId, specialtyId: existing.specialtyId || undefined },
-        orderBy: { minScore: 'asc' }
+        where: { tenantId, criteriaSetId: (existing as any).criteriaSetId || undefined },
+        orderBy: { maxScore: 'desc' }
       }) as any[]
 
       const matchingTier = tiers.find((t: any) =>

@@ -167,32 +167,6 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       return
     }
 
-    // Verify criteriaSet if provided
-    let criteriaSetIdToUse = (existingTier as any).criteriaSetId
-    if (criteriaSetId) {
-      const cs = await prisma.criteriaSet.findFirst({
-        where: { id: criteriaSetId, tenantId: req.tenantId! }
-      })
-
-      if (!cs) {
-        res.status(404).json({ error: 'Criteria set not found in your organization' })
-        return
-      }
-
-      criteriaSetIdToUse = criteriaSetId
-    }
-
-    const updateData: Record<string, unknown> = {}
-    
-    if (name !== undefined) updateData.name = name
-    if (minScore !== undefined) updateData.minScore = minScore
-    if (maxScore !== undefined) updateData.maxScore = maxScore
-    if (criteriaSetIdToUse !== (existingTier as any).criteriaSetId) updateData.criteriaSetId = criteriaSetIdToUse
-    if (lowRate !== undefined) updateData.lowRate = String(lowRate)
-    if (highRate !== undefined) updateData.highRate = String(highRate)
-    if (defaultPercentile !== undefined) updateData.defaultPercentile = defaultPercentile
-    if (isActive !== undefined) updateData.isActive = isActive
-
     // Validate score range if provided
     if (minScore !== undefined && maxScore !== undefined && minScore > maxScore) {
       res.status(400).json({ error: 'Min score must be less than or equal to max score' })
