@@ -24,6 +24,9 @@ const formSpecialtyId = ref('')
 const formLowRate = ref(0)
 const formHighRate = ref(0)
 
+// Total possible score for the selected specialty's criteria set (shown as hint)
+const totalPossibleScore = ref<number | null>(null)
+
 async function fetchTiers() {
   loading.value = true
   try {
@@ -47,7 +50,7 @@ async function fetchSpecialties() {
 
 function openAddModal() { resetForm(); showAddModal.value = true }
 
-function openEditModal(tier: Tier) {
+async function openEditModal(tier: Tier) {
   editingTier.value = tier
   formName.value = tier.name
   formMinScore.value = tier.minScore
@@ -55,6 +58,13 @@ function openEditModal(tier: Tier) {
   formSpecialtyId.value = tier.specialtyId || ''
   formLowRate.value = Number(tier.lowRate)
   formHighRate.value = Number(tier.highRate)
+  // Fetch total possible score for the specialty's criteria set
+  if (tier.specialtyId) {
+    const specialty = specialties.value.find(s => s.id === tier.specialtyId)
+    if (specialty?.criteriaSetId) {
+      await fetchTotalScore(specialty.criteriaSetId)
+    }
+  }
   showEditModal.value = true
 }
 
@@ -66,6 +76,7 @@ function resetForm() {
   formSpecialtyId.value = ''
   formLowRate.value = 0
   formHighRate.value = 0
+  totalPossibleScore.value = null
   formError.value = ''
 }
 
@@ -110,6 +121,24 @@ async function handleDelete(tier: Tier) {
 
 function goToPage(page: number) {
   if (page >= 1 && page <= totalPages.value) { currentPage.value = page; fetchTiers() }
+}
+
+// Fetch total possible score when specialty changes
+async function onSpecialtyChange() {
+  const specialty = specialties.value.find(s => s.id === formSpecialtyId.value)
+  if (specialty?.criteriaSetId) {
+    await fetchTotalScore(specialty.criteriaSetId)
+  } else {
+    totalPossibleScore.value = null
+  }
+}
+
+async function fetchTotalScore(csId: string) {
+  try {
+    const resp = await apiFetch(`/api/criteria-sets/${csId}/stats`, { headers: getAuthHeaders() })
+    const data = await resp.json()
+    totalPossibleScore.value = data.totalPossibleScore
+  } catch { /* silent — hint just won't show */ }
 }
 
 onMounted(() => { fetchTiers(); fetchSpecialties() })
@@ -205,10 +234,11 @@ onMounted(() => { fetchTiers(); fetchSpecialties() })
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required placeholder="e.g., Gold" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
 
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
-                      <select v-model="formSpecialtyId" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select v-model="formSpecialtyId" @change="onSpecialtyChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">None (global tier)</option>
                         <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
                       </select>
+                      <p v-if="totalPossibleScore !== null" class="text-xs text-gray-500 mt-1">Total possible score for this rubric: {{ totalPossibleScore }} points</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -247,10 +277,11 @@ onMounted(() => { fetchTiers(); fetchSpecialties() })
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
 
                     <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
-                      <select v-model="formSpecialtyId" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select v-model="formSpecialtyId" @change="onSpecialtyChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">None (global tier)</option>
                         <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
                       </select>
+                      <p v-if="totalPossibleScore !== null" class="text-xs text-gray-500 mt-1">Total possible score for this rubric: {{ totalPossibleScore }} points</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
