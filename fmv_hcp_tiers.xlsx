@@ -1,0 +1,52 @@
+Category,Description/Criteria,Score
+Years in Practice,"+20 years with at least 7 years being specific to relevant therapeutic area",4
+Years in Practice,"15-20 years with at least 7 years being specific to relevant therapeutic area",3
+Years in Practice,"10-15 years with at least 5 years being specific to relevant therapeutic area",2
+Years in Practice,"5-10 years",1
+Years in Practice,"Less than 5 years",0
+Specialties,"Multiple Board Certifications or Licensures",4
+Specialties,"Licensed or Board Certified in Specialty",3
+Specialties,"Non-Licensed and Non-Board Certified in Specialty",1
+"Professional Roles (Academic and Clinical)","Department chair at a nationally leading organization: teaching hospital, research institutions, academic center, specialty care facility, or medical center",4
+"Professional Roles (Academic and Clinical)","Department chair at medical school or university",3
+"Professional Roles (Academic and Clinical)","Partner in large (more than 4 partners) medical practice with area of focus including relevant therapeutic areas",3
+"Professional Roles (Academic and Clinical)","Department chair/head at a teaching hospital, academic center, specialty care facility, or medical center (organizations not considered nationally leading)",3
+"Professional Roles (Academic and Clinical)","Full, associate or assistant professor medical school or university",3
+"Professional Roles (Academic and Clinical)","Full-time staff physician at nationally leading organization, teaching hospital, research institutions, academic center, specialty care facility, or medical center",3
+"Professional Roles (Academic and Clinical)","Department head or lead at large regional hospital or regionally leading research institute",2
+"Professional Roles (Academic and Clinical)","Partner in small (4 or less partners) or solo medical practice with area of focus including relevant therapeutic areas",2
+"Professional Roles (Academic and Clinical)","Full-time staff physician at teaching hospital, academic center, specialty care facility, or medical center (org is not considered nationally leading)",2
+"Professional Roles (Academic and Clinical)","Full-time staff physician at a hospital or research institute",1
+"Professional Roles (Academic and Clinical)","Member of HCP practice with area of focus including relevant therapeutic areas",1
+"Professional Roles (Academic and Clinical)","Senior lecturer/adunct professor at medical school or university",1
+Publications,"10 or more published articles in the past 7 years in leading/top medical journals",4
+Publications,"5-9 published articles in leading journal, at least one published the past 7 years",3
+Publications,"1-4 articles published in leading journal, at least one published the past 7 years",2
+Publications,"Author/coauthor of textbook for relevant therapeutic areas",2
+Publications,"Author for a chapter(s) in textbook for relevant therapeutic areas",1
+Journals,"Editor of leading national medical journal in the past 7 years",4
+Journals,"Deputy editor or editorial board member of a leading journal in the past 7 years",4
+Journals,"Associate editor of a leading journal or Steering Committee member for 5 or more multi-centered clinical trials (at least 2 in the past 7 years)",3
+Clinical Trials,"Coordinating Principal Investigator or Institutional Review Board for clinical trials",3
+Clinical Trials,"Member Data Safety Monitoring Board or Institutional Review Board for clinical trials (at least 2 in the past 7 years)",3
+Clinical Trials,"Site level Principal Investigator of 1-4 multi-centered clinical trials (at least 2 in the past 7 years)",2
+Clinical Trials,"Sub-level Investigator for at least 5 clinical trials (at least 1 in the past 7 years)",1
+Clinical Trials,"Sub-level Investigator for at least 2-4 clinical trials (at least 1 in the past 7 years)",1
+Grant,"Recipient of at least 1 NIH or other government research grants over career",3
+Grant,"Recipient of 5-9 NIH or other government research grants over career",1
+Industry Speaking and Advisory Roles,"Spoke or chaired sessions at international or national conferences at least 5 times in the past 7 years (non-promotional speaking only)",3
+Industry Speaking and Advisory Roles,"Spoke or chaired sessions at international or national conferences 1-4 times in the past 7 years (non-promotional speaking only)",1
+Industry Speaking and Advisory Roles,"Spoke at least 5 times in the past 7 years at local/regional CME events or other peer-attended events (may include poster sessions at such events, non-promotional speaking only and excluding grand rounds at own institution)",1
+Industry Speaking and Advisory Roles,"Invited lecturer at academic instructions at least 5 times in last 7 years",3
+Advisory Roles & Committees,"FDA adviser or adviser to other national or international treatment guidelines and/or regulatory issues in the past 7 years",3
+Advisory Roles & Committees,"Committee Chair determining national treatment guidelines known hospital or health plan in the past 7 years",2
+Advisory Roles & Committees,"Member of P&T Committee at a large internationally known hospital or health plan in the past 7 years",2
+Advisory Roles & Committees,"Chair member of state or local medical advisory board in the past 7 years",1
+Advisory Roles & Committees,"Member of committee determining national or regional treatment guidelines and/or regulatory issues in the past 7 years",1
+Advisory Roles & Committees,"Member of P&T Committee at a regional hospital or health plan in the past 7 years",1
+Associations & Societies,"Leadership role of international or national medical associations or patient society in the past 7 years",3
+Associations & Societies,"President / Chair or Medical Director of international or national medical association or patient society in the past 7 years",2
+Associations & Societies,"Management role in regional association or a regional chapter of a national association or patient society in the past 7 years",2
+Associations & Societies,"Recipient of an award from national medical associations recognizing high achievement of early career individuals",2
+Associations & Societies,"President, Chair or Medical Director of regional medical society, parent society or a regional chapter of a national association in the past 7 years",1
+Associations & Societies,"Society member for relevant therapeutic area medical association or patient society",1

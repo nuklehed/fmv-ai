@@ -19,7 +19,12 @@ const formError = ref('')
 
 // ─── Detail Panel State ──────────────────────────────────────────
 
-const selectedAssessment = ref<assessmentDomain.AssessmentListItem | null>(null)
+interface FullAssessment extends assessmentDomain.AssessmentListItem {
+  criteriaSet?: { questions: Array<{ id: string; text: string; answers: Array<{ id: string; text: string; score: number }> }> }
+}
+
+const selectedAssessment = ref<FullAssessment | null>(null)
+const detailLoading = ref(false)
 const showDetailPanel = ref(false)
 
 // ─── Review Workflow State (Admin/SA only) — used for inline approve/reject in detail panel ──
@@ -80,14 +85,20 @@ function startAutoRefresh() {
 // ─── Detail Panel ────────────────────────────────────────────────
 
 async function openDetailPanel(assessment: assessmentDomain.AssessmentListItem) {
-  selectedAssessment.value = assessment
+  detailLoading.value = true
   showDetailPanel.value = true
   isReviewing.value = false; reviewOverrides.value = []
   rejectionReason.value = ''; approveTierId.value = ''
   approveRateOverride.value = ''; approveRationale.value = ''
   reviewError.value = ''
 
-  if (assessmentDomain.canApprove(assessment)) await loadTiers()
+  try {
+    const full = await assessmentDomain.fetchAssessment(assessment.id)
+    selectedAssessment.value = full as unknown as FullAssessment
+  } catch { /* keep the list item as fallback */ }
+
+  if (assessmentDomain.canApprove(selectedAssessment.value || assessment)) await loadTiers()
+  detailLoading.value = false
 }
 
 function closeDetailPanel() {
@@ -180,6 +191,24 @@ function getAiResultsArray(): any[] {
     catch { return [] }
   }
   return []
+}
+
+// ─── Template Helpers (same pattern as ReviewView) ────────────────
+
+const PLACEHOLDER_PATTERNS = [
+  'Extracted from prose output',
+  'Extracted by positional matching'
+]
+
+function getAiResultForQuestion(questionId: string): any {
+  const results = assessmentDomain.getAiResults(selectedAssessment.value as any)
+  return results.find((r: any) => r.questionId === questionId) || null
+}
+
+function hasRealRationale(questionId: string): boolean {
+  const result = getAiResultForQuestion(questionId)
+  if (!result?.rationale) return false
+  return !PLACEHOLDER_PATTERNS.some(p => result.rationale.includes(p))
 }
 
 const hasDiagnosticInfo = computed(() => getAiResultsArray().some((r: any) => r.questionId === '_diagnostic'))
@@ -373,33 +402,33 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     </div>
 
                     <!-- AI Results -->
-                    <div v-if="selectedAssessment.aiResults && Array.isArray(selectedAssessment.aiResults) && selectedAssessment.aiResults.length > 0">
+                    <div v-if="selectedAssessment.criteriaSet?.questions && selectedAssessment.aiResults">
                       <h4 class="text-sm font-medium text-gray-500 mb-2">AI Evaluation Results</h4>
 
                       <!-- View Mode (read-only AI results display) -->
                       <div v-if="selectedAssessment.status === 'AI_COMPLETE' || selectedAssessment.status === 'UNDER_REVIEW'" class="space-y-3">
-                        <div v-for="(result, index) in assessmentDomain.getAiResults(selectedAssessment)" :key="index" class="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <div v-for="(question, index) in selectedAssessment.criteriaSet.questions" :key="question.id" class="p-3 bg-purple-50 rounded-lg border border-purple-200">
                           <div class="flex items-start justify-between mb-1">
                             <span class="text-xs font-medium text-purple-700">Question {{ index + 1 }}</span>
-                            <span v-if="result.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
+                            <span v-if="getAiResultForQuestion(question.id)?.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
                           </div>
-                          <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index + 1}` }}</p>
-                          <p class="text-xs text-purple-700 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{ result.score ?? '?' }} pts)</p>
-                          <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">"{{ result.rationale }}"</p>
+                          <p class="text-sm font-medium text-gray-900">{{ question.text }}</p>
+                          <p class="text-xs text-purple-700 mt-1">Selected: {{ getAiResultForQuestion(question.id)?.selectedAnswerText || '—' }} ({{ getAiResultForQuestion(question.id)?.score ?? '?' }} pts)</p>
+                          <p v-if="hasRealRationale(question.id)" class="text-xs text-gray-600 mt-1 italic">"{{ getAiResultForQuestion(question.id)?.rationale }}"</p>
                         </div>
                       </div>
-                    </div>
 
-                    <!-- View Mode (AI Results Display) -->
-                    <div v-else class="space-y-3">
-                      <div v-for="(result, index) in assessmentDomain.getAiResults(selectedAssessment)" :key="index" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <div class="flex items-start justify-between mb-1">
-                          <span class="text-xs font-medium text-gray-600">Question {{ index + 1 }}</span>
-                          <span v-if="result.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
+                      <!-- View Mode (AI Results Display for other statuses) -->
+                      <div v-else class="space-y-3">
+                        <div v-for="(question, index) in selectedAssessment.criteriaSet.questions" :key="question.id" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div class="flex items-start justify-between mb-1">
+                            <span class="text-xs font-medium text-gray-600">Question {{ index + 1 }}</span>
+                            <span v-if="getAiResultForQuestion(question.id)?.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
+                          </div>
+                          <p class="text-sm font-medium text-gray-900">{{ question.text }}</p>
+                          <p class="text-xs text-blue-600 mt-1">Selected: {{ getAiResultForQuestion(question.id)?.selectedAnswerText || '—' }} ({{ getAiResultForQuestion(question.id)?.score ?? '?' }} pts)</p>
+                          <p v-if="hasRealRationale(question.id)" class="text-xs text-gray-600 mt-1 italic">{{ getAiResultForQuestion(question.id)?.rationale }}</p>
                         </div>
-                        <p class="text-sm font-medium text-gray-900">{{ result.questionText || `Question ${index + 1}` }}</p>
-                        <p class="text-xs text-blue-600 mt-1">Selected: {{ result.selectedAnswerText || '—' }} ({{ result.score ?? '?' }} pts)</p>
-                        <p v-if="result.rationale" class="text-xs text-gray-600 mt-1 italic">{{ result.rationale }}</p>
                       </div>
                     </div>
                   </div>
@@ -435,8 +464,8 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   <div class="p-6"><h4 class="text-sm font-medium text-gray-500 mb-2">Submitted By</h4><p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p></div>
 
                   <!-- Start Review / Continue Review Button (navigate to dedicated review page) -->
-                  <div v-if="assessmentDomain.canReview(selectedAssessment) || selectedAssessment.status === 'UNDER_REVIEW'" class="border-t border-gray-200 pt-4">
-                    <router-link :to="`/assessments/${selectedAssessment.id}/review`" class="inline-block px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">
+                  <div v-if="assessmentDomain.canReview(selectedAssessment) || selectedAssessment.status === 'UNDER_REVIEW'" class="px-6 border-t border-gray-200 pt-4">
+                    <router-link :to="`/assessments/${selectedAssessment.id}/review`" class="block w-full text-center px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors">
                       {{ selectedAssessment.status === 'UNDER_REVIEW' ? 'Continue Review' : 'Start Review' }}
                     </router-link>
                   </div>

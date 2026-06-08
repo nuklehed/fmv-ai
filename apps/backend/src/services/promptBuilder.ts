@@ -11,12 +11,21 @@ export interface PromptPair {
   userPrompt: string
 }
 
+/** Format a date for display in prompts (e.g. "June 8, 2026") */
+function formatDateForPrompt(date: Date | string | null | undefined): string {
+  if (!date) return new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const d = date instanceof Date ? date : new Date(date)
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
 /**
  * Build the default system prompt when none is configured.
  * Uses explicit examples and strong formatting instructions to reduce LLM inconsistency.
  */
-function buildDefaultSystemPrompt(_questions: CriteriaQuestion[]): string {
+function buildDefaultSystemPrompt(_questions: CriteriaQuestion[], evalDate: string): string {
   return `You are an expert evaluator for Fair Market Value (FMV) assessments of healthcare professionals (HCPs).
+
+REFERENCE DATE: The current date for this evaluation is ${evalDate}. All time-based criteria ("past X years", "in the past 7 years", etc.) should be evaluated relative to ${evalDate}.
 
 Your task is to review the HCP's CV text and select the BEST matching answer for each evaluation question. For each question, you must choose exactly ONE answer from the provided options.
 
@@ -26,54 +35,26 @@ RULES:
 3. Base your selections STRICTLY on the information in the CV text. Do not invent or assume facts.
 4. If the CV does not contain sufficient information for a question, select the lowest-scoring answer and note "insufficient data" in the rationale.
 
-OUTPUT FORMAT — EXACTLY THIS JSON STRUCTURE:
-You MUST return ONLY a valid JSON array. No markdown code blocks (no \`\`\`). No extra text before or after the JSON.
+OUTPUT FORMAT — ABSOLUTE REQUIREMENT:
+Return ONLY a valid JSON array. No introductory text, no explanatory prose, no markdown formatting, no code block wrappers.
 
-FIELD NAMES — USE THESE EXACT camelCase NAMES:
-- "questionId"  (NOT "question", NOT "q1", NOT "question_id")
-- "selectedAnswerId"  (NOT "answer", NOT "a2", NOT "selected_answer", NOT "option")
-- "rationale"
+Each object must have exactly these three fields:
+- "questionId": the EXACT UUID from the question list (36 chars)
+- "selectedAnswerId": the EXACT UUID from that question's answer options (36 chars)
+- "rationale": a brief explanation string
 
-CRITICAL — ANSWER IDS ARE LONG UUID STRINGS, NOT SHORT CODES:
-- Question IDs look like: "550e8400-e29b-41d4-a716-446655440000" (36 chars with dashes)
-- Answer IDs look like: "6ba7b810-9dad-11d1-80b4-00c04fd430c8" (36 chars with dashes)
-- NEVER use short codes like "q1", "a2", "q1a2", or any abbreviated form
-- NEVER wrap IDs in brackets — use plain strings: "550e8400-e29b..."
-
-CRITICAL: Every answer in the array MUST have all three fields populated with valid values:
-- "questionId": must be the EXACT UUID from the question list below (36 characters)
-- "selectedAnswerId": must be the EXACT UUID from that question's answer options (36 characters)
-- "rationale": must be a non-empty string explaining your choice
-
-EXAMPLE OUTPUT:
-[
-  {
-    "questionId": "550e8400-e29b-41d4-a716-446655440000",
-    "selectedAnswerId": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
-    "rationale": "The CV shows 8 years of experience which meets the 5+ years criterion."
-  },
-  {
-    "questionId": "7c9e6679-7122-4daa-b4ee-ef0f3b8d1a2c",
-    "selectedAnswerId": "8d1e5503-f4ab-4c2d-a9e1-2b3c4d5e6f7a",
-    "rationale": "Insufficient data in the CV to determine this criterion."
-  }
-]
-
-WRONG — DO NOT USE THESE:
-- {"q1": "a2"} ← completely wrong format, short codes not accepted
-- {"question": "abc", "selected_answer": "[a2]"} ← wrong field names, bracket-wrapped IDs
-- {"question_id": "abc", "answerId": "def"} ← snake_case or mixed case
-- Any output wrapped in \`\`\`json code blocks`
+Do NOT use short codes like "q1", "a2", or any abbreviated form.`
 }
 
 /**
  * Build the user prompt containing HCP info, CV text and evaluation criteria.
  */
-function buildUserPrompt(assessment: Assessment & { hcp: Hcp; specialty?: Specialty | null }, questions: CriteriaQuestion[]): string {
+function buildUserPrompt(assessment: Assessment & { hcp: Hcp; specialty?: Specialty | null }, questions: CriteriaQuestion[], evalDate: string): string {
   const hcp = assessment.hcp
   const specialtyName = assessment.specialty?.name || 'Unknown'
 
-  let prompt = `## HCP Information\n`
+  let prompt = `## Reference Date\nCurrent date for evaluation: ${evalDate}\n\n`
+  prompt += `## HCP Information\n`
   prompt += `- Name: ${hcp.firstName} ${hcp.lastName}\n`
   if (hcp.email) prompt += `- Email: ${hcp.email}\n`
   if (hcp.phone) prompt += `- Phone: ${hcp.phone}\n`
@@ -103,8 +84,9 @@ export function buildPrompt(
   assessment: Assessment & { hcp: Hcp; specialty?: Specialty | null; criteriaSet?: { systemPrompt?: string } },
   questions: CriteriaQuestion[]
 ): PromptPair {
-  const systemPrompt = assessment.criteriaSet?.systemPrompt || buildDefaultSystemPrompt(questions)
-  const userPrompt = buildUserPrompt(assessment, questions)
+  const evalDate = formatDateForPrompt(assessment.submittedAt)
+  const systemPrompt = assessment.criteriaSet?.systemPrompt || buildDefaultSystemPrompt(questions, evalDate)
+  const userPrompt = buildUserPrompt(assessment, questions, evalDate)
 
   return { systemPrompt, userPrompt }
 }

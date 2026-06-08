@@ -124,6 +124,71 @@ function tryMatchPositionalId(synthetic: string, questions: CriteriaQuestion[]):
 }
 
 /**
+ * UUID pattern: 8-4-4-4-12 hex characters with dashes
+ */
+const UUID_PATTERN = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g
+
+/**
+ * Extract UUID pairs from prose/bullet-point text.
+ * Handles formats like:
+ *   - "**Question 8597... (Years in Practice)**: `198f...`"
+ *   - "Question 8597...: 198f..."
+ *   - "Q: 8597... A: 198f..."
+ * Returns array of { questionId, answerId } pairs.
+ */
+function extractUuidPairsFromProse(text: string): Array<{ questionId: string; answerId: string }> {
+  const results: Array<{ questionId: string; answerId: string }> = []
+
+  // Pattern 1: Bullet-point with bold question label and backtick answer
+  // e.g., "- **Question 8597... (Label)**: `198f...`"
+  const bulletPattern = /(?:^|\n)[\s\-*•]+\*?\*?Question\s+([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})[^`]*`?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/gi
+  let m
+  while ((m = bulletPattern.exec(text)) !== null) {
+    results.push({ questionId: m[1], answerId: m[2] })
+  }
+
+  // Pattern 2: "Question UUID: UUID" or "UUID → UUID"
+  const pairPattern = /(?:Question|Q)[:\s]*([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})[^0-9a-fA-F]*?([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/gi
+  while ((m = pairPattern.exec(text)) !== null) {
+    results.push({ questionId: m[1], answerId: m[2] })
+  }
+
+  // Pattern 3: Line-by-line — if a line contains two UUIDs, treat first as question, second as answer
+  const lines = text.split('\n')
+  for (const line of lines) {
+    const uuids = line.match(UUID_PATTERN)
+    if (uuids && uuids.length >= 2) {
+      // Avoid duplicates from patterns 1 & 2
+      const exists = results.some(r => r.questionId === uuids[0])
+      if (!exists) {
+        results.push({ questionId: uuids[0], answerId: uuids[1] })
+      }
+    }
+  }
+
+  // Pattern 4: Multi-line — "Question <UUID>" on one line, then any line with a UUID (answer) within next few lines
+  const qHeaderPattern = /\*?\*?Question\s+([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/g
+  let qm
+  while ((qm = qHeaderPattern.exec(text)) !== null) {
+    const questionId = qm[1]
+    // Avoid duplicates from patterns 1 & 2
+    if (results.some(r => r.questionId === questionId)) continue
+    // Look for answer UUID in the next ~300 chars (spanning lines)
+    const context = text.substring(qm.index, Math.min(qm.index + 300, text.length))
+    // Skip the question UUID itself and find the first other UUID
+    const afterQuestion = context.substring(qm.index + qm[0].length)
+    const answerUuids = afterQuestion.match(UUID_PATTERN)
+    if (answerUuids && answerUuids.length > 0) {
+      results.push({ questionId, answerId: answerUuids[0] })
+    }
+  }
+
+  // Deduplicate by questionId (keep first occurrence)
+  const seen = new Set<string>()
+  return results.filter(r => { if (seen.has(r.questionId)) return false; seen.add(r.questionId); return true })
+}
+
+/**
  * Extract positional IDs from prose text (e.g., "Question q1" → q1, "answer a2" → a2).
  * Returns an array of { questionNum: number, answerNum?: number } pairs.
  */
@@ -161,7 +226,17 @@ export function parseLLMResponse(response: string, questions: CriteriaQuestion[]
   const extracted = extractJSONFromResponse(response)
 
   if (!extracted.length) {
-    // Fallback: try to extract positional IDs from prose text
+    // Fallback 1: try to extract UUID pairs from prose/bullet-point text
+    const uuidPairs = extractUuidPairsFromProse(response)
+    if (uuidPairs.length > 0) {
+      return uuidPairs.map(({ questionId, answerId }) => ({
+        questionId,
+        selectedAnswerId: answerId,
+        rationale: 'Extracted from prose output by UUID pair matching'
+      })).filter(r => r.questionId && r.selectedAnswerId)
+    }
+
+    // Fallback 2: try to extract positional IDs (q1, a2) from prose text
     const proseMatches = extractPositionalIdsFromProse(response)
     if (proseMatches.length > 0) {
       return proseMatches.map(({ questionNum, answerNum }) => {

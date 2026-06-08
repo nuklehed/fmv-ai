@@ -1,11 +1,18 @@
 // ─── Domain Types ──────────────────────────────────────────────────
 
+export interface CriteriaQuestion {
+  id: string
+  text: string
+  answers: Array<{ id: string; text: string; score: number }>
+}
+
 export interface AssessmentListItem {
   id: string
   hcp: { firstName: string; lastName: string; email?: string }
   submittedByUser: { id: string; email: string }
   specialtyId?: string | null
   criteriaSetId?: string | null
+  criteriaSet?: { questions: CriteriaQuestion[] }
   status: string
   cvText?: string | null
   aiResults?: unknown | null
@@ -85,7 +92,7 @@ const STATUS_LABELS: Record<string, string> = {
   AI_FAILED: 'AI Failed'
 }
 
-const StatusColors = STATUS_COLORS
+// StatusColors kept for potential future use (mirrors STATUS_COLORS)
 export const StatusLabels = STATUS_LABELS
 
 export function getStatusColor(status: string): string {
@@ -165,12 +172,43 @@ export function formatDate(dateStr?: string | null): string {
 /** Parse aiResults (stored as JSON string in DB) to AiResultItem[] for template use */
 export function getAiResults(assessment: AssessmentListItem): AiResultItem[] {
   if (!assessment.aiResults) return []
-  if (Array.isArray(assessment.aiResults)) return assessment.aiResults as unknown as AiResultItem[]
-  if (typeof assessment.aiResults === 'string') {
-    try { return JSON.parse(assessment.aiResults) }
+
+  let raw: any[]
+  if (Array.isArray(assessment.aiResults)) raw = assessment.aiResults as any[]
+  else if (typeof assessment.aiResults === 'string') {
+    try { raw = JSON.parse(assessment.aiResults) }
     catch { return [] }
+  } else {
+    return []
   }
-  return []
+
+  // Build lookup maps from criteriaSet questions/answers
+  const questionMap = new Map<string, CriteriaQuestion>()
+  if (assessment.criteriaSet?.questions) {
+    for (const q of assessment.criteriaSet.questions) {
+      questionMap.set(q.id, q)
+    }
+  }
+
+  // Enrich each result with resolved text and score
+  return raw.map((item: any): AiResultItem => {
+    const question = questionMap.get(item.questionId)
+    let answerText = ''
+    let score: number | undefined
+    if (question) {
+      const answer = question.answers.find((a: { id: string }) => a.id === item.selectedAnswerId)
+      if (answer) {
+        answerText = answer.text
+        score = answer.score
+      }
+    }
+    return {
+      ...item,
+      questionText: question?.text || `Question ${item.questionId}`,
+      selectedAnswerText: answerText || '',
+      score
+    }
+  })
 }
 
 // ─── API Operations (backend calls) ──────────────────────────────
@@ -294,22 +332,6 @@ export async function startReview(assessmentId: string): Promise<any> {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: 'Failed to start review' }))
     throw new Error(errorData.error || 'Failed to start review')
-  }
-
-  return response.json()
-}
-
-/** Submit admin review with overrides */
-async function submitReview(assessmentId: string, overrides: ReviewOverride[], rejectionReason?: string | null): Promise<any> {
-  const response = await fetch(`/api/assessments/${assessmentId}/review`, {
-    method: 'PUT',
-    headers: authHeaders(),
-    body: JSON.stringify({ overrides, rejectionReason })
-  })
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Failed to submit review' }))
-    throw new Error(errorData.error || 'Failed to submit review')
   }
 
   return response.json()

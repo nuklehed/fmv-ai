@@ -82,10 +82,19 @@ function onAnswerChange(_questionId: string, index: number): void {
 
 // ─── Helpers ───────────────────────────────────────────────────
 
+/** Helper to filter out placeholder rationales from automated extraction */
+const PLACEHOLDER_PATTERNS = [
+  'Extracted from prose output',
+  'Extracted by positional matching'
+]
+
 function getAiRationale(questionId: string): string {
   const results = assessmentDomain.getAiResults(assessment.value!)
   const result = results.find((r: any) => r.questionId === questionId)
-  return result?.rationale || ''
+  const rationale = result?.rationale || ''
+  // Don't show auto-extraction placeholders as rationales
+  if (PLACEHOLDER_PATTERNS.some(p => rationale.includes(p))) return ''
+  return rationale
 }
 
 function isAnswerSameAsAI(questionId: string, answerId: string): boolean {
