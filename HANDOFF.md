@@ -324,16 +324,15 @@ The approved breakdown:
    - HCP routes reject specialties that don't have a criteria set assigned
    - SpecialtiesView UI shows criteria set name in table row or "Not assigned" in red
    - Add/Edit modals have criteria set dropdown (fetched from `/api/criteria-sets?active=true`)
-| 8 | ~~[#29](https://github.com/nuklehed/fmv-ai/issues/29)~~ ✅ **COMPLETED** (`8abd93a`) — Tiers linked to Criteria Set:
-   - Schema: `Tier.criteriaSetId` replaces `specialtyId`, relation moved from Specialty→CriteriaSet
-   - SA enters only maxScore; minScore auto-calculated by backend (next higher tier's max + 1)
-   - Contiguous range validation enforced: no gaps, no overlaps between tiers
-   - Last-tier constraint: highest max must equal total possible score for the criteria set
-   - GET /api/tiers sorted by maxScore descending (highest first)
-   - Added GET /api/criteria-sets/:id/stats endpoint ({totalQuestions, totalAnswers, totalPossibleScore})
-   - TierManagementView: max-score-only form with read-only min display + total score hint
-   - CriteriaSetsView: tier name badges next to answer scores in tree view
-   - ReviewView: tier dropdown filters by assessment's criteria set via criteriaSetId param
+| 8 | ~~[#29](https://github.com/nuklehed/fmv-ai/issues/29)~~ ✅ **COMPLETED** (`78ec683`) — Tiers linked to Specialty (reverted from CriteriaSet):
+   - Schema: `Tier.specialtyId` (nullable FK → Specialty), removed criteriaSetId
+   - Manual minScore + maxScore entry (no auto-calculation)
+   - No contiguous range validation or last-tier constraint
+   - GET /api/tiers sorted by maxScore descending (highest first), specialtyId filter supported
+   - TierManagementView: specialty dropdown, manual min/max fields, removed defaultPercentile input
+   - CriteriaSetsView: removed tier name badges from answer scores (tiers are specialty-specific now)
+   - ReviewView: tier dropdown filters by assessment's specialtyId
+   - approveWithTier auto-assign filters by specialtyId instead of criteriaSetId
 | 9 | ~~[#31](https://github.com/nuklehed/fmv-ai/issues/31)~~ 🟡 **PARTIAL** — Auto-resolve criteria set in Assessment form:
    - ReviewView tier dropdown already filters by assessment's criteria set
    - ⚠️ Still needs: BU assessment form should remove criteria set dropdown, auto-resolve via HCP→Specialty→CriteriaSet
