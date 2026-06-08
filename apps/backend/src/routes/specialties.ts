@@ -80,15 +80,18 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
     // Multi-tenant isolation — use tenant from authenticated user
     const tenantId = req.tenantId!
 
-    // Validate criteriaSetId if provided — must exist and belong to same tenant
-    if (criteriaSetId) {
-      const criteriaSet = await prisma.criteriaSet.findFirst({
-        where: { id: criteriaSetId, tenantId, isActive: true }
-      })
-      if (!criteriaSet) {
-        res.status(400).json({ error: 'Invalid criteria set. Must be active and belong to your organization.' })
-        return
-      }
+    // Criteria set is required — new specialties are active by default
+    if (!criteriaSetId) {
+      res.status(400).json({ error: 'A criteria set must be assigned to the specialty.' })
+      return
+    }
+
+    const criteriaSet = await prisma.criteriaSet.findFirst({
+      where: { id: criteriaSetId, tenantId, isActive: true }
+    })
+    if (!criteriaSet) {
+      res.status(400).json({ error: 'Invalid criteria set. Must be active and belong to your organization.' })
+      return
     }
 
     // Check for duplicate name within the same tenant
