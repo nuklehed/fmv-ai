@@ -318,6 +318,22 @@ The approved breakdown:
    - Three-tier fallback: exact match → positional matching → reject
    - Strengthened system prompt with explicit 36-char UUID examples and "DO NOT" section
    - Changed user prompt format from `[${answer.id}]` to `ID: ${answer.id} | Score: ...` to avoid bracket confusion |
+| 7 | ~~[#28](https://github.com/nuklehed/fmv-ai/issues/28)~~ ✅ **COMPLETED** — Specialty → Criteria Set link:
+   - Backend POST now requires criteriaSetId (new specialties are active by default, so activation validation applies to both POST and PUT)
+   - PUT validates: cannot activate specialty without a linked criteria set
+   - HCP routes reject specialties that don't have a criteria set assigned
+   - SpecialtiesView UI shows criteria set name in table row or "Not assigned" in red
+   - Add/Edit modals have criteria set dropdown (fetched from `/api/criteria-sets?active=true`)
+| 8 | ~~[#29](https://github.com/nuklehed/fmv-ai/issues/29)~~ 🟡 **PARTIAL** — Tiers moved to CriteriaSet:
+   - Schema: `Tier.criteriaSetId` replaces `specialtyId`, relation moved from Specialty→CriteriaSet
+   - Backend tiers.ts CRUD endpoints updated, auto-tier lookup in assessment approval uses criteriaSetId
+   - Frontend TierManagementView dropdown shows criteria sets instead of specialties
+   - TypeScript types updated
+   - ⚠️ Still needs: full max-score-only entry UI, contiguous range validation, tier name badges in CriteriaSetsView
+| 9 | ~~[#31](https://github.com/nuklehed/fmv-ai/issues/31)~~ 🔴 **NOT STARTED** — Auto-resolve criteria set in Assessment form:
+   - BU form should remove criteria set dropdown, auto-resolve via HCP→Specialty→CriteriaSet
+| 10 | ~~[#32](https://github.com/nuklehed/fmv-ai/issues/32)~~ 🔴 **NOT STARTED** — Zero-score flag in review workflow:
+   - Detect score=0, red badge "Manual Review Required", prevent auto-approval
 
 ### Current blockers (user-side)
 - **Docker Desktop** — needs to be running for PostgreSQL + Redis containers. Once up:
