@@ -16,7 +16,8 @@
     "db:push": "npm --prefix apps/backend run db:push",
     "db:seed": "npm --prefix apps/backend run db:seed",
     "db:seed-fmv-tiers": "npm --prefix apps/backend run db:seed-fmv-tiers",
-    "db:seed-specialties": "npm --prefix apps/backend run db:seed-specialties"
+    "db:seed-specialties": "npm --prefix apps/backend run db:seed-specialties",
+    "db:seed-tiers": "npm --prefix apps/backend run db:seed-tiers"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
