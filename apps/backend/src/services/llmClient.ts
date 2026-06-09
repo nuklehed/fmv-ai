@@ -96,23 +96,54 @@ class OllamaLLMClient implements LLMClientInterface {
   }
 
   async chat(messages: ChatMessage[], _options?: Record<string, unknown>): Promise<LLMResponse> {
-    const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        stream: false,
-        temperature: 0.1
-      })
+    const endpoint = `${this.baseUrl}/v1/chat/completions`
+    const requestBody = JSON.stringify({
+      model: this.model,
+      messages,
+      stream: false,
+      temperature: 0.1
     })
+
+    console.log(`[LLM] Request → ${endpoint}`)
+    console.log(`[LLM] Model: ${this.model}`)
+    console.log(`[LLM] Messages: ${messages.length} (${messages.map(m => m.role).join(', ')})`)
+    // Log prompt lengths (not full content — can be huge for CV assessments)
+    messages.forEach((m, i) => {
+      console.log(`[LLM]   [${i}] ${m.role}: ${m.content.length} chars`) 
+    })
+
+    let response: Response
+    try {
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: requestBody
+      })
+    } catch (err) {
+      const networkError = err instanceof Error ? err.message : String(err)
+      console.error(`[LLM] Network error — could not reach ${endpoint}`)
+      console.error(`[LLM] Error: ${networkError}`)
+      throw new Error(`Network error connecting to LLM at ${endpoint}: ${networkError}`)
+    }
+
+    const responseText = await response.text()
+    console.log(`[LLM] Response ← status: ${response.status} ${response.statusText}, body: ${responseText.length} chars`)
+    if (response.ok) {
+      // Truncate long responses for log readability
+      const snippet = responseText.length > 2000 ? responseText.substring(0, 2000) + '...[truncated]' : responseText
+      console.log(`[LLM] Body: ${snippet}`)
+    } else {
+      console.error(`[LLM] Error body: ${responseText.substring(0, 1000)}`)
+    }
 
     if (!response.ok) {
       throw new Error(`LLM API error: ${response.status} ${response.statusText}`)
     }
 
-    const json = await response.json() as LLMData
-    return { content: json.choices?.[0]?.message?.content || '' }
+    const json = JSON.parse(responseText) as LLMData
+    const content = json.choices?.[0]?.message?.content || ''
+    console.log(`[LLM] Parsed content: ${content.length} chars`)
+    return { content }
   }
 }
 

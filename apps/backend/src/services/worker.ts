@@ -72,6 +72,10 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
 
   // Step 3: Call LLM (delegated to LLMClient — swappable provider)
   let llmContent: string
+  console.log(`[Worker] Assessment ${assessmentId} — calling LLM`)
+  console.log(`[Worker] HCP: ${typedAssessment.hcp.firstName} ${typedAssessment.hcp.lastName}`)
+  console.log(`[Worker] CV text length: ${assessment.cvText?.length || 0} chars`)
+  console.log(`[Worker] Questions: ${questions.length}`)
   try {
     const client = createLLMClient()
     const response = await client.chat([
@@ -79,16 +83,20 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
       { role: 'user', content: userPrompt }
     ])
     llmContent = response.content
+    console.log(`[Worker] LLM returned ${llmContent.length} chars of content`)
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const isNetworkError = String(error).includes('fetch failed') || 
                            String(error).includes('ENOTFOUND') || 
                            String(error).includes('ECONNREFUSED') ||
                            String(error).includes('ETIMEDOUT')
-    console.error('LLM call failed:', errorMessage)
+    console.error(`[Worker] LLM call failed for assessment ${assessmentId}`)
+    console.error(`[Worker] Full error:`, error)
     if (isNetworkError) {
-      console.error('NETWORK DIAGNOSIS: Check that the LLM server is reachable at', process.env.LLM_BASE_URL || 'http://localhost:11434')
-      console.error('Verify Tailscale is connected and the remote Ollama service is running on port 1234')
+      console.error(`[Worker] NETWORK DIAGNOSIS:`)
+      console.error(`  LLM_BASE_URL = ${process.env.LLM_BASE_URL || 'http://localhost:11434'}`)
+      console.error(`  LLM_MODEL = ${process.env.LLM_MODEL || 'qwen3.6-35b-a3b'}`)
+      console.error(`  Test connectivity: curl -X POST ${process.env.LLM_BASE_URL}/v1/chat/completions -H "Content-Type: application/json" -d '{"model":"${process.env.LLM_MODEL}","messages":[{"role":"user","content":"hi"}],"max_tokens":5}'`)
     }
     // Store error context so admin can see what went wrong and retry
     await prisma.assessment.update({
