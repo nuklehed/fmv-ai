@@ -18,7 +18,7 @@ const navItems: NavItem[] = [
   { key: '/settings/control-center/notifications', label: 'Notifications', icon: 'pi pi-bell', roles: [] },
   { key: '/settings/control-center/criteria-sets', label: 'Criteria Sets', icon: 'pi pi-book', roles: ['SA', 'ADMIN'] as const },
   { key: '/settings/control-center/specialties', label: 'Specialties', icon: 'pi pi-briefcase', roles: ['SA'] },
-  { key: '/settings/control-center/tiers', label: 'Tiers & Rates', icon: 'pi pi-star', roles: ['SA', 'ADMIN'] as const },
+  { key: '/settings/control-center/tiers', label: 'Tier Rates', icon: 'pi pi-star', roles: ['SA', 'ADMIN'] as const },
   { key: '/settings/control-center/users', label: 'Users', icon: 'pi pi-users', roles: ['SA'] }
 ]
 

@@ -10,12 +10,15 @@ const specialties = ref<Specialty[]>([])
 const criteriaSets = ref<CriteriaSet[]>([])
 const rates = ref<TierRate[]>([])
 
-// Filtered specialties — only those with rates in the selected criteria set
-const filteredSpecialties = computed(() => {
+// All active specialties — show all, with Add/Edit buttons as needed
+const tableSpecialties = computed(() => {
   if (!selectedCriteriaSetId.value) return []
-  const specIds = new Set(rates.value.map(r => r.specialtyId))
-  return specialties.value.filter(s => specIds.has(s.id))
+  return [...specialties.value].sort((a, b) => a.name.localeCompare(b.name))
 })
+
+function hasRates(specialtyId: string): boolean {
+  return rates.value.some(r => r.specialtyId === specialtyId)
+}
 const loading = ref(false)
 const formError = ref('')
 const selectedCriteriaSetId = ref<string>('')
@@ -140,7 +143,7 @@ onMounted(async () => {
       <!-- Header -->
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-1">Tier Rates</h2>
+          <h2 class="text-2xl font-bold text-gray-900 mb-1">Tier Rates Management</h2>
           <p class="text-sm text-gray-600">Configure rate ranges per specialty and tier</p>
         </div>
       </div>
@@ -165,7 +168,7 @@ onMounted(async () => {
       </div>
 
       <!-- Matrix Table -->
-      <div v-else-if="selectedCriteriaSetId && filteredSpecialties.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
+      <div v-else-if="selectedCriteriaSetId && tableSpecialties.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <!-- Tier label row (merged over Min/Max) -->
@@ -187,7 +190,7 @@ onMounted(async () => {
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="specialty in filteredSpecialties" :key="specialty.id" class="hover:bg-gray-50">
+            <tr v-for="specialty in tableSpecialties" :key="specialty.id" :class="{ 'bg-yellow-50': !hasRates(specialty.id) }">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{{ specialty.name }}</td>
 
               <template v-for="label in tierLabels" :key="label">
@@ -200,8 +203,8 @@ onMounted(async () => {
               </template>
 
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button @click="openEditModal(specialty)" class="text-blue-600 hover:text-blue-900">
-                  Edit
+                <button @click="openEditModal(specialty)" :class="hasRates(specialty.id) ? 'text-blue-600 hover:text-blue-900' : 'text-emerald-600 hover:text-emerald-900'">
+                  {{ hasRates(specialty.id) ? 'Edit' : 'Add' }}
                 </button>
               </td>
             </tr>
