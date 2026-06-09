@@ -240,7 +240,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<
 
 /**
  * GET /api/tiers/specialties/:specialtyId/criteria-sets/:criteriaSetId/rates
- * Get all rates for a specific specialty and criteria set
+ * Get all rates — use specialtyId='_all' for all specialties, or a specific ID for one
  */
 router.get('/specialties/:specialtyId/criteria-sets/:criteriaSetId/rates', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -248,14 +248,15 @@ router.get('/specialties/:specialtyId/criteria-sets/:criteriaSetId/rates', async
 
     const rates = await prisma.specialtyRate.findMany({
       where: {
-        specialtyId,
+        ...(specialtyId !== '_all' ? { specialtyId } : {}),
         criteriaSetId,
         tenantId: req.tenantId!
       },
       include: {
         specialty: { select: { id: true, name: true } },
         criteriaSet: { select: { id: true, name: true } }
-      }
+      },
+      orderBy: [{ tierLabel: 'asc' }, { specialtyId: 'asc' }]
     })
 
     res.json({ data: rates })

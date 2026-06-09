@@ -15,17 +15,15 @@ const selectedCriteriaSetId = ref<string>('')
 
 // Modal state
 const showEditModal = ref(false)
-const editingRate = ref<TierRate | null>(null)
-const editLowRate = ref(0)
-const editHighRate = ref(0)
-const editTierLabel = ref('')
+const editingSpecialty = ref<{ id: string; name: string } | null>(null)
+const edits = ref<Record<string, { lowRate: number; highRate: number }>>({})
 
-// Editable cells (specialtyId → tierLabel → {lowRate, highRate})
-const editableCells = computed(() => {
-  const map = new Map<string, Record<string, { lowRate: string; highRate: string }>>()
-  for (const rate of rates.value) {
-    if (!map.has(rate.specialtyId)) map.set(rate.specialtyId, {})
-    map.get(rate.specialtyId)![rate.tierLabel] = { lowRate: rate.lowRate, highRate: rate.highRate }
+// Rates keyed by specialtyId → tierLabel → rate object
+const ratesMap = computed(() => {
+  const map = new Map<string, Record<string, TierRate>>()
+  for (const r of rates.value) {
+    if (!map.has(r.specialtyId)) map.set(r.specialtyId, {})
+    map.get(r.specialtyId)![r.tierLabel] = r
   }
   return map
 })
@@ -39,21 +37,6 @@ const tierLabels = computed(() => {
   // Fallback to generic tier names
   const numTiers = 3
   return Array.from({ length: numTiers }, (_, i) => `Tier ${numTiers - i}`)
-})
-
-// Matrix data for rendering
-const matrixData = computed(() => {
-  const data: Array<{ id: string; name: string; [key: string]: any }> = []
-  for (const specialty of specialties.value) {
-    const row: any = { id: specialty.id, name: specialty.name }
-    const ratesForSpecialty = editableCells.value.get(specialty.id) || {}
-    for (const label of tierLabels.value) {
-      const rateData = ratesForSpecialty[label]
-      row[label] = rateData ? `${rateData.lowRate}–${rateData.highRate}` : null
-    }
-    data.push(row)
-  }
-  return data
 })
 
 async function fetchSpecialties() {
@@ -72,24 +55,12 @@ async function fetchRates() {
   if (!selectedCriteriaSetId.value) return
   loading.value = true
   try {
-    const result = await (await apiFetch(`/api/tiers?criteriaSetId=${selectedCriteriaSetId.value}`, { headers: getAuthHeaders() })).json()
-    // Flatten the matrix data back to rates array for editing
-    if (result.data && result.data.length > 0) {
-      const labels = tierLabels.value
-      const flattened: TierRate[] = []
-      for (const row of result.data) {
-        for (const label of labels) {
-          if (row[label]) {
-            // Parse the rate string to find the rate id
-            const existing = rates.value.find(r => r.specialtyId === row.id && r.tierLabel === label)
-            if (existing) {
-              flattened.push(existing)
-            }
-          }
-        }
-      }
-      rates.value = flattened
-    }
+    // Fetch flat rates list for this criteria set
+    const result = await (await apiFetch(
+      `/api/tiers/specialties/_all/criteria-sets/${selectedCriteriaSetId.value}/rates`,
+      { headers: getAuthHeaders() }
+    )).json()
+    rates.value = result.data || []
   } catch {
     formError.value = 'Failed to load tier rates'
   } finally {
@@ -97,60 +68,58 @@ async function fetchRates() {
   }
 }
 
-async function openEditModal(rate: TierRate) {
-  editingRate.value = rate
-  editLowRate.value = Number(rate.lowRate)
-  editHighRate.value = Number(rate.highRate)
-  editTierLabel.value = rate.tierLabel
+async function openEditModal(specialty: Specialty) {
+  const specialtyRates = ratesMap.value.get(specialty.id) || {}
+  edits.value = {}
+  for (const label of tierLabels.value) {
+    const rate = specialtyRates[label]
+    edits.value[label] = rate
+      ? { lowRate: Number(rate.lowRate), highRate: Number(rate.highRate) }
+      : { lowRate: 0, highRate: 0 }
+  }
+  editingSpecialty.value = { id: specialty.id, name: specialty.name }
   showEditModal.value = true
 }
 
-async function handleEdit() {
-  if (!editingRate.value || !editTierLabel.value) return
-  if (editLowRate.value > editHighRate.value) { formError.value = 'Low rate must be ≤ high rate'; return }
-  
-  try {
-    await apiFetch(`/api/tiers/${editingRate.value.id}`, {
-      method: 'PUT', headers: getAuthHeaders(),
-      body: JSON.stringify({ tierLabel: editTierLabel.value, lowRate: editLowRate.value, highRate: editHighRate.value })
-    })
-    showEditModal.value = false
-    editingRate.value = null
-    await fetchRates()
-  } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'Failed to update rate'
-  }
-}
+async function handleSave() {
+  if (!editingSpecialty.value) return
+  const specId = editingSpecialty.value.id
+  const criteriaSetId = selectedCriteriaSetId.value
 
-async function handleAdd(specialtyId: string) {
-  if (!selectedCriteriaSetId.value) return
-  
-  for (const label of tierLabels.value) {
-    const existing = rates.value.find(r => r.specialtyId === specialtyId && r.tierLabel === label)
-    if (!existing) {
-      try {
-        await apiFetch('/api/tiers', {
-          method: 'POST', headers: getAuthHeaders(),
-          body: JSON.stringify({
-            specialtyId,
-            criteriaSetId: selectedCriteriaSetId.value,
-            tierLabel: label,
-            lowRate: 50,
-            highRate: 245
-          })
+  const promises = tierLabels.value.map(async (label) => {
+    const edit = edits.value[label]
+    if (!edit) return
+    if (edit.lowRate > edit.highRate) { formError.value = `Low rate must be ≤ high rate`; return }
+
+    const existing = rates.value.find(r => r.specialtyId === specId && r.tierLabel === label)
+    if (existing) {
+      await apiFetch(`/api/tiers/${existing.id}`, {
+        method: 'PUT', headers: getAuthHeaders(),
+        body: JSON.stringify({ lowRate: edit.lowRate, highRate: edit.highRate })
+      })
+    } else {
+      await apiFetch('/api/tiers', {
+        method: 'POST', headers: getAuthHeaders(),
+        body: JSON.stringify({
+          specialtyId: specId,
+          criteriaSetId: criteriaSetId,
+          tierLabel: label,
+          lowRate: edit.lowRate,
+          highRate: edit.highRate
         })
-      } catch { /* silent — will show on refresh */ }
+      })
     }
-  }
-  
+  })
+
+  await Promise.all(promises)
+  showEditModal.value = false
+  editingSpecialty.value = null
   await fetchRates()
 }
 
-function handleDelete(rate: TierRate) {
-  if (!confirm(`Delete rate for ${rate.tierLabel}?`)) return
-  apiFetch(`/api/tiers/${rate.id}`, { method: 'DELETE', headers: getAuthHeaders() })
-    .then(() => fetchRates())
-    .catch(() => formError.value = 'Failed to delete rate')
+function formatRate(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value
+  return isNaN(num) ? '—' : `$${num.toLocaleString()}`
 }
 
 onMounted(async () => {
@@ -189,43 +158,39 @@ onMounted(async () => {
       </div>
 
       <!-- Matrix Table -->
-      <div v-else-if="selectedCriteriaSetId && matrixData.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
+      <div v-else-if="selectedCriteriaSetId && specialties.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">Specialty</th>
-              <th v-for="label in tierLabels" :key="label" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {{ label }} Rate
-              </th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <template v-for="label in tierLabels" :key="label">
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Min</th>
+                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Max</th>
+              </template>
+              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="row in matrixData" :key="row.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{{ row.name }}</td>
-              <td v-for="label in tierLabels" :key="label" class="px-6 py-4 text-center">
-                <template v-if="row[label]">
-                  <span class="text-sm text-gray-900">${{ row[label].split('–')[0] }}–${{ row[label].split('–')[1] }}</span>
-                </template>
-                <template v-else>
-                  <span class="text-xs text-gray-400 italic">Not set</span>
-                </template>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
-                <button v-for="label in tierLabels" :key="label" @click="openEditModal(rates.find(r => r.specialtyId === row.id && r.tierLabel === label) || rates[0] as any)" class="text-blue-600 hover:text-blue-900 text-xs">
+            <tr v-for="specialty in specialties" :key="specialty.id" class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{{ specialty.name }}</td>
+
+              <template v-for="label in tierLabels" :key="label">
+                <td class="px-4 py-4 text-center text-sm text-gray-700">
+                  {{ formatRate(ratesMap.get(specialty.id)?.[label]?.lowRate ?? '—') }}
+                </td>
+                <td class="px-4 py-4 text-center text-sm text-gray-700">
+                  {{ formatRate(ratesMap.get(specialty.id)?.[label]?.highRate ?? '—') }}
+                </td>
+              </template>
+
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <button @click="openEditModal(specialty)" class="text-blue-600 hover:text-blue-900">
                   Edit
                 </button>
               </td>
             </tr>
           </tbody>
         </table>
-
-        <!-- Add Rates Button -->
-        <div class="bg-gray-50 px-4 py-3 border-t border-gray-200">
-          <button @click="handleAdd(matrixData[0]?.id)" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
-            + Add Missing Rates
-          </button>
-        </div>
       </div>
 
       <!-- Empty State -->
@@ -239,22 +204,40 @@ onMounted(async () => {
           <div v-if="showEditModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
               <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showEditModal = false" />
-              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md w-full">
+              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Rate</h3>
-                  <form @submit.prevent="handleEdit" class="space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Label *</label><input v-model="editTierLabel" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                  <h3 class="text-lg font-medium text-gray-900 mb-1">Edit Rates</h3>
+                  <p v-if="editingSpecialty" class="text-sm text-gray-600">{{ editingSpecialty.name }}</p>
 
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Low Rate ($) *</label><input v-model.number="editLowRate" type="number" step="5" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">High Rate ($) *</label><input v-model.number="editHighRate" type="number" step="5" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    </div>
+                  <form @submit.prevent="handleSave" class="mt-4 space-y-3">
+                    <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
+                          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Min Rate ($)</th>
+                          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Max Rate ($)</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-for="label in tierLabels" :key="label">
+                          <td class="px-3 py-2 text-sm font-medium text-gray-900">{{ label }}</td>
+                          <td class="px-3 py-2">
+                            <input v-model.number="edits[label].lowRate" type="number" step="5" min="0" required
+                              class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-2 focus:ring-blue-500" />
+                          </td>
+                          <td class="px-3 py-2">
+                            <input v-model.number="edits[label].highRate" type="number" step="5" min="0" required
+                              class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-2 focus:ring-blue-500" />
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
 
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button @click="handleEdit" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save</button>
+                  <button @click="handleSave" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save All</button>
                   <button @click="showEditModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
