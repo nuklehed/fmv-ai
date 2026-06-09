@@ -205,10 +205,10 @@ router.put('/:id/review', authenticate, requireAdminOrSA, async (req: Authentica
 /** POST /api/assessments/:id/approve — Approve with tier/rate */
 router.post('/:id/approve', authenticate, requireAdminOrSA, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { tierId, rateOverride, rationale, effectiveDate, renewalDate } = req.body
+    const { tierLabel, rateOverride, rationale, effectiveDate, renewalDate } = req.body
 
     const assessment = await domain.approveWithTier(
-      req.params.id, tierId, rateOverride, rationale,
+      req.params.id, tierLabel, rateOverride, rationale,
       effectiveDate ? new Date(effectiveDate) : undefined,
       renewalDate ? new Date(renewalDate) : undefined,
       req.userId!, req.tenantId!
@@ -217,7 +217,7 @@ router.post('/:id/approve', authenticate, requireAdminOrSA, async (req: Authenti
   } catch (error) {
     if (error instanceof Error && error.message.includes('not found')) {
       res.status(404).json({ error: 'Assessment not found' })
-    } else if (error instanceof Error && (error.message.includes('Only assessments') || error.message.includes('without a total score') || error.message.includes('No tier matches') || error.message.includes('Selected tier') || error.message.includes('Rate must'))) {
+    } else if (error instanceof Error && (error.message.includes('Only assessments') || error.message.includes('without a total score') || error.message.includes('No tier matches') || error.message.includes('Rate must'))) {
       res.status(400).json({ error: error.message })
     } else {
       console.error('Error approving assessment:', error)

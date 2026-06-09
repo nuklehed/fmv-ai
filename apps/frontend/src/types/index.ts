@@ -46,7 +46,7 @@ export interface Assessment {
   status: AssessmentStatus
   aiResults?: Record<string, unknown> | null
   totalScore?: number | null
-  tierId?: string | null
+  tierLabel?: string | null
   rate?: number | null
   approvedByUserId?: string | null
   rejectionReason?: string | null
@@ -63,6 +63,7 @@ export interface CriteriaSet {
   id: string
   name: string
   description?: string | null
+  tierThresholds?: Array<{ label: string; minScore: number; maxScore: number }>
   isActive: boolean
   tenantId: string
 }
@@ -97,20 +98,16 @@ export interface Notification {
   createdAt: string
 }
 
-export interface Tier {
+export interface SpecialtyRate {
   id: string
-  name: string
-  minScore: number
-  maxScore: number
-  specialtyId: string | null
-  lowRate: number
-  highRate: number
-  defaultPercentile: number
+  specialtyId: string
+  criteriaSetId: string
+  tierLabel: string
+  lowRate: string
+  highRate: string
   tenantId: string
-  isActive: boolean
   createdAt: string
   updatedAt: string
-  specialty?: { id: string; name: string } | null
 }
 
 export interface ApplicationSetting {

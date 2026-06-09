@@ -99,7 +99,7 @@ export class AssessmentDomain {
       include: {
         hcp: { select: { firstName: true, lastName: true, email: true } },
         submittedByUser: { select: { id: true, email: true } },
-        tier: { select: { name: true, lowRate: true, highRate: true } }
+        specialty: { select: { id: true, name: true } }
       }
     }) as any[]
 
@@ -137,7 +137,9 @@ export class AssessmentDomain {
             questions: { where: { isActive: true }, include: { answers: { where: { isActive: true } } } }
           }
         },
-        tier: true
+        rates: {
+          where: { specialtyId: (existing as any)?.specialtyId || undefined }
+        }
       }
     })
   }
@@ -277,8 +279,7 @@ export class AssessmentDomain {
       data: updateData,
       include: {
         hcp: true,
-        submittedByUser: { select: { id: true, email: true } },
-        tier: true
+        submittedByUser: { select: { id: true, email: true } }
       }
     })
   }
@@ -579,8 +580,7 @@ export class AssessmentDomain {
       include: {
         hcp: true,
         submittedByUser: { select: { id: true, email: true } },
-        approvedByUser: { select: { id: true, email: true } },
-        tier: { select: { name: true, lowRate: true, highRate: true } }
+        approvedByUser: { select: { id: true, email: true } }
       }
     })
 
@@ -616,7 +616,7 @@ export class AssessmentDomain {
 
   async approveWithTier(
     id: string,
-    tierId: string | undefined,
+    tierLabel: string | undefined,
     rateOverride: number | undefined,
     rationale: string | undefined,
     effectiveDate: Date | undefined,
@@ -626,56 +626,56 @@ export class AssessmentDomain {
   ): Promise<Assessment> {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },
-      include: { hcp: true, tier: true, submittedByUser: true }
+      include: { hcp: true, submittedByUser: true }
     })
 
     if (!existing) throw new Error('Assessment not found')
     if (existing.status !== 'UNDER_REVIEW') throw new Error('Only assessments under review can be approved')
     if (!existing.totalScore) throw new Error('Cannot approve assessment without a total score')
 
-    // Determine tier and rate
-    let assignedTierId = tierId || existing.tierId
+    // Get criteria set thresholds to determine valid tier labels
+    const criteriaSet = await this.prisma.criteriaSet.findFirst({
+      where: { id: existing.criteriaSetId! }
+    })
+    if (!criteriaSet) throw new Error('Criteria set not found')
+
+    const thresholds: any[] = criteriaSet.tierThresholds ? JSON.parse(JSON.stringify(criteriaSet.tierThresholds)) : []
+    if (thresholds.length === 0) throw new Error('No tier thresholds defined for this criteria set')
+
+    // Determine tier label and rate from SpecialtyRate
+    let assignedTierLabel = tierLabel || existing.tierLabel
     let finalRate: number | null = existing.rate as number | null
 
-    if (!assignedTierId) {
-      // Auto-assign tier based on score — filter by specialtyId if assessment has one
-      const tiers = await this.prisma.tier.findMany({
-        where: { tenantId, specialtyId: (existing as any).specialtyId || undefined },
-        orderBy: { maxScore: 'desc' }
-      }) as any[]
-
-      const matchingTier = tiers.find((t: any) =>
+    if (!assignedTierLabel) {
+      // Auto-assign based on score matching thresholds
+      const matchingThreshold = thresholds.find((t: any) =>
         existing.totalScore! >= t.minScore &&
         existing.totalScore! <= t.maxScore
       )
 
-      if (!matchingTier) throw new Error('No tier matches the assessment score. Please assign a tier manually.')
+      if (!matchingThreshold) throw new Error('No tier matches the assessment score. Please assign a tier manually.')
 
-      assignedTierId = matchingTier.id
-
-      // Calculate rate based on percentile (default 50th percentile)
-      const range = Number(matchingTier.highRate) - Number(matchingTier.lowRate)
-      finalRate = Number(matchingTier.lowRate) + (range * (matchingTier.defaultPercentile / 100))
-    } else {
-      // Validate tier belongs to tenant
-      const tier = await this.prisma.tier.findFirst({
-        where: { id: assignedTierId, tenantId }
-      })
-
-      if (!tier) throw new Error('Selected tier not found in your organization')
-
-      // Calculate rate based on percentile or use override
-      const range = Number(tier.highRate) - Number(tier.lowRate)
-      finalRate = rateOverride !== undefined ? rateOverride : (Number(tier.lowRate) + (range * (tier.defaultPercentile / 100)))
+      assignedTierLabel = matchingThreshold.label
     }
+
+    // Look up SpecialtyRate for this specialty + criteria set + tier label
+    const specialtyRate = await this.prisma.specialtyRate.findFirst({
+      where: {
+        specialtyId: existing.specialtyId!,
+        criteriaSetId: existing.criteriaSetId!,
+        tierLabel: assignedTierLabel
+      }
+    })
+
+    if (!specialtyRate) throw new Error(`No rate defined for ${assignedTierLabel} in this specialty. Please set rates first.`)
+
+    // Calculate rate based on percentile or use override
+    const range = Number(specialtyRate.highRate) - Number(specialtyRate.lowRate)
+    finalRate = rateOverride !== undefined ? rateOverride : (Number(specialtyRate.lowRate) + (range * 50 / 100))
 
     // Validate rate is within tier bounds if override provided
     if (rateOverride !== undefined && finalRate !== null) {
-      const tier = await this.prisma.tier.findFirst({
-        where: { id: assignedTierId as string, tenantId }
-      })
-
-      if (tier && (finalRate < Number(tier.lowRate) || finalRate > Number(tier.highRate))) {
+      if (finalRate < Number(specialtyRate.lowRate) || finalRate > Number(specialtyRate.highRate)) {
         throw new Error('Rate must be within tier bounds')
       }
     }
@@ -685,7 +685,6 @@ export class AssessmentDomain {
     let endDate: Date | null = renewalDate ? new Date(renewalDate) : null
 
     if (!endDate) {
-      // Get approval validity period from application settings (default 730 days = 2 years)
       const setting = await this.prisma.applicationSetting.findFirst({
         where: { key: 'approvalValidityPeriod', tenantId }
       })
@@ -699,7 +698,7 @@ export class AssessmentDomain {
       where: { id },
       data: {
         status: 'APPROVED',
-        tierId: assignedTierId,
+        tierLabel: assignedTierLabel,
         rate: finalRate as any,
         approvedByUserId: userId,
         effectiveDate: startDate,
@@ -709,8 +708,7 @@ export class AssessmentDomain {
       include: {
         hcp: true,
         submittedByUser: { select: { id: true, email: true } },
-        approvedByUser: { select: { id: true, email: true } },
-        tier: { select: { name: true, lowRate: true, highRate: true } }
+        approvedByUser: { select: { id: true, email: true } }
       }
     })
 
@@ -723,8 +721,8 @@ export class AssessmentDomain {
         entityId: id,
         action: 'APPROVE',
         fieldChanged: 'status,tier,rate',
-        oldValue: JSON.stringify({ status: 'UNDER_REVIEW', tierId: existing.tierId, rate: existing.rate }),
-        newValue: JSON.stringify({ status: 'APPROVED', tierId: assignedTierId, rate: finalRate }),
+        oldValue: JSON.stringify({ status: 'UNDER_REVIEW', tierLabel: existing.tierLabel, rate: existing.rate }),
+        newValue: JSON.stringify({ status: 'APPROVED', tierLabel: assignedTierLabel, rate: finalRate }),
         rationale
       }
     })
@@ -735,7 +733,7 @@ export class AssessmentDomain {
         userId: existing.submittedByUserId,
         type: 'ASSESSMENT_APPROVED',
         title: `Assessment Approved — ${existing.hcp.firstName} ${existing.hcp.lastName}`,
-        message: `Your assessment has been approved. Tier: ${updatedAssessment.tier?.name || 'N/A'}, Rate: $${finalRate?.toFixed(2) || '0.00'}`
+        message: `Your assessment has been approved. Tier: ${assignedTierLabel}, Rate: $${finalRate?.toFixed(2) || '0.00'}`
       }
     })
 

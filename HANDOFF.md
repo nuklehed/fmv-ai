@@ -434,6 +434,48 @@ When implementing or refactoring code:
 
 This prevents accumulating technical debt — unused imports, dead code, and duplicated patterns that AI sessions keep reintroducing.
 
+## Session notes — 2026-06-08 (Tier → SpecialtyRate refactor)
+### What was done
+| # | What |
+|---|------|
+| 1 | **Schema refactored** — Removed `Tier` model, added `SpecialtyRate` junction table + `CriteriaSet.tierThresholds` JSONB field |
+| 2 | **New SpecialtyRate model**: `(specialtyId, criteriaSetId, tierLabel)` unique key with `lowRate`, `highRate` |
+| 3 | **CriteriaSet.tierThresholds**: JSON array `[{label:"Tier 1",minScore:22,maxScore:35}, ...]` — score bands defined per rubric |
+| 4 | **Assessment.tierId → tierLabel**: Stores tier label string (e.g., "Tier 1") instead of FK to Tier |
+| 5 | **Backend routes rewritten**: `/api/tiers` now returns matrix data, has new endpoints for thresholds and SpecialtyRate CRUD |
+| 6 | **Approval workflow updated**: `approveWithTier()` now uses tierLabel from criteria set thresholds + SpecialtyRate lookup |
+| 7 | **Frontend TierManagementView.vue** completely rewritten as rate matrix (specialties × tier columns) |
+| 8 | **ReviewView.vue + AssessmentsListView.vue** updated to use `fetchTierThresholds()` instead of `fetchTiers()` |
+| 9 | **Types updated**: Removed `Tier` interface, added `SpecialtyRate`, `Assessment.tierLabel` instead of `tierId` |
+| 10 | **Seed scripts updated**: `seed-tiers.ts` now creates SpecialtyRate entries + updates criteria set thresholds |
+| 11 | **Data migrated**: 33 SpecialtyRate entries created (11 specialties × 3 tiers), 2 criteria sets with thresholds |
+
+### Domain logic
+- **Score ranges** are defined on CriteriaSet (per rubric) — different criteria sets can have different tier structures
+- **Rates** are defined on SpecialtyRate (per specialty + criteria set + tier label) — allows per-specialty rate variation
+- **Approval workflow**: Admin picks tier label → system looks up SpecialtyRate for that specialty/criteria/tier → calculates rate from low/high bounds
+- **Tiers page** renders dynamic columns based on criteria set's tierThresholds (e.g., Tier 3, Tier 2, Tier 1)
+
+### API changes
+| Endpoint | Old | New |
+|----------|-----|-----|
+| GET /api/tiers | Paginated tier list with specialty filter | Matrix data grouped by specialty, dynamic tier columns |
+| GET /api/tiers/:id | Single tier details | N/A (removed) |
+| POST /api/tiers | Create tier with score ranges | Create SpecialtyRate entry |
+| PUT /api/tiers/:id | Update tier | Update SpecialtyRate |
+| DELETE /api/tiers/:id | Soft-delete tier | Delete SpecialtyRate |
+| — | — | GET /api/tiers/thresholds/:criteriaSetId (new) |
+
+### Frontend changes
+- TierManagementView: Matrix view with criteria set selector, dynamic tier columns, inline edit modal
+- ReviewView/AssessmentsListView: Tier dropdown now shows labels from criteria set thresholds (not tier IDs)
+- Approve API call now sends `tierLabel` instead of `tierId`
+
+### Anti-patterns — DO NOT repeat these
+- ❌ **Never reference `Tier` model or `tierId` field** — use `SpecialtyRate` and `tierLabel` instead
+- ❌ **Never hardcode tier score ranges in frontend/backend logic** — always read from `CriteriaSet.tierThresholds`
+- ✅ **Always look up rates via SpecialtyRate** using `(specialtyId, criteriaSetId, tierLabel)` composite key
+
 ## Suggested skills to invoke next
 - **triage** — to label issues as ready for AFK agents once published
 - **to-prd** — if a formal PRD is needed before implementation starts

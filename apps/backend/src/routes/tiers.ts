@@ -8,85 +8,132 @@ const prisma = new PrismaClient()
 
 /**
  * GET /api/tiers
- * List tiers with pagination, optional active filter and specialtyId filter
+ * Returns tier rate matrix grouped by specialty, with dynamic columns
+ * based on the criteria set's tier thresholds.
  */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const page = Math.max(1, parseInt(req.query.page as string) || 1)
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
-    const activeOnly = req.query.active === 'true'
-    const specialtyId = req.query.specialtyId as string | undefined
+    const { criteriaSetId } = req.query
 
-    const where: Record<string, unknown> = { tenantId: req.tenantId!, isActive: true }
-    if (!activeOnly) {
-      delete (where as any).isActive
+    // Get all active specialties for this tenant
+    const specialties = await prisma.specialty.findMany({
+      where: { tenantId: req.tenantId!, isActive: true },
+      select: { id: true, name: true }
+    })
+
+    if (specialties.length === 0) {
+      res.json({ data: [], pagination: { page: 1, limit: 25, totalCount: 0, totalPages: 0 } })
+      return
     }
-    if (specialtyId) {
-      where.specialtyId = specialtyId
+
+    // Get criteria set thresholds if specified
+    let tierLabels: string[] = []
+    if (criteriaSetId) {
+      const cs = await prisma.criteriaSet.findFirst({
+        where: { id: criteriaSetId as string, tenantId: req.tenantId! }
+      })
+      if (cs?.tierThresholds) {
+        const thresholds: any[] = JSON.parse(JSON.stringify(cs.tierThresholds))
+        tierLabels = thresholds.map((t: any) => t.label)
+      }
     }
 
-    const totalCount = await prisma.tier.count({ where })
-
-    // Sort by maxScore descending (highest tier first)
-    const tiers = await prisma.tier.findMany({
-      where,
-      include: {
-        specialty: { select: { id: true, name: true } }
+    // Get all specialty rates for this tenant
+    const rates = await prisma.specialtyRate.findMany({
+      where: {
+        tenantId: req.tenantId!,
+        ...(criteriaSetId ? { criteriaSetId: criteriaSetId as string } : {}),
+        specialty: { isActive: true }
       },
-      orderBy: { maxScore: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit
+      include: {
+        specialty: { select: { id: true, name: true } },
+        criteriaSet: { select: { id: true, name: true } }
+      }
     })
 
-    res.json({
-      data: tiers,
-      pagination: { page, limit, totalCount, totalPages: Math.ceil(totalCount / limit) }
+    // Group rates by specialty
+    const specialtyRatesMap = new Map<string, Record<string, { lowRate: string; highRate: string }>>()
+    for (const rate of rates) {
+      if (!specialtyRatesMap.has(rate.specialtyId)) {
+        specialtyRatesMap.set(rate.specialtyId, {})
+      }
+      specialtyRatesMap.get(rate.specialtyId)![rate.tierLabel] = {
+        lowRate: rate.lowRate,
+        highRate: rate.highRate
+      }
+    }
+
+    // Build matrix rows
+    const data = specialties.map(specialty => {
+      const row: any = { id: specialty.id, name: specialty.name }
+      const ratesForSpecialty = specialtyRatesMap.get(specialty.id) || {}
+
+      for (const label of tierLabels) {
+        const rateData = ratesForSpecialty[label]
+        if (rateData) {
+          row[label] = `$${rateData.lowRate}–$${rateData.highRate}`
+        } else {
+          row[label] = null
+        }
+      }
+
+      return row
     })
+
+    res.json({ data, pagination: { page: 1, limit: data.length, totalCount: data.length, totalPages: 1 } })
   } catch (error) {
-    console.error('Error fetching tiers:', error)
+    console.error('Error fetching tier matrix:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 /**
- * GET /api/tiers/:id
- * Get single tier details
+ * GET /api/tiers/thresholds/:criteriaSetId
+ * Returns tier thresholds for a criteria set (for approval dropdown)
  */
-router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+router.get('/thresholds/:criteriaSetId', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { id } = req.params
+    const { criteriaSetId } = req.params
 
-    const tier = await prisma.tier.findFirst({
-      where: { id, tenantId: req.tenantId! },
-      include: { specialty: { select: { id: true, name: true } } }
+    const criteriaSet = await prisma.criteriaSet.findFirst({
+      where: { id: criteriaSetId, tenantId: req.tenantId! }
     })
 
-    if (!tier) { res.status(404).json({ error: 'Tier not found' }); return }
-    res.json(tier)
+    if (!criteriaSet) {
+      res.status(404).json({ error: 'Criteria set not found' })
+      return
+    }
+
+    const thresholds: any[] = criteriaSet.tierThresholds ? JSON.parse(JSON.stringify(criteriaSet.tierThresholds)) : []
+
+    res.json({ labels: thresholds.map((t: any) => t.label), thresholds })
   } catch (error) {
-    console.error('Error fetching tier:', error)
+    console.error('Error fetching tier thresholds:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 /**
  * POST /api/tiers
- * Create a new tier — SA enters minScore and maxScore manually
+ * Create a specialty rate entry
  */
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { name, minScore, maxScore, specialtyId, lowRate, highRate, defaultPercentile } = req.body
+    const { specialtyId, criteriaSetId, tierLabel, lowRate, highRate } = req.body
 
-    if (!name || minScore === undefined || maxScore === undefined || lowRate === undefined || highRate === undefined) {
+    if (!specialtyId || !criteriaSetId || !tierLabel || lowRate === undefined || highRate === undefined) {
       res.status(400).json({ error: 'All fields are required' })
       return
     }
 
-    // Validate score range
-    if (minScore > maxScore) {
-      res.status(400).json({ error: 'Min score must be less than or equal to max score' })
-      return
-    }
+    // Validate specialty and criteria set belong to tenant
+    const [specialty, criteriaSet] = await Promise.all([
+      prisma.specialty.findFirst({ where: { id: specialtyId, tenantId: req.tenantId! } }),
+      prisma.criteriaSet.findFirst({ where: { id: criteriaSetId, tenantId: req.tenantId! } })
+    ])
+
+    if (!specialty) { res.status(404).json({ error: 'Specialty not found' }); return }
+    if (!criteriaSet) { res.status(404).json({ error: 'Criteria set not found' }); return }
 
     // Validate rate range
     if (lowRate > highRate) {
@@ -94,64 +141,53 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
       return
     }
 
-    // Validate percentile
-    if (defaultPercentile !== undefined && (defaultPercentile < 0 || defaultPercentile > 100)) {
-      res.status(400).json({ error: 'Default percentile must be between 0 and 100' })
+    const existing = await prisma.specialtyRate.findFirst({
+      where: { specialtyId, criteriaSetId, tierLabel }
+    })
+
+    if (existing) {
+      res.status(409).json({ error: 'Rate already exists for this specialty/criteria set/tier combination' })
       return
     }
 
-    // Validate specialtyId if provided — must belong to tenant
-    if (specialtyId) {
-      const specialty = await prisma.specialty.findFirst({
-        where: { id: specialtyId, tenantId: req.tenantId! }
-      })
-      if (!specialty) {
-        res.status(404).json({ error: 'Specialty not found in your organization' })
-        return
-      }
-    }
-
-    const tier = await prisma.tier.create({
+    const rate = await prisma.specialtyRate.create({
       data: {
-        name,
-        minScore,
-        maxScore,
-        specialtyId: specialtyId || null,
+        specialtyId,
+        criteriaSetId,
+        tierLabel,
         lowRate: String(lowRate),
         highRate: String(highRate),
-        defaultPercentile: defaultPercentile ?? 50,
         tenantId: req.tenantId!
       },
-      include: { specialty: { select: { id: true, name: true } } }
+      include: {
+        specialty: { select: { id: true, name: true } },
+        criteriaSet: { select: { id: true, name: true } }
+      }
     })
 
-    res.status(201).json(tier)
+    res.status(201).json(rate)
   } catch (error) {
-    console.error('Error creating tier:', error)
+    console.error('Error creating specialty rate:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 /**
  * PUT /api/tiers/:id
- * Update a tier — SA edits minScore and maxScore manually
+ * Update a specialty rate entry
  */
 router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { name, minScore, maxScore, specialtyId, lowRate, highRate, defaultPercentile, isActive } = req.body
+    const { tierLabel, lowRate, highRate } = req.body
 
-    // Verify tier belongs to tenant
-    const existingTier = await prisma.tier.findFirst({
-      where: { id, tenantId: req.tenantId! }
+    // Verify existing record belongs to tenant
+    const existing = await prisma.specialtyRate.findFirst({
+      where: { id, tenantId: req.tenantId! },
+      include: { specialty: true, criteriaSet: true }
     })
-    if (!existingTier) { res.status(404).json({ error: 'Tier not found' }); return }
 
-    // Validate score range if both provided
-    if (minScore !== undefined && maxScore !== undefined && minScore > maxScore) {
-      res.status(400).json({ error: 'Min score must be less than or equal to max score' })
-      return
-    }
+    if (!existing) { res.status(404).json({ error: 'Specialty rate not found' }); return }
 
     // Validate rate range if provided
     if (lowRate !== undefined && highRate !== undefined && lowRate > highRate) {
@@ -159,65 +195,72 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       return
     }
 
-    // Validate percentile if provided
-    if (defaultPercentile !== undefined && (defaultPercentile < 0 || defaultPercentile > 100)) {
-      res.status(400).json({ error: 'Default percentile must be between 0 and 100' })
-      return
-    }
-
-    // Validate specialtyId if provided
-    let specialtyIdToUse = (existingTier as any).specialtyId
-    if (specialtyId !== undefined && specialtyId !== specialtyIdToUse) {
-      if (specialtyId) {
-        const specialty = await prisma.specialty.findFirst({
-          where: { id: specialtyId, tenantId: req.tenantId! }
-        })
-        if (!specialty) { res.status(404).json({ error: 'Specialty not found in your organization' }); return }
-      }
-      specialtyIdToUse = specialtyId
-    }
-
     const updateData: Record<string, unknown> = {}
-    if (name !== undefined) updateData.name = name
-    if (minScore !== undefined) updateData.minScore = minScore
-    if (maxScore !== undefined) updateData.maxScore = maxScore
-    if (specialtyIdToUse !== (existingTier as any).specialtyId) updateData.specialtyId = specialtyIdToUse
+    if (tierLabel !== undefined) updateData.tierLabel = tierLabel
     if (lowRate !== undefined) updateData.lowRate = String(lowRate)
     if (highRate !== undefined) updateData.highRate = String(highRate)
-    if (defaultPercentile !== undefined) updateData.defaultPercentile = defaultPercentile
-    if (isActive !== undefined) updateData.isActive = isActive
 
-    const updatedTier = await prisma.tier.update({
+    const updated = await prisma.specialtyRate.update({
       where: { id },
       data: updateData,
-      include: { specialty: { select: { id: true, name: true } } }
+      include: {
+        specialty: { select: { id: true, name: true } },
+        criteriaSet: { select: { id: true, name: true } }
+      }
     })
 
-    res.json(updatedTier)
+    res.json(updated)
   } catch (error) {
-    console.error('Error updating tier:', error)
+    console.error('Error updating specialty rate:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })
 
 /**
  * DELETE /api/tiers/:id
- * Soft-delete a tier by setting isActive=false
+ * Delete a specialty rate entry
  */
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params
 
-    const existingTier = await prisma.tier.findFirst({
-      where: { id, tenantId: req.tenantId!, isActive: true }
+    const existing = await prisma.specialtyRate.findFirst({
+      where: { id, tenantId: req.tenantId! }
     })
-    if (!existingTier) { res.status(404).json({ error: 'Tier not found' }); return }
 
-    // Soft-delete (preserves FK integrity with assessments)
-    await prisma.tier.update({ where: { id }, data: { isActive: false } })
-    res.json({ message: 'Tier deleted successfully' })
+    if (!existing) { res.status(404).json({ error: 'Specialty rate not found' }); return }
+
+    await prisma.specialtyRate.delete({ where: { id } })
+    res.json({ message: 'Specialty rate deleted successfully' })
   } catch (error) {
-    console.error('Error deleting tier:', error)
+    console.error('Error deleting specialty rate:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/**
+ * GET /api/tiers/specialties/:specialtyId/criteria-sets/:criteriaSetId/rates
+ * Get all rates for a specific specialty and criteria set
+ */
+router.get('/specialties/:specialtyId/criteria-sets/:criteriaSetId/rates', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { specialtyId, criteriaSetId } = req.params
+
+    const rates = await prisma.specialtyRate.findMany({
+      where: {
+        specialtyId,
+        criteriaSetId,
+        tenantId: req.tenantId!
+      },
+      include: {
+        specialty: { select: { id: true, name: true } },
+        criteriaSet: { select: { id: true, name: true } }
+      }
+    })
+
+    res.json({ data: rates })
+  } catch (error) {
+    console.error('Error fetching specialty rates:', error)
     res.status(500).json({ error: 'Internal server error' })
   }
 })

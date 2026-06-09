@@ -69,7 +69,7 @@ model Specialty {
   updatedAt     DateTime      @updatedAt
   assessments   Assessment[]  @relation("AssessmentSpecialty")
   hcps          Hcp[]
-  tiers         Tier[]
+  rates         SpecialtyRate[]
   criteriaSet   CriteriaSet?  @relation("SpecialtyCriteriaSet", fields: [criteriaSetId], references: [id])
 
   @@unique([name, tenantId])
@@ -78,17 +78,19 @@ model Specialty {
 }
 
 model CriteriaSet {
-  id           String        @id @default(uuid())
-  name         String
-  description  String?
-  systemPrompt String?
-  isActive     Boolean       @default(true)
-  tenantId     String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  assessments  Assessment[]  @relation("CriteriaSetAssessments")
-  questions    Question[]
-  specialties  Specialty[]   @relation("SpecialtyCriteriaSet")
+  id            String        @id @default(uuid())
+  name          String
+  description   String?
+  systemPrompt  String?
+  tierThresholds Json?        // [{"label":"Tier 1","minScore":22,"maxScore":35}, ...]
+  isActive      Boolean       @default(true)
+  tenantId      String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  assessments   Assessment[]  @relation("CriteriaSetAssessments")
+  questions     Question[]
+  specialties   Specialty[]   @relation("SpecialtyCriteriaSet")
+  rates         SpecialtyRate[]
   @@index([tenantId, isActive])
 }
 
@@ -130,7 +132,7 @@ model Assessment {
   status            String       @default("DRAFT")
   aiResults         String?
   totalScore        Int?
-  tierId            String?
+  tierLabel         String?      // e.g., "Tier 1" — selected from criteria set thresholds
   rate              String?
   approvedByUserId  String?
   rejectionReason   String?
@@ -146,41 +148,29 @@ model Assessment {
   hcp               Hcp          @relation(fields: [hcpId], references: [id])
   specialty         Specialty?   @relation("AssessmentSpecialty", fields: [specialtyId], references: [id])
   submittedByUser   User         @relation("SubmittedAssessments", fields: [submittedByUserId], references: [id])
-  tier              Tier?        @relation(fields: [tierId], references: [id])
 
   @@index([hcpId, status])
   @@index([submittedByUserId])
   @@index([tenantId, status])
 }
 
-model Tier {
-  id                String       @id @default(uuid())
-  name              String
-  minScore          Int
-  maxScore          Int
-  specialtyId       String?
-  lowRate           String
-  highRate          String
-  defaultPercentile Int          @default(50)
-  tenantId          String
-  isActive          Boolean      @default(true)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  assessments       Assessment[]
-  specialty         Specialty?   @relation(fields: [specialtyId], references: [id])
+model SpecialtyRate {
+  id            String   @id @default(uuid())
+  specialtyId   String
+  criteriaSetId String
+  tierLabel     String   // "Tier 1", "Tier 2", etc.
+  lowRate       String
+  highRate      String
+  tenantId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  @@index([tenantId, specialtyId])
-  @@index([tenantId, isActive])
-}
+  specialty     Specialty @relation(fields: [specialtyId], references: [id])
+  criteriaSet   CriteriaSet @relation(fields: [criteriaSetId], references: [id])
 
-model TierConfig {
-  id             String   @id @default(uuid())
-  numberOfTiers  Int
-  tenantId       String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@unique([tenantId])
+  @@unique([specialtyId, criteriaSetId, tierLabel])
+  @@index([tenantId])
+  @@index([criteriaSetId])
 }
 
 model ApplicationSetting {

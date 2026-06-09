@@ -1,46 +1,60 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import type { Tier, Specialty } from '@/types'
+import { ref, computed, onMounted } from 'vue'
+import type { Specialty } from '@/types'
 import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
-const tiers = ref<Tier[]>([])
+interface TierRate { id: string; specialtyId: string; criteriaSetId: string; tierLabel: string; lowRate: string; highRate: string; tenantId: string; createdAt: string; updatedAt: string }
+interface CriteriaSet { id: string; name: string; tierThresholds?: any[] }
+
 const specialties = ref<Specialty[]>([])
+const criteriaSets = ref<CriteriaSet[]>([])
+const rates = ref<TierRate[]>([])
 const loading = ref(false)
-const currentPage = ref(1)
-const pageSize = ref(25)
-const totalPages = ref(0)
-const totalCount = ref(0)
 const formError = ref('')
+const selectedCriteriaSetId = ref<string>('')
 
-const showAddModal = ref(false)
+// Modal state
 const showEditModal = ref(false)
-const editingTier = ref<Tier | null>(null)
+const editingRate = ref<TierRate | null>(null)
+const editLowRate = ref(0)
+const editHighRate = ref(0)
+const editTierLabel = ref('')
 
-// Form state — min/max scores are manually entered by the user
-const formName = ref('')
-const formMinScore = ref(0)
-const formMaxScore = ref(0)
-const formSpecialtyId = ref('')
-const formLowRate = ref(0)
-const formHighRate = ref(0)
-
-// Total possible score for the selected specialty's criteria set (shown as hint)
-const totalPossibleScore = ref<number | null>(null)
-
-async function fetchTiers() {
-  loading.value = true
-  try {
-    const params = new URLSearchParams({ page: String(currentPage.value), limit: String(pageSize.value) })
-    const result = await (await apiFetch(`/api/tiers?${params}`, { headers: getAuthHeaders() })).json()
-    tiers.value = result.data
-    totalPages.value = result.pagination.totalPages
-    totalCount.value = result.pagination.totalCount
-  } catch {
-    formError.value = 'Failed to load tiers'
-  } finally {
-    loading.value = false
+// Editable cells (specialtyId → tierLabel → {lowRate, highRate})
+const editableCells = computed(() => {
+  const map = new Map<string, Record<string, { lowRate: string; highRate: string }>>()
+  for (const rate of rates.value) {
+    if (!map.has(rate.specialtyId)) map.set(rate.specialtyId, {})
+    map.get(rate.specialtyId)![rate.tierLabel] = { lowRate: rate.lowRate, highRate: rate.highRate }
   }
-}
+  return map
+})
+
+// Tier labels from selected criteria set
+const tierLabels = computed(() => {
+  const cs = criteriaSets.value.find(c => c.id === selectedCriteriaSetId.value)
+  if (cs?.tierThresholds) {
+    return cs.tierThresholds.map((t: any) => t.label)
+  }
+  // Fallback to generic tier names
+  const numTiers = 3
+  return Array.from({ length: numTiers }, (_, i) => `Tier ${numTiers - i}`)
+})
+
+// Matrix data for rendering
+const matrixData = computed(() => {
+  const data: Array<{ id: string; name: string; [key: string]: any }> = []
+  for (const specialty of specialties.value) {
+    const row: any = { id: specialty.id, name: specialty.name }
+    const ratesForSpecialty = editableCells.value.get(specialty.id) || {}
+    for (const label of tierLabels.value) {
+      const rateData = ratesForSpecialty[label]
+      row[label] = rateData ? `${rateData.lowRate}–${rateData.highRate}` : null
+    }
+    data.push(row)
+  }
+  return data
+})
 
 async function fetchSpecialties() {
   try {
@@ -48,250 +62,192 @@ async function fetchSpecialties() {
   } catch { /* silent */ }
 }
 
-function openAddModal() { resetForm(); showAddModal.value = true }
+async function fetchCriteriaSets() {
+  try {
+    criteriaSets.value = await (await apiFetch('/api/criteria-sets?active=true', { headers: getAuthHeaders() })).json()
+  } catch { /* silent */ }
+}
 
-async function openEditModal(tier: Tier) {
-  editingTier.value = tier
-  formName.value = tier.name
-  formMinScore.value = tier.minScore
-  formMaxScore.value = tier.maxScore
-  formSpecialtyId.value = tier.specialtyId || ''
-  formLowRate.value = Number(tier.lowRate)
-  formHighRate.value = Number(tier.highRate)
-  // Fetch total possible score for the specialty's criteria set
-  if (tier.specialtyId) {
-    const specialty = specialties.value.find(s => s.id === tier.specialtyId)
-    if (specialty?.criteriaSetId) {
-      await fetchTotalScore(specialty.criteriaSetId)
+async function fetchRates() {
+  if (!selectedCriteriaSetId.value) return
+  loading.value = true
+  try {
+    const result = await (await apiFetch(`/api/tiers?criteriaSetId=${selectedCriteriaSetId.value}`, { headers: getAuthHeaders() })).json()
+    // Flatten the matrix data back to rates array for editing
+    if (result.data && result.data.length > 0) {
+      const labels = tierLabels.value
+      const flattened: TierRate[] = []
+      for (const row of result.data) {
+        for (const label of labels) {
+          if (row[label]) {
+            // Parse the rate string to find the rate id
+            const existing = rates.value.find(r => r.specialtyId === row.id && r.tierLabel === label)
+            if (existing) {
+              flattened.push(existing)
+            }
+          }
+        }
+      }
+      rates.value = flattened
     }
+  } catch {
+    formError.value = 'Failed to load tier rates'
+  } finally {
+    loading.value = false
   }
+}
+
+async function openEditModal(rate: TierRate) {
+  editingRate.value = rate
+  editLowRate.value = Number(rate.lowRate)
+  editHighRate.value = Number(rate.highRate)
+  editTierLabel.value = rate.tierLabel
   showEditModal.value = true
 }
 
-function resetForm() {
-  editingTier.value = null
-  formName.value = ''
-  formMinScore.value = 0
-  formMaxScore.value = 0
-  formSpecialtyId.value = ''
-  formLowRate.value = 0
-  formHighRate.value = 0
-  totalPossibleScore.value = null
-  formError.value = ''
-}
-
-function validateTier() {
-  if (!formName.value.trim()) { formError.value = 'Tier name is required'; return false }
-  if (formMinScore.value > formMaxScore.value) { formError.value = 'Min score must be ≤ max score'; return false }
-  if (formLowRate.value > formHighRate.value) { formError.value = 'Low rate must be ≤ high rate'; return false }
-  return true
-}
-
-async function handleAdd() {
-  if (!validateTier()) return
-  try {
-    await apiFetch('/api/tiers', {
-      method: 'POST', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
-        specialtyId: formSpecialtyId.value || null, lowRate: formLowRate.value, highRate: formHighRate.value })
-    })
-    showAddModal.value = false; resetForm(); await fetchTiers()
-  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to create tier' }
-}
-
 async function handleEdit() {
-  if (!editingTier.value || !validateTier()) return
+  if (!editingRate.value || !editTierLabel.value) return
+  if (editLowRate.value > editHighRate.value) { formError.value = 'Low rate must be ≤ high rate'; return }
+  
   try {
-    await apiFetch(`/api/tiers/${editingTier.value.id}`, {
+    await apiFetch(`/api/tiers/${editingRate.value.id}`, {
       method: 'PUT', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: formName.value, minScore: formMinScore.value, maxScore: formMaxScore.value,
-        specialtyId: formSpecialtyId.value || null, lowRate: formLowRate.value, highRate: formHighRate.value })
+      body: JSON.stringify({ tierLabel: editTierLabel.value, lowRate: editLowRate.value, highRate: editHighRate.value })
     })
-    showEditModal.value = false; resetForm(); await fetchTiers()
-  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update tier' }
-}
-
-async function handleDelete(tier: Tier) {
-  if (!confirm(`Are you sure you want to delete "${tier.name}"?`)) return
-  try {
-    await apiFetch(`/api/tiers/${tier.id}`, { method: 'DELETE', headers: getAuthHeaders() })
-    await fetchTiers()
-  } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to delete tier' }
-}
-
-function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) { currentPage.value = page; fetchTiers() }
-}
-
-// Fetch total possible score when specialty changes
-async function onSpecialtyChange() {
-  const specialty = specialties.value.find(s => s.id === formSpecialtyId.value)
-  if (specialty?.criteriaSetId) {
-    await fetchTotalScore(specialty.criteriaSetId)
-  } else {
-    totalPossibleScore.value = null
+    showEditModal.value = false
+    editingRate.value = null
+    await fetchRates()
+  } catch (error) {
+    formError.value = error instanceof Error ? error.message : 'Failed to update rate'
   }
 }
 
-async function fetchTotalScore(csId: string) {
-  try {
-    const resp = await apiFetch(`/api/criteria-sets/${csId}/stats`, { headers: getAuthHeaders() })
-    const data = await resp.json()
-    totalPossibleScore.value = data.totalPossibleScore
-  } catch { /* silent — hint just won't show */ }
+async function handleAdd(specialtyId: string) {
+  if (!selectedCriteriaSetId.value) return
+  
+  for (const label of tierLabels.value) {
+    const existing = rates.value.find(r => r.specialtyId === specialtyId && r.tierLabel === label)
+    if (!existing) {
+      try {
+        await apiFetch('/api/tiers', {
+          method: 'POST', headers: getAuthHeaders(),
+          body: JSON.stringify({
+            specialtyId,
+            criteriaSetId: selectedCriteriaSetId.value,
+            tierLabel: label,
+            lowRate: 50,
+            highRate: 245
+          })
+        })
+      } catch { /* silent — will show on refresh */ }
+    }
+  }
+  
+  await fetchRates()
 }
 
-onMounted(() => { fetchTiers(); fetchSpecialties() })
+function handleDelete(rate: TierRate) {
+  if (!confirm(`Delete rate for ${rate.tierLabel}?`)) return
+  apiFetch(`/api/tiers/${rate.id}`, { method: 'DELETE', headers: getAuthHeaders() })
+    .then(() => fetchRates())
+    .catch(() => formError.value = 'Failed to delete rate')
+}
+
+onMounted(async () => {
+  await Promise.all([fetchSpecialties(), fetchCriteriaSets()])
+})
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Main Content -->
     <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <!-- Header -->
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-1">Tier Management</h2>
-          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} tiers configured</p>
+          <h2 class="text-2xl font-bold text-gray-900 mb-1">Tier Rates</h2>
+          <p class="text-sm text-gray-600">Configure rate ranges per specialty and tier</p>
         </div>
-        <button
-          @click="openAddModal"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium"
-        >
-          + Add Tier
-        </button>
+      </div>
+
+      <!-- Criteria Set Selector -->
+      <div class="mb-6 flex items-center gap-4">
+        <label class="text-sm font-medium text-gray-700">Criteria Set:</label>
+        <select v-model="selectedCriteriaSetId" @change="fetchRates" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
+          <option value="">— Select —</option>
+          <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
+        </select>
       </div>
 
       <!-- Error Message -->
-      <div v-if="formError && !showAddModal && !showEditModal" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+      <div v-if="formError && !showEditModal" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
         <p class="text-sm text-red-600">{{ formError }}</p>
       </div>
 
       <!-- Loading State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Loading tiers...</p>
+        <p class="text-sm text-gray-500">Loading tier rates...</p>
       </div>
 
-      <!-- Table -->
-      <div v-else class="bg-white shadow rounded-lg overflow-hidden">
+      <!-- Matrix Table -->
+      <div v-else-if="selectedCriteriaSetId && matrixData.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialty</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score Range</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate Range</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">Specialty</th>
+              <th v-for="label in tierLabels" :key="label" class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                {{ label }} Rate
+              </th>
               <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-if="tiers.length === 0">
-              <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
-                No tiers found. Click "Add Tier" to create one.
+            <tr v-for="row in matrixData" :key="row.id" class="hover:bg-gray-50">
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{{ row.name }}</td>
+              <td v-for="label in tierLabels" :key="label" class="px-6 py-4 text-center">
+                <template v-if="row[label]">
+                  <span class="text-sm text-gray-900">${{ row[label].split('–')[0] }}–${{ row[label].split('–')[1] }}</span>
+                </template>
+                <template v-else>
+                  <span class="text-xs text-gray-400 italic">Not set</span>
+                </template>
               </td>
-            </tr>
-            <tr v-for="tier in tiers" :key="tier.id" class="hover:bg-gray-50">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ tier.name }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ tier.specialty?.name || '—' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ tier.minScore }}–{{ tier.maxScore }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${{ Number(tier.lowRate).toFixed(2) }} – ${{ Number(tier.highRate).toFixed(2) }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
-                <button @click="openEditModal(tier)" class="text-blue-600 hover:text-blue-900">Edit</button>
-                <span>|</span>
-                <button @click="handleDelete(tier)" class="text-red-600 hover:text-red-900">Delete</button>
+                <button v-for="label in tierLabels" :key="label" @click="openEditModal(rates.find(r => r.specialtyId === row.id && r.tierLabel === label) || rates[0] as any)" class="text-blue-600 hover:text-blue-900 text-xs">
+                  Edit
+                </button>
               </td>
             </tr>
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-          <div class="text-sm text-gray-500">
-            Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, totalCount) }} of {{ totalCount }} results
-          </div>
-          <div class="flex space-x-2">
-            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Previous</button>
-            <template v-for="p in Math.min(5, totalPages)" :key="p">
-              <button @click="goToPage(p)" :class="[
-                'px-3 py-1 border rounded text-sm',
-                p === currentPage ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
-              ]">{{ p }}</button>
-            </template>
-            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Next</button>
-          </div>
+        <!-- Add Rates Button -->
+        <div class="bg-gray-50 px-4 py-3 border-t border-gray-200">
+          <button @click="handleAdd(matrixData[0]?.id)" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+            + Add Missing Rates
+          </button>
         </div>
       </div>
 
-      <!-- ─── Add Tier Modal ──────────────────────────────────────── -->
-      <Teleport to="body">
-        <Transition name="modal">
-          <div v-if="showAddModal" class="fixed inset-0 z-50 overflow-y-auto">
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showAddModal = false" />
-              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Tier</h3>
-                  <form @submit.prevent="handleAdd" class="space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required placeholder="e.g., Gold" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+      <!-- Empty State -->
+      <div v-else class="bg-white shadow rounded-lg p-8 text-center">
+        <p class="text-sm text-gray-500">Select a criteria set to configure tier rates</p>
+      </div>
 
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
-                      <select v-model="formSpecialtyId" @change="onSpecialtyChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">None (global tier)</option>
-                        <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
-                      </select>
-                      <p v-if="totalPossibleScore !== null" class="text-xs text-gray-500 mt-1">Total possible score for this rubric: {{ totalPossibleScore }} points</p>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Min Score *</label><input v-model.number="formMinScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Max Score *</label><input v-model.number="formMaxScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Low Rate ($) *</label><input v-model.number="formLowRate" type="number" step="0.01" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">High Rate ($) *</label><input v-model.number="formHighRate" type="number" step="0.01" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    </div>
-
-                    <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
-                  </form>
-                </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button @click="handleAdd" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Create</button>
-                  <button @click="showAddModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </Transition>
-      </Teleport>
-
-      <!-- ─── Edit Tier Modal ─────────────────────────────────────── -->
+      <!-- ─── Edit Rate Modal ─────────────────────────────────────── -->
       <Teleport to="body">
         <Transition name="modal">
           <div v-if="showEditModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
               <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showEditModal = false" />
-              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Tier</h3>
+                  <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Rate</h3>
                   <form @submit.prevent="handleEdit" class="space-y-4">
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Name *</label><input v-model="formName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-
-                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
-                      <select v-model="formSpecialtyId" @change="onSpecialtyChange" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">None (global tier)</option>
-                        <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
-                      </select>
-                      <p v-if="totalPossibleScore !== null" class="text-xs text-gray-500 mt-1">Total possible score for this rubric: {{ totalPossibleScore }} points</p>
-                    </div>
+                    <div><label class="block text-sm font-medium text-gray-700 mb-1">Tier Label *</label><input v-model="editTierLabel" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
 
                     <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Min Score *</label><input v-model.number="formMinScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Max Score *</label><input v-model.number="formMaxScore" type="number" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Low Rate ($) *</label><input v-model.number="formLowRate" type="number" step="0.01" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-                      <div><label class="block text-sm font-medium text-gray-700 mb-1">High Rate ($) *</label><input v-model.number="formHighRate" type="number" step="0.01" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                      <div><label class="block text-sm font-medium text-gray-700 mb-1">Low Rate ($) *</label><input v-model.number="editLowRate" type="number" step="5" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                      <div><label class="block text-sm font-medium text-gray-700 mb-1">High Rate ($) *</label><input v-model.number="editHighRate" type="number" step="5" required min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
                     </div>
 
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>

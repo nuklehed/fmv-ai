@@ -17,7 +17,7 @@ export interface AssessmentListItem {
   cvText?: string | null
   aiResults?: unknown | null
   totalScore?: number | null
-  tierId?: string | null
+  tierLabel?: string | null
   rate?: number | null
   approvedByUserId?: string | null
   rejectionReason?: string | null
@@ -27,7 +27,6 @@ export interface AssessmentListItem {
   updatedAt: string
   submittedAt?: string | null
   completedAt?: string | null
-  tier?: { name: string; lowRate: number; highRate: number } | null
 }
 
 export interface AssessmentDetail extends Omit<AssessmentListItem, 'hcp'> {
@@ -339,7 +338,7 @@ export async function startReview(assessmentId: string): Promise<any> {
 
 /** Approve an assessment with tier/rate */
 export async function approveAssessment(assessmentId: string, options: {
-  tierId?: string | null
+  tierLabel?: string | null
   rateOverride?: number | null
   rationale?: string | null
 }): Promise<any> {
@@ -373,14 +372,11 @@ export async function rejectAssessment(assessmentId: string, reason: string): Pr
   return response.json()
 }
 
-/** Fetch available tiers, optionally filtered by specialtyId */
-export async function fetchTiers(specialtyId?: string): Promise<Array<{ id: string; name: string; lowRate: number; highRate: number }>> {
-  const params = new URLSearchParams({ active: 'true' })
-  if (specialtyId) params.set('specialtyId', specialtyId)
-  const response = await fetch(`/api/tiers?${params}`, { headers: authHeaders() })
-  if (!response.ok) throw new Error('Failed to fetch tiers')
-  const data = await response.json()
-  return data.data
+/** Fetch tier thresholds for a criteria set (for approval dropdown) */
+export async function fetchTierThresholds(criteriaSetId: string): Promise<{ labels: string[]; thresholds: any[] }> {
+  const response = await fetch(`/api/tiers/thresholds/${criteriaSetId}`, { headers: authHeaders() })
+  if (!response.ok) throw new Error('Failed to fetch tier thresholds')
+  return response.json()
 }
 
 /** Fetch available specialties */

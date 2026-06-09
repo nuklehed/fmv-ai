@@ -1,10 +1,9 @@
 /**
- * Seed script: Tiers for all specialties (except Cardiology)
+ * Seed script: Create SpecialtyRate entries and CriteriaSet.tierThresholds
  * 
- * Creates 3 tiers per specialty with contiguous rate ranges:
- *   Tier 1 (22-35 pts): $445 - $645  (highest)
- *   Tier 2 (11-21 pts): $245 - $445  (mid)
- *   Tier 3 (1-10 pts):  $50 - $245   (lowest)
+ * For each specialty (except Cardiology), creates:
+ * - Tier thresholds on the criteria set (Tier 1, 2, 3 score ranges)
+ * - SpecialtyRate entries with rate ranges per tier
  * 
  * Run: npx tsx prisma/seed-tiers.ts
  */
@@ -18,7 +17,8 @@ async function main() {
 
   // Fetch all active specialties except Cardiology
   const specialties = await prisma.specialty.findMany({
-    where: { tenantId, isActive: true, name: { not: 'Cardiology' } }
+    where: { tenantId, isActive: true, name: { not: 'Cardiology' } },
+    include: { criteriaSet: true }
   })
 
   if (specialties.length === 0) {
@@ -28,64 +28,69 @@ async function main() {
 
   // Tier definitions — contiguous rate ranges rounded to nearest $5
   const tierDefs = [
-    { name: 'Tier 1', minScore: 22, maxScore: 35, lowRate: '445', highRate: '645' },
-    { name: 'Tier 2', minScore: 11, maxScore: 21, lowRate: '245', highRate: '445' },
-    { name: 'Tier 3', minScore: 1,  maxScore: 10, lowRate: '50',  highRate: '245' }
+    { label: 'Tier 1', minScore: 22, maxScore: 35, lowRate: '445', highRate: '645' },
+    { label: 'Tier 2', minScore: 11, maxScore: 21, lowRate: '245', highRate: '445' },
+    { label: 'Tier 3', minScore: 1,  maxScore: 10, lowRate: '50',  highRate: '245' }
   ]
 
-  let created = 0
-  let skipped = 0
+  let ratesCreated = 0
+  let thresholdsUpdated = 0
 
   for (const specialty of specialties) {
-    // Check if tiers already exist for this specialty
-    const existingCount = await prisma.tier.count({
-      where: { specialtyId: specialty.id, tenantId }
-    })
-
-    if (existingCount > 0) {
-      console.log(`⏭️  "${specialty.name}" — ${existingCount} tier(s) already exist, skipping`)
-      skipped += 3
+    if (!specialty.criteriaSetId) {
+      console.log(`⏭️  "${specialty.name}" — no criteria set linked, skipping`)
       continue
     }
 
+    const csId = specialty.criteriaSetId
+
+    // Check if SpecialtyRate entries already exist
+    const existingCount = await prisma.specialtyRate.count({
+      where: { specialtyId: specialty.id, criteriaSetId: csId, tenantId }
+    })
+
+    if (existingCount > 0) {
+      console.log(`⏭️  "${specialty.name}" — ${existingCount} rate(s) already exist, skipping`)
+      continue
+    }
+
+    // Create SpecialtyRate entries for this specialty
     for (const tierDef of tierDefs) {
-      await prisma.tier.create({
+      await prisma.specialtyRate.create({
         data: {
-          id: `tier-${specialty.id.replace('spec-', '')}-${tierDef.name.toLowerCase().replace(' ', '-')}`,
-          name: `${specialty.name} — ${tierDef.name}`,
-          minScore: tierDef.minScore,
-          maxScore: tierDef.maxScore,
           specialtyId: specialty.id,
+          criteriaSetId: csId,
+          tierLabel: tierDef.label,
           lowRate: tierDef.lowRate,
           highRate: tierDef.highRate,
-          defaultPercentile: 50,
           tenantId
         }
       })
-      created++
+      ratesCreated++
     }
 
-    console.log(`✅ "${specialty.name}" — 3 tiers created (score ${tierDefs[2].minScore}-${tierDefs[0].maxScore}, rates $${tierDefs[2].lowRate}–$${tierDefs[0].highRate})`)
+    console.log(`✅ "${specialty.name}" — ${tierDefs.length} SpecialtyRate entries created`)
   }
 
-  // Summary by specialty
-  console.log('\n📋 Tier summary:')
-  const tiers = await prisma.tier.findMany({
-    where: { tenantId },
-    include: { specialty: true },
-    orderBy: [{ specialtyId: 'asc' }, { minScore: 'desc' }]
+  // Update criteria sets with tierThresholds if not already set
+  const criteriaSets = await prisma.criteriaSet.findMany({
+    where: { tenantId, isActive: true }
   })
 
-  let currentSpecialty = ''
-  for (const tier of tiers) {
-    if (tier.specialty?.name !== currentSpecialty) {
-      currentSpecialty = tier.specialty?.name ?? 'Unknown'
-      console.log(`\n  ${currentSpecialty}:`)
-    }
-    console.log(`    ${tier.name} → score ${tier.minScore}-${tier.maxScore}, rate $${tier.lowRate}–$${tier.highRate}`)
+  for (const cs of criteriaSets) {
+    if (cs.tierThresholds) continue
+
+    // Use the same tier definitions for all criteria sets
+    await prisma.criteriaSet.update({
+      where: { id: cs.id },
+      data: { tierThresholds: tierDefs }
+    })
+    thresholdsUpdated++
   }
 
-  console.log(`\n✅ Total tiers created: ${created} (skipped: ${skipped})`)
+  console.log(`\n📋 Summary:`)
+  console.log(`   SpecialtyRate entries created: ${ratesCreated}`)
+  console.log(`   CriteriaSets with thresholds: ${thresholdsUpdated}`)
 }
 
 main()
