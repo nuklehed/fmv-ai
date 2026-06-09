@@ -81,7 +81,15 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     llmContent = response.content
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const isNetworkError = String(error).includes('fetch failed') || 
+                           String(error).includes('ENOTFOUND') || 
+                           String(error).includes('ECONNREFUSED') ||
+                           String(error).includes('ETIMEDOUT')
     console.error('LLM call failed:', errorMessage)
+    if (isNetworkError) {
+      console.error('NETWORK DIAGNOSIS: Check that the LLM server is reachable at', process.env.LLM_BASE_URL || 'http://localhost:11434')
+      console.error('Verify Tailscale is connected and the remote Ollama service is running on port 1234')
+    }
     // Store error context so admin can see what went wrong and retry
     await prisma.assessment.update({
       where: { id: assessmentId },

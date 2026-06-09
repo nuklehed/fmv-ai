@@ -182,6 +182,14 @@ async function retryFailedAssessment(assessment: assessmentDomain.AssessmentList
   if (!confirm(`Retry AI processing for ${assessment.hcp.firstName} ${assessment.hcp.lastName}?`)) return
   retryLoading.value = true; retrySuccess.value = ''
   try {
+    // Pre-flight LLM health check to give better error feedback
+    const health = await assessmentDomain.checkLlmHealth()
+    if (!health.ok) {
+      formError.value = `LLM server unreachable: ${health.error || 'Connection failed'}. Please check your Ollama/Tailscale connection and try again.`
+      setTimeout(() => { formError.value = '' }, 8000)
+      retryLoading.value = false
+      return
+    }
     await assessmentDomain.retryAssessment(assessment.id)
     retrySuccess.value = 'Retrying... Status will update to AI_PROCESSING'
     await fetchAssessments()

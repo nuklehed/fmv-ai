@@ -37,21 +37,61 @@ class OllamaLLMClient implements LLMClientInterface {
   }
 
   async healthCheck(): Promise<{ ok: boolean; model?: string; error?: string }> {
+    // Try Ollama-native /api/tags first, fall back to /v1/models for OpenRouter/other proxies
+    let response: Response | null = null
     try {
-      const response = await fetch(`${this.baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) })
-      if (!response.ok) throw new Error(`Ollama responded with ${response.status}`)
-      const data = await response.json() as { models?: Array<{ name: string }> }
-      const modelLoaded = data.models?.some(m => m.name.includes(this.model))
-      return {
-        ok: true,
-        model: this.model,
-        ...(modelLoaded ? {} : { error: `Ollama is running but model '${this.model}' is not loaded. Run: ollama pull ${this.model}` })
+      response = await fetch(`${this.baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) })
+      if (response.ok) {
+        const data = await response.json() as { models?: Array<{ name: string }> }
+        const modelLoaded = data.models?.some(m => m.name.includes(this.model))
+        return {
+          ok: true,
+          model: this.model,
+          ...(modelLoaded ? {} : { error: `Ollama is running but model '${this.model}' is not loaded. Run: ollama pull ${this.model}` })
+        }
       }
-    } catch (err) {
-      return {
-        ok: false,
-        error: err instanceof Error ? err.message : 'Failed to reach Ollama'
+    } catch {
+      // /api/tags failed — try OpenRouter-style endpoint
+    }
+
+    // Fallback: try /v1/models (OpenRouter, LM Studio, etc.)
+    try {
+      response = await fetch(`${this.baseUrl}/v1/models`, { signal: AbortSignal.timeout(3000) })
+      if (response.ok) {
+        return {
+          ok: true,
+          model: this.model,
+          error: 'Server reachable but not Ollama — health check cannot verify model availability'
+        }
       }
+    } catch {
+      // /v1/models also failed
+    }
+
+    // Final fallback: try a minimal chat call to verify the endpoint works at all
+    try {
+      response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages: [{ role: 'user', content: 'Hi' }],
+          max_tokens: 5
+        }),
+        signal: AbortSignal.timeout(3000)
+      })
+      if (response.ok || response.status === 400 || response.status === 401) {
+        // 400 = bad request (model may not exist but endpoint works)
+        // 401 = auth required (endpoint works)
+        return { ok: true, model: this.model }
+      }
+    } catch {
+      // Chat endpoint also failed
+    }
+
+    return {
+      ok: false,
+      error: response ? `Server responded with ${response.status}` : 'Could not reach the LLM server at any endpoint'
     }
   }
 
