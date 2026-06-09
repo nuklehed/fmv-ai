@@ -304,7 +304,7 @@ onMounted(() => {
                 {{ assessment.totalScore !== null ? assessment.totalScore : '—' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {{ (assessment as any).tier?.name || '—' }}
+                {{ (assessment as any).tierLabel || '—' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 ${{ assessment.rate?.toFixed(2) || '—' }}
@@ -382,10 +382,10 @@ onMounted(() => {
                     </div>
 
                     <!-- Tier & Rate -->
-                    <div v-if="(selectedAssessment as any).tier || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
+                    <div v-if="(selectedAssessment as any).tierLabel || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
                       <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
                       <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div><span class="text-gray-600">Tier:</span> <span class="ml-1 font-medium">{{ (selectedAssessment as any).tier?.name || '—' }}</span></div>
+                        <div><span class="text-gray-600">Tier:</span> <span class="ml-1 font-medium">{{ (selectedAssessment as any).tierLabel || '—' }}</span></div>
                         <div><span class="text-gray-600">Rate:</span> <span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span></div>
                       </div>
                     </div>

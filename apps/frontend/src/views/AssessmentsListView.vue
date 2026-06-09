@@ -445,10 +445,10 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   </div>
 
                   <!-- Tier & Rate Information -->
-                  <div v-if="selectedAssessment.tier || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div v-if="selectedAssessment.tierLabel || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
                     <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
                     <div class="grid grid-cols-2 gap-2 text-sm">
-                      <div><span class="text-gray-600">Tier:</span><span class="ml-1 font-medium">{{ selectedAssessment.tier?.name || '—' }}</span></div>
+                      <div><span class="text-gray-600">Tier:</span><span class="ml-1 font-medium">{{ selectedAssessment.tierLabel || '—' }}</span></div>
                       <div><span class="text-gray-600">Rate:</span><span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span></div>
                     </div>
                   </div>

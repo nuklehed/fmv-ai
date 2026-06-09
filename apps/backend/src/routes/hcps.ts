@@ -124,7 +124,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
             status: true,
             totalScore: true,
             rate: true,
-            tierId: true,
+            tierLabel: true,
             submittedAt: true,
             completedAt: true
           }

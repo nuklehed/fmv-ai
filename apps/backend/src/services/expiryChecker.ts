@@ -84,7 +84,7 @@ async function checkExpiringAssessments(prisma: PrismaClient): Promise<void> {
         userId: assessment.submittedByUserId,
         type: 'EXPIRY_REMINDER',
         title: `Assessment Expiring Soon — ${assessment.hcp.firstName} ${assessment.hcp.lastName}`,
-        message: `${urgencyLevel}: The assessment for ${assessment.hcp.firstName} ${assessment.hcp.lastName} (Tier: ${assessment.tier?.name || 'N/A'}) expires on ${assessment.renewalDate!.toLocaleDateString()}. Please submit a renewal assessment.`
+        message: `${urgencyLevel}: The assessment for ${assessment.hcp.firstName} ${assessment.hcp.lastName} (Tier: ${assessment.tierLabel || 'N/A'}) expires on ${assessment.renewalDate!.toLocaleDateString()}. Please submit a renewal assessment.`
       }
     })
 
@@ -103,7 +103,7 @@ async function checkExpiringAssessments(prisma: PrismaClient): Promise<void> {
           userId: admin.id,
           type: 'EXPIRY_REMINDER',
           title: `Assessment Expiring Soon — ${assessment.hcp.firstName} ${assessment.hcp.lastName}`,
-          message: `${urgencyLevel}: The assessment for ${assessment.hcp.firstName} ${assessment.hcp.lastName} (Tier: ${assessment.tier?.name || 'N/A'}) expires on ${assessment.renewalDate!.toLocaleDateString()}.`
+          message: `${urgencyLevel}: The assessment for ${assessment.hcp.firstName} ${assessment.hcp.lastName} (Tier: ${assessment.tierLabel || 'N/A'}) expires on ${assessment.renewalDate!.toLocaleDateString()}.`
         }
       })
     }
