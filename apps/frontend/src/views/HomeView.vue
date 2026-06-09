@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { Assessment, Notification } from '@/types'
-import { api } from '@/api/client'
+import type { Assessment } from '@/types'
 import * as assessmentDomain from '@/domain/assessment'
 
 // Assessment list state
@@ -17,12 +16,6 @@ const totalCount = ref(0)
 // Detail panel state
 const selectedAssessment = ref<Assessment | null>(null)
 const showDetailPanel = ref(false)
-
-// Notification state
-const notifications = ref<Notification[]>([])
-const unreadCount = ref(0)
-const showNotifications = ref(false)
-const notificationLoading = ref(false)
 
 
 async function fetchAssessments() {
@@ -47,40 +40,6 @@ async function fetchAssessments() {
     console.error('Error fetching assessments:', error)
   } finally {
     loading.value = false
-  }
-}
-
-async function fetchNotifications() {
-  try {
-    const result = await api.get<{ data: Notification[]; unreadCount: number }>('/api/notifications?limit=10&unreadOnly=true')
-    
-    if (result.data) {
-      notifications.value = result.data.data || []
-      unreadCount.value = result.data.unreadCount ?? 0
-    }
-  } catch (error) {
-    console.error('Error fetching notifications:', error)
-  }
-}
-
-async function markNotificationAsRead(id: string) {
-  try {
-    await api.put(`/api/notifications/${id}/read`)
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
-    // Remove from list
-    notifications.value = notifications.value.filter(n => n.id !== id)
-  } catch (error) {
-    console.error('Error marking notification as read:', error)
-  }
-}
-
-async function markAllNotificationsAsRead() {
-  try {
-    await api.put('/api/notifications/mark-all-read')
-    unreadCount.value = 0
-    notifications.value = []
-  } catch (error) {
-    console.error('Error marking all as read:', error)
   }
 }
 
@@ -130,15 +89,6 @@ function getExpiryUrgency(renewalDate?: string | null): { color: string; label: 
     return { color: 'bg-yellow-100 text-yellow-800', label: `${daysUntilExpiry} days left` }
   } else {
     return { color: 'bg-green-100 text-green-800', label: `${daysUntilExpiry} days left` }
-  }
-}
-
-function getNotificationIcon(type: string): string {
-  switch (type) {
-    case 'ASSESSMENT_APPROVED': return '✅'
-    case 'ASSESSMENT_REJECTED': return '❌'
-    case 'EXPIRY_REMINDER': return '⚠️'
-    default: return '📧'
   }
 }
 
@@ -200,20 +150,9 @@ function startAutoRefresh() {
   }, 30000) // Every 30 seconds
 }
 
-// Refresh notifications periodically
-const notificationIntervalRef = { current: null as ReturnType<typeof setInterval> | null }
-
-function startNotificationPolling() {
-  notificationIntervalRef.current = setInterval(() => {
-    fetchNotifications()
-  }, 60000) // Every minute
-}
-
 onMounted(() => {
   fetchAssessments()
-  fetchNotifications()
   startAutoRefresh()
-  startNotificationPolling()
 })
 </script>
 
@@ -469,71 +408,6 @@ onMounted(() => {
         </Transition>
       </Teleport>
     </main>
-
-    <!-- ─── Notification Bell Dropdown ─────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="showNotifications" class="fixed inset-0 z-40" @click.self="showNotifications = false" />
-    </Teleport>
-    
-    <div class="fixed top-4 right-4 z-50">
-      <!-- Notification Bell Button -->
-      <button
-        @click="showNotifications = !showNotifications; fetchNotifications()"
-        class="relative p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow"
-      >
-        <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-        
-        <!-- Unread Badge -->
-        <span v-if="unreadCount > 0" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-          {{ unreadCount > 9 ? '9+' : unreadCount }}
-        </span>
-      </button>
-
-      <!-- Notification Dropdown -->
-      <Transition name="notification-dropdown">
-        <div v-if="showNotifications" class="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden">
-          <!-- Header -->
-          <div class="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-            <h3 class="text-sm font-semibold text-gray-900">Notifications</h3>
-            <button @click="markAllNotificationsAsRead" class="text-xs text-blue-600 hover:text-blue-800 font-medium">Mark all read</button>
-          </div>
-
-          <!-- Notification List -->
-          <div v-if="notificationLoading" class="p-4 text-center">
-            <p class="text-sm text-gray-500">Loading...</p>
-          </div>
-          
-          <div v-else-if="notifications.length === 0" class="p-4 text-center">
-            <p class="text-sm text-gray-500">No new notifications</p>
-          </div>
-
-          <div v-else class="max-h-96 overflow-y-auto">
-            <button
-              v-for="notification in notifications"
-              :key="notification.id"
-              @click="markNotificationAsRead(notification.id)"
-              class="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 transition-colors"
-            >
-              <div class="flex items-start space-x-3">
-                <span class="text-lg">{{ getNotificationIcon(notification.type) }}</span>
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-900 truncate">{{ notification.title }}</p>
-                  <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ notification.message }}</p>
-                  <p class="text-xs text-gray-400 mt-1">{{ new Date(notification.createdAt).toLocaleString() }}</p>
-                </div>
-              </div>
-            </button>
-          </div>
-
-          <!-- Footer -->
-          <div v-if="notifications.length > 0" class="px-4 py-2 bg-gray-50 border-t border-gray-200 text-center">
-            <a href="/assessments" class="text-xs text-blue-600 hover:text-blue-800 font-medium">View all assessments</a>
-          </div>
-        </div>
-      </Transition>
-    </div>
   </div>
 </template>
 
