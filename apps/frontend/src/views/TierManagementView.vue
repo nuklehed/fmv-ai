@@ -9,6 +9,13 @@ interface CriteriaSet { id: string; name: string; tierThresholds?: any[] }
 const specialties = ref<Specialty[]>([])
 const criteriaSets = ref<CriteriaSet[]>([])
 const rates = ref<TierRate[]>([])
+
+// Filtered specialties — only those with rates in the selected criteria set
+const filteredSpecialties = computed(() => {
+  if (!selectedCriteriaSetId.value) return []
+  const specIds = new Set(rates.value.map(r => r.specialtyId))
+  return specialties.value.filter(s => specIds.has(s.id))
+})
 const loading = ref(false)
 const formError = ref('')
 const selectedCriteriaSetId = ref<string>('')
@@ -158,20 +165,29 @@ onMounted(async () => {
       </div>
 
       <!-- Matrix Table -->
-      <div v-else-if="selectedCriteriaSetId && specialties.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
+      <div v-else-if="selectedCriteriaSetId && filteredSpecialties.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
+            <!-- Tier label row (merged over Min/Max) -->
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10">Specialty</th>
+              <th></th>
               <template v-for="label in tierLabels" :key="label">
-                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Min</th>
-                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Max</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" colspan="2">{{ label }}</th>
               </template>
-              <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+              <th></th>
+            </tr>
+            <!-- Min / Max sub-row -->
+            <tr>
+              <th class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10" rowspan="2">Specialty</th>
+              <template v-for="label in tierLabels" :key="label">
+                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Min</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Max</th>
+              </template>
+              <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" rowspan="2">Action</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="specialty in specialties" :key="specialty.id" class="hover:bg-gray-50">
+            <tr v-for="specialty in filteredSpecialties" :key="specialty.id" class="hover:bg-gray-50">
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{{ specialty.name }}</td>
 
               <template v-for="label in tierLabels" :key="label">
