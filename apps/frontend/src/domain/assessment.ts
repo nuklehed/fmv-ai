@@ -110,18 +110,22 @@ export function isDraft(assessment: AssessmentListItem): boolean {
 }
 
 /** Check if assessment can be reviewed (AI_COMPLETE + admin/SA) */
+/** Check if assessment can be reviewed (AI_COMPLETE + admin/SA) */
 export function canReview(assessment: AssessmentListItem, userRole?: string): boolean {
-  return assessment.status === 'AI_COMPLETE' && isAdminOrSA(userRole)
+  const role = userRole || (localStorage.getItem('userRole') as string | undefined)
+  return assessment.status === 'AI_COMPLETE' && isAdminOrSA(role)
 }
 
 /** Check if assessment can be approved (UNDER_REVIEW + admin/SA) */
 export function canApprove(assessment: AssessmentListItem, userRole?: string): boolean {
-  return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(userRole)
+  const role = userRole || (localStorage.getItem('userRole') as string | undefined)
+  return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(role)
 }
 
 /** Check if assessment can be rejected (UNDER_REVIEW + admin/SA) */
 export function canReject(assessment: AssessmentListItem, userRole?: string): boolean {
-  return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(userRole)
+  const role = userRole || (localStorage.getItem('userRole') as string | undefined)
+  return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(role)
 }
 
 function isAdminOrSA(role?: string): boolean {

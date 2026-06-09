@@ -196,10 +196,7 @@ const refreshIntervalRef = { current: null as ReturnType<typeof setInterval> | n
 
 function startAutoRefresh() {
   refreshIntervalRef.current = setInterval(() => {
-    const hasProcessing = assessments.value.some(a => a.status === 'AI_PROCESSING')
-    if (hasProcessing) {
-      fetchAssessments()
-    }
+    fetchAssessments()
   }, 30000) // Every 30 seconds
 }
 
