@@ -10,10 +10,10 @@ const specialties = ref<Specialty[]>([])
 const criteriaSets = ref<CriteriaSet[]>([])
 const rates = ref<TierRate[]>([])
 
-// All active specialties — show all, with Add/Edit buttons as needed
+// Specialties assigned to the selected criteria set
 const tableSpecialties = computed(() => {
   if (!selectedCriteriaSetId.value) return []
-  return [...specialties.value].sort((a, b) => a.name.localeCompare(b.name))
+  return specialties.value.filter(s => s.criteriaSetId === selectedCriteriaSetId.value).sort((a, b) => a.name.localeCompare(b.name))
 })
 
 function hasRates(specialtyId: string): boolean {

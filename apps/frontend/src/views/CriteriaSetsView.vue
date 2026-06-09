@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
 
 interface Answer {
@@ -35,6 +35,16 @@ const newSystemPrompt = ref('')
 
 // Form state for tier thresholds (SA-only)
 const tierThresholds = ref<Array<{ label: string; minScore: number; maxScore: number }>>([])
+const maxTiers = ref<number>(3)
+
+// Max possible score from active questions/answers
+const maxPossibleScore = computed(() => {
+  if (!editingItem.value?.questions) return 0
+  return editingItem.value.questions.reduce((sum, q) => {
+    if (!q.isActive) return sum
+    return sum + q.answers.filter(a => a.isActive).reduce((s, a) => s + a.score, 0)
+  }, 0)
+})
 
 // Question/Answer modal states
 const showAddQuestionModal = ref(false)
@@ -129,6 +139,7 @@ function openThresholdsModal(cs: CriteriaSet) {
 }
 
 function addTierRow() {
+  if (tierThresholds.value.length >= maxTiers.value) return
   tierThresholds.value.push({ label: '', minScore: 0, maxScore: 0 })
 }
 
@@ -325,8 +336,17 @@ function handleSearch() {
   searchTimeout = setTimeout(() => fetchCriteriaSets(), 300)
 }
 
+async function fetchMaxTiers() {
+  try {
+    const res = await apiFetch('/api/tier-config', { headers: getAuthHeaders() })
+    const config = await res.json()
+    maxTiers.value = config.numberOfTiers ?? 3
+  } catch { /* silent */ }
+}
+
 onMounted(() => {
   fetchCriteriaSets()
+  fetchMaxTiers()
 })
 </script>
 
@@ -396,7 +416,7 @@ onMounted(() => {
             <div class="flex items-center space-x-2">
               <!-- System Prompt button (SA-only) -->
               <button @click="openPromptModal(cs)" class="text-purple-600 hover:text-purple-900 text-sm" title="Edit system prompt (SA only)">
-                ⚙️ Prompt
+                Prompt
               </button>
               <span>|</span>
               <!-- Tier Thresholds button (SA-only) -->
@@ -710,13 +730,14 @@ onMounted(() => {
 
                   <!-- Current thresholds summary -->
                   <div v-if="editingItem?.tierThresholds && editingItem.tierThresholds.length > 0" class="mb-4 p-3 bg-gray-50 rounded-md">
-                    <p class="text-xs font-medium text-gray-600 mb-1">Current ranges:</p>
+                    <p class="text-xs font-medium text-gray-600 mb-1">Max possible score: {{ maxPossibleScore }} · Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
                     <div class="flex flex-wrap gap-2">
                       <span v-for="t in editingItem.tierThresholds" :key="t.label" class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
                         {{ t.label }}: {{ t.minScore }}–{{ t.maxScore }}
                       </span>
                     </div>
                   </div>
+                  <p class="text-xs text-gray-500 mb-4">Max possible score: {{ maxPossibleScore }} · No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
 
                   <form @submit.prevent="handleUpdateThresholds" class="space-y-4">
                     <!-- Thresholds table -->
@@ -746,9 +767,13 @@ onMounted(() => {
                       </table>
                     </div>
 
-                    <button type="button" @click="addTierRow" class="text-sm text-emerald-600 hover:text-emerald-900 font-medium">
-                      + Add Tier
-                    </button>
+                    <div class="flex items-center justify-between">
+                      <button type="button" @click="addTierRow" :disabled="tierThresholds.length >= maxTiers"
+                        class="text-sm text-emerald-600 hover:text-emerald-900 font-medium disabled:opacity-30 disabled:cursor-not-allowed">
+                        + Add Tier
+                      </button>
+                      <span v-if="tierThresholds.length >= maxTiers" class="text-xs text-gray-500">Maximum {{ maxTiers }} tiers set in Settings</span>
+                    </div>
 
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
