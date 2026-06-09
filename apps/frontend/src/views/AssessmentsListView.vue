@@ -483,35 +483,38 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     </div>
                   </div>
 
-                  <!-- Tier & Rate Information -->
-                  <div v-if="selectedAssessment.tierLabel || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
-                    <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
-                    <div class="grid grid-cols-2 gap-2 text-sm">
-                      <div><span class="text-gray-600">Tier:</span><span class="ml-1 font-medium">{{ selectedAssessment.tierLabel || '—' }}</span></div>
-                      <div><span class="text-gray-600">Rate:</span><span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span></div>
+                  <!-- Tier & Rate (approved) -->
+                  <template v-if="selectedAssessment.status === 'APPROVED'">
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                      <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <h4 class="text-xs font-medium text-green-900 mb-1">Tier</h4>
+                        <p class="text-sm font-semibold text-gray-900">{{ selectedAssessment.tierLabel || '—' }}</p>
+                      </div>
+                      <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <h4 class="text-xs font-medium text-green-900 mb-1">Rate</h4>
+                        <p class="text-sm font-semibold text-gray-900">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</p>
+                      </div>
                     </div>
-                  </div>
+                  </template>
 
-                  <!-- Effective & Renewal Dates -->
-                  <div v-if="selectedAssessment.effectiveDate || selectedAssessment.renewalDate" class="grid grid-cols-2 gap-4">
-                    <div><h4 class="text-sm font-medium text-gray-500 mb-2">Effective Date</h4><p class="text-sm text-gray-900">{{ assessmentDomain.formatDate(selectedAssessment.effectiveDate) }}</p></div>
-                    <div><h4 class="text-sm font-medium text-gray-500 mb-2">Renewal Date</h4><p class="text-sm text-gray-900">{{ assessmentDomain.formatDate(selectedAssessment.renewalDate) }}</p></div>
-                  </div>
-
-                  <!-- Dates -->
-                  <div class="grid grid-cols-2 gap-4 p-6">
-                    <div><h4 class="text-sm font-medium text-gray-500 mb-2">Created</h4><p class="text-sm text-gray-900">{{ assessmentDomain.formatDate(selectedAssessment.createdAt) }}</p></div>
-                    <div><h4 class="text-sm font-medium text-gray-500 mb-2">Submitted</h4><p class="text-sm text-gray-900">{{ assessmentDomain.formatDate(selectedAssessment.submittedAt) }}</p></div>
+                  <!-- All dates compact -->
+                  <div class="grid grid-cols-3 gap-2 text-xs mb-3">
+                    <div v-if="selectedAssessment.createdAt"><span class="text-gray-500">Created</span><p class="text-gray-900 font-medium">{{ assessmentDomain.formatDate(selectedAssessment.createdAt) }}</p></div>
+                    <div v-if="selectedAssessment.submittedAt"><span class="text-gray-500">Submitted</span><p class="text-gray-900 font-medium">{{ assessmentDomain.formatDate(selectedAssessment.submittedAt) }}</p></div>
+                    <div v-if="selectedAssessment.effectiveDate"><span class="text-gray-500">Effective</span><p class="text-gray-900 font-medium">{{ assessmentDomain.formatDate(selectedAssessment.effectiveDate) }}</p></div>
                   </div>
 
                   <!-- Rejection Reason -->
-                  <div v-if="selectedAssessment.rejectionReason">
-                    <h4 class="text-sm font-medium text-red-600 mb-2">Rejection Reason</h4>
+                  <div v-if="selectedAssessment.rejectionReason" class="mb-3">
+                    <h4 class="text-sm font-medium text-red-600 mb-1">Rejection Reason</h4>
                     <p class="text-sm text-gray-900 bg-red-50 p-3 rounded-lg">{{ selectedAssessment.rejectionReason }}</p>
                   </div>
 
                   <!-- Submitted By -->
-                  <div class="p-6"><h4 class="text-sm font-medium text-gray-500 mb-2">Submitted By</h4><p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p></div>
+                  <div v-if="selectedAssessment.submittedByUser?.email" class="mb-3">
+                    <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted By</h4>
+                    <p class="text-sm text-gray-900">{{ selectedAssessment.submittedByUser.email }}</p>
+                  </div>
 
                   <!-- Start Review / Continue Review Button (navigate to dedicated review page) -->
                   <div v-if="assessmentDomain.canReview(selectedAssessment) || selectedAssessment.status === 'UNDER_REVIEW'" class="px-6 border-t border-gray-200 pt-4">

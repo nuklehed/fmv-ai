@@ -321,7 +321,7 @@ onMounted(() => {
                   </div>
 
                   <!-- Panel Content -->
-                  <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                  <div class="flex-1 overflow-y-auto p-6 space-y-3">
                     <!-- HCP Info -->
                     <div>
                       <h4 class="text-sm font-medium text-gray-500 mb-2">HCP</h4>
@@ -330,7 +330,7 @@ onMounted(() => {
 
                     <!-- Status -->
                     <div>
-                      <h4 class="text-sm font-medium text-gray-500 mb-2">Status</h4>
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">Status</h4>
                       <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
                         {{ getStatusLabel(selectedAssessment.status) }}
                       </span>
@@ -345,31 +345,38 @@ onMounted(() => {
                       <p class="text-2xl font-bold text-gray-900">{{ selectedAssessment.totalScore }}</p>
                     </div>
 
-                    <!-- Tier & Rate -->
-                    <div v-if="(selectedAssessment as any).tierLabel || selectedAssessment.rate" class="p-3 bg-green-50 rounded-lg border border-green-200">
-                      <h4 class="text-sm font-medium text-green-900 mb-2">Tier & Rate</h4>
-                      <div class="grid grid-cols-2 gap-2 text-sm">
-                        <div><span class="text-gray-600">Tier:</span> <span class="ml-1 font-medium">{{ (selectedAssessment as any).tierLabel || '—' }}</span></div>
-                        <div><span class="text-gray-600">Rate:</span> <span class="ml-1 font-medium">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</span></div>
+                    <!-- Approved: Tier, Rate, Dates in one compact block -->
+                    <template v-if="selectedAssessment.status === 'APPROVED'">
+                      <div class="grid grid-cols-2 gap-3">
+                        <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <h4 class="text-xs font-medium text-green-900 mb-1">Tier</h4>
+                          <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).tierLabel || '—' }}</p>
+                        </div>
+                        <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                          <h4 class="text-xs font-medium text-green-900 mb-1">Rate</h4>
+                          <p class="text-sm font-semibold text-gray-900">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</p>
+                        </div>
                       </div>
-                    </div>
+                      <div v-if="selectedAssessment.renewalDate" class="p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
+                        <h4 class="text-xs font-medium mb-1">Renewal Status</h4>
+                        <p class="text-sm">{{ getExpiryUrgency(selectedAssessment.renewalDate)?.label }}</p>
+                      </div>
+                    </template>
 
-                    <!-- Dates -->
-                    <div v-if="selectedAssessment.effectiveDate || selectedAssessment.renewalDate" class="grid grid-cols-2 gap-4">
-                      <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Effective Date</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                    <!-- Dates: all in one row -->
+                    <div class="grid grid-cols-3 gap-2 text-xs">
+                      <div v-if="selectedAssessment.createdAt">
+                        <span class="text-gray-500">Created</span>
+                        <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.createdAt) }}</p>
                       </div>
-                      <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Renewal Date</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.renewalDate) }}</p>
+                      <div v-if="selectedAssessment.submittedAt">
+                        <span class="text-gray-500">Submitted</span>
+                        <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.submittedAt) }}</p>
                       </div>
-                    </div>
-
-                    <!-- Expiry Urgency -->
-                    <div v-if="selectedAssessment.status === 'APPROVED' && selectedAssessment.renewalDate" class="p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
-                      <h4 class="text-sm font-medium mb-1">Renewal Status</h4>
-                      <p class="text-sm">{{ getExpiryUrgency(selectedAssessment.renewalDate)?.label }}</p>
+                      <div v-if="selectedAssessment.effectiveDate">
+                        <span class="text-gray-500">Effective</span>
+                        <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                      </div>
                     </div>
 
                     <!-- Rejection Reason -->
@@ -379,21 +386,9 @@ onMounted(() => {
                     </div>
 
                     <!-- Submitted By -->
-                    <div>
+                    <div v-if="(selectedAssessment as any).submittedByUser?.email">
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted By</h4>
-                      <p class="text-sm text-gray-900">{{ (selectedAssessment as any).submittedByUser?.email || '—' }}</p>
-                    </div>
-
-                    <!-- Dates -->
-                    <div class="grid grid-cols-2 gap-4">
-                      <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Created</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.createdAt) }}</p>
-                      </div>
-                      <div>
-                        <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted</h4>
-                        <p class="text-sm text-gray-900">{{ formatDate(selectedAssessment.submittedAt) }}</p>
-                      </div>
+                      <p class="text-sm text-gray-900">{{ (selectedAssessment as any).submittedByUser.email }}</p>
                     </div>
                   </div>
 
