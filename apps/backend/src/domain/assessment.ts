@@ -464,6 +464,74 @@ export class AssessmentDomain {
     }
   }
 
+  /** Cancel an assessment stuck in AI_PROCESSING — removes from queue and resets status */
+  async cancelAssessment(
+    id: string,
+    userId: string,
+    tenantId: string
+  ): Promise<{ message: string; assessment: any }> {
+    const existing = await this.prisma.assessment.findFirst({
+      where: { id, tenantId },
+      include: { hcp: true }
+    })
+
+    if (!existing) throw new Error('Assessment not found')
+    if (existing.status !== 'AI_PROCESSING') {
+      throw new Error(`Cannot cancel — assessment is in ${existing.status} status, only AI_PROCESSING assessments can be cancelled`)
+    }
+
+    // Remove from BullMQ queue if it exists
+    const { getAIQueue } = await import('../services/queue')
+    const queue = await getAIQueue()
+    if (queue) {
+      // Get all jobs for this assessment and remove them
+      const [waitingJobs, activeJobs, failedJobs] = await Promise.all([
+        queue.getJobs(['waiting']),
+        queue.getJobs(['active']),
+        queue.getJobs(['failed'])
+      ])
+
+      let removedCount = 0
+      for (const job of [...waitingJobs, ...activeJobs, ...failedJobs]) {
+        if (job.data.assessmentId === id) {
+          try {
+            if (job.state === 'active') {
+              // Pause the worker first to prevent race conditions
+              await queue.pause()
+              await job.moveToFailed(new Error('Cancelled by user'), true)
+              removedCount++
+            } else {
+              await job.remove()
+              removedCount++
+            }
+          } catch (err) {
+            console.warn(`Could not remove job ${job.id} from queue:`, err instanceof Error ? err.message : String(err))
+          }
+        }
+      }
+
+      // Resume the worker if we paused it
+      if (removedCount > 0) {
+        await queue.resume()
+      }
+
+      console.log(`[Cancel] Removed ${removedCount} job(s) for assessment ${id} from queue`)
+    }
+
+    // Reset status to DRAFT so user can resubmit or edit
+    const updated = await this.prisma.assessment.update({
+      where: { id },
+      data: { status: 'DRAFT' },
+      include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
+    })
+
+    console.log(`[Cancel] Assessment ${id} cancelled by user ${userId}, status reset to DRAFT`)
+    return {
+      message: 'Assessment cancelled and queued job removed',
+      assessment: updated as any
+    }
+  }
+
   async deleteAssessment(id: string, tenantId: string, userRole: 'BU' | 'ADMIN' | 'SA'): Promise<void> {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },

@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import type { Assessment, Notification } from '@/types'
 import { api } from '@/api/client'
+import * as assessmentDomain from '@/domain/assessment'
 
 // Assessment list state
 const assessments = ref<Assessment[]>([])
@@ -164,6 +165,27 @@ async function openDetailPanel(assessment: Assessment) {
   showDetailPanel.value = true
 }
 
+const cancelLoading = ref(false)
+
+async function cancelAssessment(assessment: Assessment) {
+  const a = assessment as any
+  if (!confirm(`Cancel AI processing for ${a.hcp?.firstName || '?'} ${a.hcp?.lastName || '?'}? This will reset the assessment to DRAFT.`)) return
+  cancelLoading.value = true
+  try {
+    await assessmentDomain.cancelAssessment(assessment.id)
+    await fetchAssessments()
+  } catch (error) {
+    alert(error instanceof Error ? error.message : 'Failed to cancel assessment')
+  } finally {
+    cancelLoading.value = false
+  }
+}
+
+async function cancelSelectedAssessment() {
+  if (!selectedAssessment.value) return
+  await cancelAssessment(selectedAssessment.value)
+}
+
 function closeDetailPanel() {
   showDetailPanel.value = false
   selectedAssessment.value = null
@@ -315,7 +337,10 @@ onMounted(() => {
                 </span>
                 <span v-else class="text-xs text-gray-400">—</span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" @click.stop>
+              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
+                <button v-if="assessment.status === 'AI_PROCESSING'" @click.stop="cancelAssessment(assessment)" :disabled="cancelLoading" class="text-red-600 hover:text-red-900 font-medium mr-3">
+                  {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
+                </button>
                 <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
               </td>
             </tr>
@@ -373,6 +398,9 @@ onMounted(() => {
                       <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
                         {{ getStatusLabel(selectedAssessment.status) }}
                       </span>
+                      <button v-if="selectedAssessment.status === 'AI_PROCESSING'" @click.stop="cancelSelectedAssessment()" :disabled="cancelLoading" class="ml-2 text-xs text-red-600 hover:text-red-900 underline">
+                        {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
+                      </button>
                     </div>
 
                     <!-- Score -->

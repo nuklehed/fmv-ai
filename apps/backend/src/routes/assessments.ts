@@ -147,6 +147,23 @@ router.post('/:id/submit', async (req: AuthenticatedRequest, res: Response): Pro
   }
 })
 
+/** POST /api/assessments/:id/cancel — Cancel assessment stuck in AI_PROCESSING */
+router.post('/:id/cancel', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const result = await domain.cancelAssessment(req.params.id, req.userId!, req.tenantId!)
+    res.json(result)
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('not found')) {
+      res.status(404).json({ error: 'Assessment not found' })
+    } else if (error instanceof Error && error.message.includes('Cannot cancel')) {
+      res.status(400).json({ error: error.message })
+    } else {
+      console.error('Error cancelling assessment:', error)
+      res.status(500).json({ error: 'Internal server error' })
+    }
+  }
+})
+
 /** POST /api/assessments/:id/retry — Retry AI processing for failed assessments (Admin/SA only) */
 router.post('/:id/retry', authenticate, requireAdminOrSA, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {

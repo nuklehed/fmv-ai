@@ -420,6 +420,21 @@ export async function retryAssessment(assessmentId: string): Promise<any> {
   return response.json()
 }
 
+/** Cancel an assessment stuck in AI_PROCESSING — resets to DRAFT and removes from queue */
+export async function cancelAssessment(assessmentId: string): Promise<any> {
+  const response = await fetch(`/api/assessments/${assessmentId}/cancel`, {
+    method: 'POST',
+    headers: authHeaders()
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: 'Failed to cancel assessment' }))
+    throw new Error(errorData.error || 'Failed to cancel assessment')
+  }
+
+  return response.json()
+}
+
 /** Check Ollama/LLM health before submitting for AI processing */
 export async function checkLlmHealth(): Promise<{ ok: boolean; model?: string; error?: string }> {
   const response = await fetch('/api/llm/health')

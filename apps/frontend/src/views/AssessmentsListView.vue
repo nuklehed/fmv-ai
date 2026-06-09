@@ -176,6 +176,7 @@ async function rejectAssessment() {
 
 const retryLoading = ref(false)
 const retrySuccess = ref('')
+const cancelLoading = ref(false)
 const showDiagnosticInfo = ref(false)
 
 async function retryFailedAssessment(assessment: assessmentDomain.AssessmentListItem) {
@@ -198,6 +199,26 @@ async function retryFailedAssessment(assessment: assessmentDomain.AssessmentList
     formError.value = error instanceof Error ? error.message : 'Failed to retry assessment'
     setTimeout(() => { formError.value = '' }, 5000)
   } finally { retryLoading.value = false }
+}
+
+async function cancelAssessment(assessment: assessmentDomain.AssessmentListItem) {
+  if (!confirm(`Cancel AI processing for ${assessment.hcp.firstName} ${assessment.hcp.lastName}? This will reset the assessment to DRAFT.`)) return
+  cancelLoading.value = true; formError.value = ''
+  try {
+    await assessmentDomain.cancelAssessment(assessment.id)
+    formError.value = '✓ Assessment cancelled — status reset to DRAFT'
+    setTimeout(() => { formError.value = '' }, 5000)
+    await fetchAssessments()
+  } catch (error) {
+    formError.value = error instanceof Error ? error.message : 'Failed to cancel assessment'
+    setTimeout(() => { formError.value = '' }, 5000)
+  } finally { cancelLoading.value = false }
+}
+
+async function cancelSelectedAssessment() {
+  if (!selectedAssessment.value) return
+  const a = selectedAssessment.value as any
+  await cancelAssessment(a)
 }
 
 // ─── Diagnostic Info Helpers ─────────────────────────────────────
@@ -332,6 +353,12 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       Review
                     </router-link>
                   </template>
+                  <!-- AI_PROCESSING: show cancel button + view -->
+                  <template v-if="assessment.status === 'AI_PROCESSING'">
+                    <button @click.stop="cancelAssessment(assessment)" :disabled="cancelLoading" class="text-red-600 hover:text-red-900 font-medium mr-3">
+                      {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
+                    </button>
+                  </template>
                   <!-- AI_FAILED: show retry button + view -->
                   <template v-if="assessmentDomain.isFailed(assessment) && assessmentDomain.canRetry(assessment)">
                     <button @click.stop="retryFailedAssessment(assessment)" :disabled="retryLoading" class="text-orange-600 hover:text-orange-900 font-medium mr-3">
@@ -390,6 +417,10 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', assessmentDomain.getStatusColor(selectedAssessment.status)]">
                         {{ assessmentDomain.getStatusLabel(selectedAssessment.status) }}
                       </span>
+                      <!-- Cancel button for AI_PROCESSING -->
+                      <button v-if="selectedAssessment.status === 'AI_PROCESSING'" @click.stop="cancelSelectedAssessment()" :disabled="cancelLoading" class="ml-2 text-xs text-red-600 hover:text-red-900 underline">
+                        {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
+                      </button>
                     </div>
 
                     <!-- Score -->

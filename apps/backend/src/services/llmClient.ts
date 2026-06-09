@@ -114,13 +114,26 @@ class OllamaLLMClient implements LLMClientInterface {
 
     let response: Response
     try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: requestBody
-      })
+      // 5-minute timeout on LLM requests to prevent indefinite hangs
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody,
+          signal: controller.signal
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
     } catch (err) {
       const networkError = err instanceof Error ? err.message : String(err)
+      const isTimeout = networkError.includes('abort') || networkError.includes('timeout')
+      if (isTimeout) {
+        console.error(`[LLM] Request timed out after 5 minutes — ${endpoint}`)
+        throw new Error(`LLM request timed out after 5 minutes. The server may be overloaded or the prompt is too large.`)
+      }
       console.error(`[LLM] Network error — could not reach ${endpoint}`)
       console.error(`[LLM] Error: ${networkError}`)
       throw new Error(`Network error connecting to LLM at ${endpoint}: ${networkError}`)
