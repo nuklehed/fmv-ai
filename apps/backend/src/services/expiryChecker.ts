@@ -50,9 +50,7 @@ async function checkExpiringAssessments(prisma: PrismaClient): Promise<void> {
       }
     },
     include: {
-      hcp: true,
-      submittedByUser: true,
-      tier: { select: { name: true } }
+      hcp: true
     }
   })
 

@@ -8,16 +8,21 @@ const prisma = new PrismaClient()
 
 /**
  * GET /api/tier-config
- * Get the tier configuration for the tenant (upserts if not exists)
+ * Get the global tier configuration for the tenant (stored as ApplicationSetting)
  */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const config = await prisma.tierConfig.upsert({
-      where: { tenantId: req.tenantId! },
-      create: { tenantId: req.tenantId!, numberOfTiers: 3 },
-      update: {},
-      select: { id: true, numberOfTiers: true, tenantId: true, createdAt: true, updatedAt: true }
+    const setting = await prisma.applicationSetting.findFirst({
+      where: { key: 'numberOfTiers', tenantId: req.tenantId! }
     })
+
+    const config = {
+      id: 'global',
+      numberOfTiers: setting ? parseInt(setting.value) : 3,
+      tenantId: req.tenantId!,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
 
     res.json(config)
   } catch (error) {
@@ -28,7 +33,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
 
 /**
  * PUT /api/tier-config
- * Update the number of tiers for the tenant
+ * Update the global number of tiers for the tenant
  */
 router.put('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
@@ -44,12 +49,19 @@ router.put('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
       return
     }
 
-    const config = await prisma.tierConfig.upsert({
-      where: { tenantId: req.tenantId! },
-      create: { tenantId: req.tenantId!, numberOfTiers },
-      update: { numberOfTiers },
-      select: { id: true, numberOfTiers: true, tenantId: true, createdAt: true, updatedAt: true }
+    await prisma.applicationSetting.upsert({
+      where: { key_tenantId: { key: 'numberOfTiers', tenantId: req.tenantId! } },
+      create: { key: 'numberOfTiers', value: String(numberOfTiers), tenantId: req.tenantId! },
+      update: { value: String(numberOfTiers) }
     })
+
+    const config = {
+      id: 'global',
+      numberOfTiers,
+      tenantId: req.tenantId!,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
 
     res.json(config)
   } catch (error) {

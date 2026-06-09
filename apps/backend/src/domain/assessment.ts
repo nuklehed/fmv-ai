@@ -137,9 +137,7 @@ export class AssessmentDomain {
             questions: { where: { isActive: true }, include: { answers: { where: { isActive: true } } } }
           }
         },
-        rates: {
-          where: { specialtyId: (existing as any)?.specialtyId || undefined }
-        }
+
       }
     })
   }
@@ -643,7 +641,7 @@ export class AssessmentDomain {
     if (thresholds.length === 0) throw new Error('No tier thresholds defined for this criteria set')
 
     // Determine tier label and rate from SpecialtyRate
-    let assignedTierLabel = tierLabel || existing.tierLabel
+    let assignedTierLabel: string | null = tierLabel || existing.tierLabel
     let finalRate: number | null = existing.rate as number | null
 
     if (!assignedTierLabel) {
@@ -663,7 +661,7 @@ export class AssessmentDomain {
       where: {
         specialtyId: existing.specialtyId!,
         criteriaSetId: existing.criteriaSetId!,
-        tierLabel: assignedTierLabel
+        tierLabel: assignedTierLabel!
       }
     })
 

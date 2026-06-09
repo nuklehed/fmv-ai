@@ -10,7 +10,7 @@ interface Question {
 }
 interface CriteriaSet {
   id: string; name: string; description?: string | null; systemPrompt?: string | null
-  isActive: boolean; tenantId: string; createdAt: string; updatedAt: string; questions: Question[]
+  isActive: boolean; tenantId: string; createdAt: string; updatedAt: string; questions: Question[]; tierThresholds?: Array<{label:string;minScore:number;maxScore:number}>
 }
 
 const criteriaSets = ref<CriteriaSet[]>([])
@@ -22,6 +22,7 @@ const formError = ref('')
 const showAddModal = ref(false)
 const showEditModal = ref(false)
 const showPromptModal = ref(false)
+const showThresholdsModal = ref(false)
 const editingItem = ref<CriteriaSet | null>(null)
 
 // Form state for criteria set add/edit
@@ -31,6 +32,9 @@ const formDescription = ref('')
 // Form state for system prompt (SA-only)
 const currentSystemPrompt = ref('')
 const newSystemPrompt = ref('')
+
+// Form state for tier thresholds (SA-only)
+const tierThresholds = ref<Array<{ label: string; minScore: number; maxScore: number }>>([])
 
 // Question/Answer modal states
 const showAddQuestionModal = ref(false)
@@ -79,6 +83,7 @@ function resetForm() {
   questionText.value = ''
   answerText.value = ''
   answerScore.value = 0
+  tierThresholds.value = []
   formError.value = ''
 }
 
@@ -112,6 +117,64 @@ async function handleUpdate() {
     })
     showEditModal.value = false; resetForm(); editingItem.value = null; await fetchCriteriaSets()
   } catch (error) { formError.value = error instanceof Error ? error.message : 'Failed to update criteria set' }
+}
+
+// ─── Tier Thresholds (SA-only) ──────────────────────────────────────
+
+function openThresholdsModal(cs: CriteriaSet) {
+  editingItem.value = cs
+  tierThresholds.value = cs.tierThresholds ? JSON.parse(JSON.stringify(cs.tierThresholds)) : []
+  formError.value = ''
+  showThresholdsModal.value = true
+}
+
+function addTierRow() {
+  tierThresholds.value.push({ label: '', minScore: 0, maxScore: 0 })
+}
+
+function removeTierRow(index: number) {
+  tierThresholds.value.splice(index, 1)
+}
+
+function handleUpdateThresholds() {
+  if (!editingItem.value || tierThresholds.value.length === 0) {
+    formError.value = 'At least one tier is required'
+    return
+  }
+
+  // Validate labels unique
+  const labels = tierThresholds.value.map(t => t.label)
+  if (labels.some(l => !l.trim())) { formError.value = 'All tiers must have a label'; return }
+  if (new Set(labels).size !== labels.length) { formError.value = 'Tier labels must be unique'; return }
+
+  // Validate scores
+  for (const t of tierThresholds.value) {
+    if (t.minScore > t.maxScore) { formError.value = `"${t.label}": minScore must be ≤ maxScore`; return }
+  }
+
+  // Check overlaps (sort by minScore)
+  const sorted = [...tierThresholds.value].sort((a, b) => a.minScore - b.minScore)
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].minScore <= sorted[i - 1].maxScore) {
+      formError.value = `"${sorted[i].label}" overlaps with "${sorted[i - 1].label}" — ranges must not overlap`
+      return
+    }
+  }
+
+  handleSaveThresholds()
+}
+
+async function handleSaveThresholds() {
+  if (!editingItem.value) return
+  try {
+    await apiFetch(`/api/criteria-sets/${editingItem.value.id}`, {
+      method: 'PUT', headers: getAuthHeaders(),
+      body: JSON.stringify({ tierThresholds: tierThresholds.value })
+    })
+    showThresholdsModal.value = false; resetForm(); editingItem.value = null; await fetchCriteriaSets()
+  } catch (error) {
+    formError.value = error instanceof Error ? error.message : 'Failed to update tier thresholds'
+  }
 }
 
 async function openPromptModal(cs: CriteriaSet) {
@@ -334,6 +397,11 @@ onMounted(() => {
               <!-- System Prompt button (SA-only) -->
               <button @click="openPromptModal(cs)" class="text-purple-600 hover:text-purple-900 text-sm" title="Edit system prompt (SA only)">
                 ⚙️ Prompt
+              </button>
+              <span>|</span>
+              <!-- Tier Thresholds button (SA-only) -->
+              <button @click="openThresholdsModal(cs)" class="text-emerald-600 hover:text-emerald-900 text-sm" title="Edit tier score ranges (SA only)">
+                Thresholds
               </button>
               <span>|</span>
               <button @click="openEditModal(cs)" class="text-blue-600 hover:text-blue-900 text-sm">Edit</button>
@@ -622,6 +690,72 @@ onMounted(() => {
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleUpdateAnswer" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save Changes</button>
                   <button @click="showEditAnswerModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+      </Teleport>
+
+      <!-- Tier Thresholds Modal (SA-only) -->
+      <Teleport to="body">
+        <Transition name="modal">
+          <div v-if="showThresholdsModal" class="fixed inset-0 z-50 overflow-y-auto">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showThresholdsModal = false" />
+              <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <h3 class="text-lg font-medium text-gray-900 mb-1">Edit Tier Thresholds</h3>
+                  <p class="text-xs text-emerald-600 mb-4">SA-only — Defines score ranges for each tier in this criteria set</p>
+
+                  <!-- Current thresholds summary -->
+                  <div v-if="editingItem?.tierThresholds && editingItem.tierThresholds.length > 0" class="mb-4 p-3 bg-gray-50 rounded-md">
+                    <p class="text-xs font-medium text-gray-600 mb-1">Current ranges:</p>
+                    <div class="flex flex-wrap gap-2">
+                      <span v-for="t in editingItem.tierThresholds" :key="t.label" class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
+                        {{ t.label }}: {{ t.minScore }}–{{ t.maxScore }}
+                      </span>
+                    </div>
+                  </div>
+
+                  <form @submit.prevent="handleUpdateThresholds" class="space-y-4">
+                    <!-- Thresholds table -->
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                          <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tier Label</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Min Score</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Max Score</th>
+                            <th class="px-3 py-2 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                          <tr v-for="(tier, index) in tierThresholds" :key="index">
+                            <td class="px-3 py-2"><input v-model="tier.label" type="text" required placeholder="e.g. Tier 1" class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
+                            <td class="px-3 py-2"><input v-model.number="tier.minScore" type="number" min="0" required class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
+                            <td class="px-3 py-2"><input v-model.number="tier.maxScore" type="number" min="0" required class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
+                            <td class="px-3 py-2 text-center">
+                              <button type="button" @click="removeTierRow(index)" :disabled="tierThresholds.length <= 1"
+                                class="text-red-600 hover:text-red-900 disabled:opacity-30 disabled:cursor-not-allowed text-sm">
+                                ✕
+                              </button>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <button type="button" @click="addTierRow" class="text-sm text-emerald-600 hover:text-emerald-900 font-medium">
+                      + Add Tier
+                    </button>
+
+                    <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
+                  </form>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button @click="handleUpdateThresholds" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm">Save Thresholds</button>
+                  <button @click="showThresholdsModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>

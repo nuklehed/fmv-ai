@@ -250,6 +250,47 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
       return
     }
 
+    // Tier thresholds are SA-only
+    if (req.userRole !== 'SA' && req.body.tierThresholds !== undefined) {
+      res.status(403).json({ error: 'Only Superadmins can edit tier thresholds' })
+      return
+    }
+
+    // Validate tierThresholds if provided
+    if (req.body.tierThresholds !== undefined) {
+      const thresholds = req.body.tierThresholds
+      if (!Array.isArray(thresholds) || thresholds.length === 0) {
+        res.status(400).json({ error: 'Tier thresholds must be a non-empty array' })
+        return
+      }
+      // Sort by minScore so overlap check works regardless of input order
+      const sorted = [...thresholds].sort((a, b) => Number(a.minScore) - Number(b.minScore))
+      const labels = new Set<string>()
+      let prevMax = -1
+      for (const t of sorted) {
+        if (!t.label || typeof t.label !== 'string') {
+          res.status(400).json({ error: 'Each tier must have a label string' })
+          return
+        }
+        if (labels.has(t.label)) {
+          res.status(400).json({ error: `Duplicate tier label: ${t.label}` })
+          return
+        }
+        labels.add(t.label)
+        const min = Number(t.minScore); const max = Number(t.maxScore)
+        if (isNaN(min) || isNaN(max) || min > max) {
+          res.status(400).json({ error: `Tier "${t.label}": minScore must be ≤ maxScore` })
+          return
+        }
+        // Check overlap with previous tier in score-sorted order
+        if (min <= prevMax) {
+          res.status(400).json({ error: `Tier "${t.label}": score range overlaps with a previous tier` })
+          return
+        }
+        prevMax = max
+      }
+    }
+
     // Check for duplicate name (excluding current criteria set)
     if (name && typeof name === 'string') {
       const duplicate = await prisma.criteriaSet.findFirst({
@@ -274,6 +315,11 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     // Only SA can set systemPrompt
     if (req.userRole === 'SA' && systemPrompt !== undefined) {
       updateData.systemPrompt = systemPrompt || null
+    }
+
+    // Only SA can set tierThresholds
+    if (req.userRole === 'SA' && req.body.tierThresholds !== undefined) {
+      updateData.tierThresholds = JSON.parse(JSON.stringify(req.body.tierThresholds))
     }
 
     const criteriaSet = await prisma.criteriaSet.update({
