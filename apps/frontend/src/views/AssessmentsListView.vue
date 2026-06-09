@@ -403,17 +403,17 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   </div>
 
                   <!-- Panel Content -->
-                  <div class="flex-1 overflow-y-auto p-6 space-y-4">
+                  <div class="flex-1 overflow-y-auto p-6">
                     <!-- HCP Info -->
-                    <div>
-                      <h4 class="text-sm font-medium text-gray-500 mb-2">HCP</h4>
+                    <div class="mb-3">
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">HCP</h4>
                       <p class="text-base font-semibold text-gray-900">{{ selectedAssessment.hcp.firstName }} {{ selectedAssessment.hcp.lastName }}</p>
                       <p v-if="selectedAssessment.hcp.email" class="text-sm text-gray-600">{{ selectedAssessment.hcp.email }}</p>
                     </div>
 
                     <!-- Status -->
-                    <div>
-                      <h4 class="text-sm font-medium text-gray-500 mb-2">Status</h4>
+                    <div class="mb-3">
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">Status</h4>
                       <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', assessmentDomain.getStatusColor(selectedAssessment.status)]">
                         {{ assessmentDomain.getStatusLabel(selectedAssessment.status) }}
                       </span>
@@ -424,14 +424,14 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     </div>
 
                     <!-- Score -->
-                    <div v-if="selectedAssessment.totalScore !== null">
+                    <div v-if="selectedAssessment.totalScore !== null" class="mb-3">
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Total Score</h4>
                       <p class="text-2xl font-bold text-gray-900">{{ selectedAssessment.totalScore }}</p>
                     </div>
 
                     <!-- AI Failed Error Display -->
-                    <div v-if="assessmentDomain.isFailed(selectedAssessment)">
-                      <h4 class="text-sm font-medium text-red-700 mb-2 flex items-center">
+                    <div v-if="assessmentDomain.isFailed(selectedAssessment)" class="mb-3">
+                      <h4 class="text-sm font-medium text-red-700 mb-1 flex items-center">
                         <svg class="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
                         AI Processing Failed
                       </h4>
@@ -452,8 +452,8 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     </div>
 
                     <!-- AI Results -->
-                    <div v-if="selectedAssessment.criteriaSet?.questions && selectedAssessment.aiResults">
-                      <h4 class="text-sm font-medium text-gray-500 mb-2">AI Evaluation Results</h4>
+                    <div v-if="selectedAssessment.criteriaSet?.questions && selectedAssessment.aiResults" class="mb-3">
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">AI Evaluation Results</h4>
 
                       <!-- View Mode (read-only AI results display) -->
                       <div v-if="selectedAssessment.status === 'AI_COMPLETE' || selectedAssessment.status === 'UNDER_REVIEW'" class="space-y-3">

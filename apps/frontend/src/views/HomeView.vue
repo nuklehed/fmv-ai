@@ -321,15 +321,15 @@ onMounted(() => {
                   </div>
 
                   <!-- Panel Content -->
-                  <div class="flex-1 overflow-y-auto p-6 space-y-3">
+                  <div class="flex-1 overflow-y-auto p-6">
                     <!-- HCP Info -->
-                    <div>
-                      <h4 class="text-sm font-medium text-gray-500 mb-2">HCP</h4>
+                    <div class="mb-3">
+                      <h4 class="text-sm font-medium text-gray-500 mb-1">HCP</h4>
                       <p class="text-base font-semibold text-gray-900">{{ (selectedAssessment as any).hcp?.firstName || '—' }} {{ (selectedAssessment as any).hcp?.lastName || '—' }}</p>
                     </div>
 
                     <!-- Status -->
-                    <div>
+                    <div class="mb-3">
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Status</h4>
                       <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
                         {{ getStatusLabel(selectedAssessment.status) }}
@@ -340,14 +340,14 @@ onMounted(() => {
                     </div>
 
                     <!-- Score -->
-                    <div v-if="selectedAssessment.totalScore !== null">
+                    <div v-if="selectedAssessment.totalScore !== null" class="mb-3">
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Total Score</h4>
                       <p class="text-2xl font-bold text-gray-900">{{ selectedAssessment.totalScore }}</p>
                     </div>
 
-                    <!-- Approved: Tier, Rate, Dates in one compact block -->
+                    <!-- Approved: Tier & Rate -->
                     <template v-if="selectedAssessment.status === 'APPROVED'">
-                      <div class="grid grid-cols-2 gap-3">
+                      <div class="grid grid-cols-2 gap-3 mb-3">
                         <div class="p-3 bg-green-50 rounded-lg border border-green-200">
                           <h4 class="text-xs font-medium text-green-900 mb-1">Tier</h4>
                           <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).tierLabel || '—' }}</p>
@@ -357,14 +357,14 @@ onMounted(() => {
                           <p class="text-sm font-semibold text-gray-900">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</p>
                         </div>
                       </div>
-                      <div v-if="selectedAssessment.renewalDate" class="p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
+                      <div v-if="selectedAssessment.renewalDate" class="mb-3 p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
                         <h4 class="text-xs font-medium mb-1">Renewal Status</h4>
                         <p class="text-sm">{{ getExpiryUrgency(selectedAssessment.renewalDate)?.label }}</p>
                       </div>
                     </template>
 
                     <!-- Dates: all in one row -->
-                    <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div class="grid grid-cols-3 gap-2 text-xs mb-3">
                       <div v-if="selectedAssessment.createdAt">
                         <span class="text-gray-500">Created</span>
                         <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.createdAt) }}</p>
@@ -380,13 +380,13 @@ onMounted(() => {
                     </div>
 
                     <!-- Rejection Reason -->
-                    <div v-if="selectedAssessment.rejectionReason">
+                    <div v-if="selectedAssessment.rejectionReason" class="mb-3">
                       <h4 class="text-sm font-medium text-red-600 mb-1">Rejection Reason</h4>
                       <p class="text-sm text-gray-900 bg-red-50 p-3 rounded-lg">{{ selectedAssessment.rejectionReason }}</p>
                     </div>
 
                     <!-- Submitted By -->
-                    <div v-if="(selectedAssessment as any).submittedByUser?.email">
+                    <div v-if="(selectedAssessment as any).submittedByUser?.email" class="mb-3">
                       <h4 class="text-sm font-medium text-gray-500 mb-1">Submitted By</h4>
                       <p class="text-sm text-gray-900">{{ (selectedAssessment as any).submittedByUser.email }}</p>
                     </div>
