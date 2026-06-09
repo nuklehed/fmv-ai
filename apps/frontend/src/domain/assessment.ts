@@ -166,6 +166,17 @@ export function formatDate(dateStr?: string | null): string {
   return new Date(dateStr).toLocaleDateString()
 }
 
+// ─── Criteria Set Score Helpers ───────────────────────────────────
+
+/** Sum of the highest answer score per active question — the theoretical maximum */
+export function getMaxPossibleScore(questions: Array<{ id: string; text: string; answers: Array<{ id: string; score: number; isActive?: boolean }>; isActive?: boolean }>): number {
+  return questions.reduce((sum, q) => {
+    if (!q.isActive) return sum
+    const maxAnswer = (q.answers ?? []).reduce((best, a) => Math.max(best, a.score), 0)
+    return sum + maxAnswer
+  }, 0)
+}
+
 // ─── AI Results Helpers ───────────────────────────────────────────
 
 /** Parse aiResults (stored as JSON string in DB) to AiResultItem[] for template use */

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getAuthHeaders, apiFetch } from '@/composables/useCrud'
+import { getMaxPossibleScore } from '@/domain/assessment'
 
 interface Answer {
   id: string; text: string; score: number; order: number; isActive: boolean
@@ -38,13 +39,10 @@ const tierThresholds = ref<Array<{ label: string; minScore: number; maxScore: nu
 const maxTiers = ref<number>(3)
 
 // Max possible score from active questions/answers
-const maxPossibleScore = computed(() => {
+function getMaxScore(): number {
   if (!editingItem.value?.questions) return 0
-  return editingItem.value.questions.reduce((sum, q) => {
-    if (!q.isActive) return sum
-    return sum + q.answers.filter(a => a.isActive).reduce((s, a) => s + a.score, 0)
-  }, 0)
-})
+  return getMaxPossibleScore(editingItem.value.questions)
+}
 
 // Question/Answer modal states
 const showAddQuestionModal = ref(false)
@@ -730,14 +728,14 @@ onMounted(() => {
 
                   <!-- Current thresholds summary -->
                   <div v-if="editingItem?.tierThresholds && editingItem.tierThresholds.length > 0" class="mb-4 p-3 bg-gray-50 rounded-md">
-                    <p class="text-xs font-medium text-gray-600 mb-1">Max possible score: {{ maxPossibleScore }} · Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
+                    <p class="text-xs font-medium text-gray-600 mb-1">Max possible score: {{ getMaxScore() }} · Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
                     <div class="flex flex-wrap gap-2">
                       <span v-for="t in editingItem.tierThresholds" :key="t.label" class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
                         {{ t.label }}: {{ t.minScore }}–{{ t.maxScore }}
                       </span>
                     </div>
                   </div>
-                  <p class="text-xs text-gray-500 mb-4">Max possible score: {{ maxPossibleScore }} · No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
+                  <p class="text-xs text-gray-500 mb-4">Max possible score: {{ getMaxScore() }} · No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
 
                   <form @submit.prevent="handleUpdateThresholds" class="space-y-4">
                     <!-- Thresholds table -->
