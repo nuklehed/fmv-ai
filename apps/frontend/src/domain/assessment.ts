@@ -438,8 +438,8 @@ export async function searchHcps(query: string, page = 1, limit = 20): Promise<a
 /** Create a new HCP (BU-create endpoint) */
 export async function createHcp(data: {
   firstName: string; lastName: string; email?: string | null; phone?: string | null
-  address?: string | null; state?: string | null; specialtyId?: string | null
-  identifiers?: Array<{ type: string; value: string }>
+  address?: string | null; city?: string | null; state?: string | null; country?: string | null
+  specialtyId?: string | null; identifiers?: Array<{ type: string; value: string }>
 }): Promise<any> {
   const response = await fetch('/api/hcps/bu-create', {
     method: 'POST',
@@ -456,7 +456,10 @@ export async function createHcp(data: {
 }
 
 /** Update HCP contact info */
-export async function updateHcp(hcpId: string, data: { email?: string | null; phone?: string | null; address?: string | null; state?: string | null }): Promise<void> {
+export async function updateHcp(hcpId: string, data: {
+  email?: string | null; phone?: string | null; address?: string | null
+  city?: string | null; state?: string | null; country?: string | null
+}): Promise<void> {
   const response = await fetch(`/api/hcps/${hcpId}`, {
     method: 'PUT',
     headers: authHeaders(),

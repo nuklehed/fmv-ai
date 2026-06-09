@@ -728,14 +728,15 @@ onMounted(() => {
 
                   <!-- Current thresholds summary -->
                   <div v-if="editingItem?.tierThresholds && editingItem.tierThresholds.length > 0" class="mb-4 p-3 bg-gray-50 rounded-md">
-                    <p class="text-xs font-medium text-gray-600 mb-1">Max possible score: {{ getMaxScore() }} · Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
-                    <div class="flex flex-wrap gap-2">
+                    <p class="text-xs font-medium text-gray-600 mb-2">Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
+                    <div class="flex flex-wrap gap-2 items-center">
+                      <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">Max: {{ getMaxScore() }}</span>
                       <span v-for="t in editingItem.tierThresholds" :key="t.label" class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
                         {{ t.label }}: {{ t.minScore }}–{{ t.maxScore }}
                       </span>
                     </div>
                   </div>
-                  <p class="text-xs text-gray-500 mb-4">Max possible score: {{ getMaxScore() }} · No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
+                  <p v-else class="text-xs text-gray-500 mb-4">No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
 
                   <form @submit.prevent="handleUpdateThresholds" class="space-y-4">
                     <!-- Thresholds table -->

@@ -31,6 +31,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
         { firstName: { contains: lowerSearch } },
         { lastName: { contains: lowerSearch } },
         { email: { contains: lowerSearch } },
+        { city: { contains: lowerSearch } },
         { state: { contains: lowerSearch } },
         {
           identifiers: {
@@ -150,7 +151,7 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
  */
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, phone, address, state, specialtyId, identifiers } = req.body
+    const { firstName, lastName, email, phone, address, city, state, country, specialtyId, identifiers } = req.body
 
     if (!firstName || !lastName) {
       res.status(400).json({ error: 'First name and last name are required' })
@@ -223,7 +224,9 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
         email: email || null,
         phone: phone || null,
         address: address || null,
+        city: city || null,
         state: state || null,
+        country: country || 'US',
         specialtyId: specialtyId || null,
         tenantId,
         identifiers: identifiers && Array.isArray(identifiers) ? {
@@ -260,7 +263,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
 router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params
-    const { firstName, lastName, email, phone, address, state, specialtyId, identifiers } = req.body
+    const { firstName, lastName, email, phone, address, city, state, country, specialtyId, identifiers } = req.body
 
     // Validate specialtyId if provided — must have a linked criteria set
     if (specialtyId) {
@@ -332,7 +335,9 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
     if (email !== undefined) updateData.email = email || null
     if (phone !== undefined) updateData.phone = phone || null
     if (address !== undefined) updateData.address = address || null
+    if (city !== undefined) updateData.city = city || null
     if (state !== undefined) updateData.state = state || null
+    if (country !== undefined) updateData.country = country || 'US'
     if (specialtyId !== undefined) updateData.specialtyId = specialtyId
 
     // Handle identifiers replacement — delete old, create new
@@ -401,7 +406,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response): Promise<
  */
 router.post('/bu-create', authenticate, requireBUOrHigher, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { firstName, lastName, email, phone, address, state, specialtyId, identifiers } = req.body
+    const { firstName, lastName, email, phone, address, city, state, country, specialtyId, identifiers } = req.body
 
     if (!firstName || !lastName) {
       res.status(400).json({ error: 'First name and last name are required' })
@@ -474,7 +479,9 @@ router.post('/bu-create', authenticate, requireBUOrHigher, async (req: Authentic
         email: email || null,
         phone: phone || null,
         address: address || null,
+        city: city || null,
         state: state || null,
+        country: country || 'US',
         specialtyId: specialtyId || null,
         tenantId,
         identifiers: identifiers && Array.isArray(identifiers) ? {

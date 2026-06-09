@@ -5,7 +5,9 @@ interface Hcp {
   email?: string
   phone?: string
   address?: string
+  city?: string
   state?: string
+  country?: string
   specialtyId?: string
   specialtyName?: string
   tier?: number | null

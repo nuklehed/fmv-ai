@@ -10,7 +10,9 @@ interface HcpOption {
   email?: string
   phone?: string
   address?: string
+  city?: string
   state?: string
+  country?: string
   specialtyId?: string
   specialtyName?: string
 }
@@ -30,6 +32,7 @@ watch([draftId, isEditMode], ([newDraftId, newIsEditMode]) => {
 // ─── UI State (kept in view for reactivity) ───────────────────────
 
 const selectedHcp = ref<HcpOption | null>(null)
+const isNewHcp = ref(false)
 const hcpSearchQuery = ref('')
 const hcpSuggestions = ref<HcpOption[]>([])
 const showHcpDropdown = ref(false)
@@ -38,7 +41,9 @@ const showNewHcpForm = ref(false)
 const editEmail = ref('')
 const editPhone = ref('')
 const editAddress = ref('')
+const editCity = ref('')
 const editState = ref('')
+const editCountry = ref('US')
 
 const specialtyId = ref('')
 const criteriaSetId = ref('')
@@ -52,7 +57,7 @@ const cvTextLength = ref(0)
 const createdAssessmentId = ref<string | null>(null)
 
 const newHcpForm = ref({
-  firstName: '', lastName: '', email: '', phone: '', address: '', state: '',
+  firstName: '', lastName: '', email: '', phone: '', address: '', city: '', state: '', country: 'US',
   specialtyId: '' as string, identifiers: [] as { type: string; value: string }[]
 })
 const isCreatingHcp = ref(false)
@@ -76,8 +81,8 @@ async function fetchHcps(query: string) {
     const suggestions = await assessmentDomain.searchHcps(query)
     hcpSuggestions.value = suggestions.map((h: any) => ({
       id: h.id, firstName: h.firstName, lastName: h.lastName,
-      email: h.email || '', phone: h.phone || '', address: h.address || '',
-      state: h.state || '', specialtyId: h.specialtyId || '', specialtyName: h.specialty?.name || ''
+      email: h.email || '', phone: h.phone || '', address: h.address || '', city: h.city || '',
+      state: h.state || '', country: h.country || 'US', specialtyId: h.specialtyId || '', specialtyName: h.specialty?.name || ''
     }))
   } catch { /* silent */ }
 }
@@ -91,6 +96,7 @@ function onHcpSearchInput() {
 
 function selectHcp(hcp: HcpOption) {
   selectedHcp.value = hcp
+  isNewHcp.value = false
   hcpSearchQuery.value = `${hcp.firstName} ${hcp.lastName}`
   hcpSuggestions.value = []
   showHcpDropdown.value = false
@@ -99,7 +105,9 @@ function selectHcp(hcp: HcpOption) {
   editEmail.value = hcp.email || ''
   editPhone.value = hcp.phone || ''
   editAddress.value = hcp.address || ''
+  editCity.value = hcp.city || ''
   editState.value = hcp.state || ''
+  editCountry.value = hcp.country || 'US'
   specialtyId.value = hcp.specialtyId || ''
   resetCvUpload()
 }
@@ -122,7 +130,9 @@ async function createNewHcp() {
       email: newHcpForm.value.email || null,
       phone: newHcpForm.value.phone || null,
       address: newHcpForm.value.address || null,
+      city: newHcpForm.value.city || null,
       state: newHcpForm.value.state || null,
+      country: newHcpForm.value.country || 'US',
       specialtyId: newHcpForm.value.specialtyId || null,
       identifiers: newHcpForm.value.identifiers.length > 0 ? newHcpForm.value.identifiers : undefined
     })
@@ -130,9 +140,11 @@ async function createNewHcp() {
     selectHcp({
       id: createdHcp.id, firstName: createdHcp.firstName, lastName: createdHcp.lastName,
       email: createdHcp.email || '', phone: createdHcp.phone || '',
-      address: createdHcp.address || '', state: createdHcp.state || '',
+      address: createdHcp.address || '', city: createdHcp.city || '',
+      state: createdHcp.state || '', country: createdHcp.country || 'US',
       specialtyId: createdHcp.specialty?.id || '', specialtyName: createdHcp.specialty?.name || ''
     })
+    isNewHcp.value = true
     showNewHcpForm.value = false
     formSuccess.value = 'New HCP created successfully'
   } catch (error) {
@@ -227,13 +239,16 @@ async function handleSubmit() {
       editEmail.value !== selectedHcp.value.email ||
       editPhone.value !== selectedHcp.value.phone ||
       editAddress.value !== selectedHcp.value.address ||
-      editState.value !== selectedHcp.value.state
+      editCity.value !== selectedHcp.value.city ||
+      editState.value !== selectedHcp.value.state ||
+      editCountry.value !== selectedHcp.value.country
     )
 
     if (needsHcpUpdate) {
       await assessmentDomain.updateHcp(selectedHcp.value.id, {
         email: editEmail.value || null, phone: editPhone.value || null,
-        address: editAddress.value || null, state: editState.value || null
+        address: editAddress.value || null, city: editCity.value || null,
+        state: editState.value || null, country: editCountry.value || 'US'
       })
     }
 
@@ -368,7 +383,9 @@ async function loadDraft() {
     editEmail.value = selectedHcp.value.email || ''
     editPhone.value = selectedHcp.value.phone || ''
     editAddress.value = selectedHcp.value.address || ''
+    editCity.value = selectedHcp.value.city || ''
     editState.value = selectedHcp.value.state || ''
+    editCountry.value = selectedHcp.value.country || 'US'
 
     specialtyId.value = draft.specialtyId || ''
     criteriaSetId.value = draft.criteriaSetId || ''
@@ -574,8 +591,18 @@ onMounted(async () => {
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
+                  <label for="new-hcp-city" class="block text-xs font-medium text-gray-700 mb-1">City</label>
+                  <input id="new-hcp-city" v-model="newHcpForm.city" type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
+                </div>
+                <div>
                   <label for="new-hcp-state" class="block text-xs font-medium text-gray-700 mb-1">State</label>
                   <input id="new-hcp-state" v-model="newHcpForm.state" type="text"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
+                </div>
+                <div>
+                  <label for="new-hcp-country" class="block text-xs font-medium text-gray-700 mb-1">Country</label>
+                  <input id="new-hcp-country" v-model="newHcpForm.country" type="text" placeholder="US"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
                 </div>
                 <div>
@@ -609,7 +636,8 @@ onMounted(async () => {
             <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
               <span class="text-gray-500">Email:</span><span class="text-gray-900">{{ selectedHcp.email || '—' }}</span>
               <span class="text-gray-500">Phone:</span><span class="text-gray-900">{{ selectedHcp.phone || '—' }}</span>
-              <span class="text-gray-500">State:</span><span class="text-gray-900">{{ selectedHcp.state || '—' }}</span>
+              <span class="text-gray-500">City:</span><span class="text-gray-900">{{ selectedHcp.city || '—' }}</span>
+              <span class="text-gray-500">State/Country:</span><span class="text-gray-900">{{ [selectedHcp.state, selectedHcp.country].filter(Boolean).join(', ') || '—' }}</span>
               <span class="text-gray-500">Specialty:</span><span class="text-gray-900">{{ selectedHcp.specialtyName || '—' }}</span>
             </div>
           </div>
@@ -639,8 +667,18 @@ onMounted(async () => {
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
             <div>
+              <label for="edit-city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input id="edit-city" v-model="editCity" type="text" placeholder="e.g., Los Angeles"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
               <label for="edit-state" class="block text-sm font-medium text-gray-700 mb-1">State</label>
               <input id="edit-state" v-model="editState" type="text" placeholder="e.g., CA, NY"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+            <div>
+              <label for="edit-country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+              <input id="edit-country" v-model="editCountry" type="text" placeholder="US"
                 class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
