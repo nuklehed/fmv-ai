@@ -36,13 +36,13 @@ async function fetchAssessments() {
     if (statusFilter.value) params.status = statusFilter.value
 
     const queryString = new URLSearchParams(params).toString()
-    const result = await api.get<{ data: Assessment[]; pagination: { totalCount: number; totalPages: number } }>(`/api/assessments?${queryString}`)
-    
-    if (result.data) {
-      assessments.value = result.data.data || []
-      totalPages.value = result.data.pagination?.totalPages || 0
-      totalCount.value = result.data.pagination?.totalCount || 0
-    }
+    const url = `/api/assessments?${queryString}`
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('accessToken')}` } })
+    const result = await response.json() as { data: Assessment[]; pagination: { totalCount: number; totalPages: number } }
+
+    assessments.value = result.data || []
+    totalPages.value = result.pagination?.totalPages || 0
+    totalCount.value = result.pagination?.totalCount || 0
   } catch (error) {
     console.error('Error fetching assessments:', error)
   } finally {
