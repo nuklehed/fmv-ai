@@ -104,9 +104,16 @@ class OllamaLLMClient implements LLMClientInterface {
       temperature: 0.1
     })
 
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const apiKey = process.env.LLM_API_KEY?.trim()
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`
+    }
+
     console.log(`[LLM] Request → ${endpoint}`)
     console.log(`[LLM] Model: ${this.model}`)
     console.log(`[LLM] Messages: ${messages.length} (${messages.map(m => m.role).join(', ')})`)
+    console.log(`[LLM] Auth: ${apiKey ? 'Bearer token configured' : 'no auth'}`)
     // Log prompt lengths (not full content — can be huge for CV assessments)
     messages.forEach((m, i) => {
       console.log(`[LLM]   [${i}] ${m.role}: ${m.content.length} chars`) 
@@ -120,7 +127,7 @@ class OllamaLLMClient implements LLMClientInterface {
       try {
         response = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: requestBody,
           signal: controller.signal
         })
