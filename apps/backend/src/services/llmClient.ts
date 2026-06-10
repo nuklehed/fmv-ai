@@ -37,10 +37,16 @@ class OllamaLLMClient implements LLMClientInterface {
   }
 
   async healthCheck(): Promise<{ ok: boolean; model?: string; error?: string }> {
+    const apiKey = process.env.LLM_API_KEY?.trim()
+    const authHeaders: Record<string, string> = {}
+    if (apiKey) {
+      authHeaders['Authorization'] = `Bearer ${apiKey}`
+    }
+
     // Try Ollama-native /api/tags first, fall back to /v1/models for OpenRouter/other proxies
     let response: Response | null = null
     try {
-      response = await fetch(`${this.baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000) })
+      response = await fetch(`${this.baseUrl}/api/tags`, { signal: AbortSignal.timeout(3000), headers: authHeaders })
       if (response.ok) {
         const data = await response.json() as { models?: Array<{ name: string }> }
         const modelLoaded = data.models?.some(m => m.name.includes(this.model))
@@ -56,7 +62,7 @@ class OllamaLLMClient implements LLMClientInterface {
 
     // Fallback: try /v1/models (OpenRouter, LM Studio, etc.)
     try {
-      response = await fetch(`${this.baseUrl}/v1/models`, { signal: AbortSignal.timeout(3000) })
+      response = await fetch(`${this.baseUrl}/v1/models`, { signal: AbortSignal.timeout(3000), headers: authHeaders })
       if (response.ok) {
         return {
           ok: true,
@@ -72,7 +78,7 @@ class OllamaLLMClient implements LLMClientInterface {
     try {
       response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           model: this.model,
           messages: [{ role: 'user', content: 'Hi' }],
