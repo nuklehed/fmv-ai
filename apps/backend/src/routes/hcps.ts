@@ -1,9 +1,9 @@
 import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
-import { createAdminRouter, authenticate, requireBUOrHigher } from './saRouter'
+import { createAdminRouter, createAuthedRouter, authenticate, requireBUOrHigher } from './saRouter'
 
-const router = createAdminRouter()
+const router = createAuthedRouter()
 const prisma = new PrismaClient()
 
 /**

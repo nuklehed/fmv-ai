@@ -82,7 +82,7 @@ async function fetchHcps(query: string) {
     hcpSuggestions.value = suggestions.map((h: any) => ({
       id: h.id, firstName: h.firstName, lastName: h.lastName,
       email: h.email || '', phone: h.phone || '', address: h.address || '', city: h.city || '',
-      state: h.state || '', country: h.country || 'US', specialtyId: h.specialtyId || '', specialtyName: h.specialty?.name || ''
+      state: h.state || '', country: h.country || 'US', specialtyId: h.specialtyId || '', specialtyName: h.specialtyName || ''
     }))
   } catch { /* silent */ }
 }
