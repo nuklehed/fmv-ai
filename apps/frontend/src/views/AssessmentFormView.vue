@@ -91,6 +91,7 @@ function onHcpSearchInput() {
   if (hcpSearchTimeout) clearTimeout(hcpSearchTimeout)
   const query = hcpSearchQuery.value.trim()
   if (query.length < 2) { hcpSuggestions.value = []; return }
+  showHcpDropdown.value = true
   hcpSearchTimeout = setTimeout(() => fetchHcps(query), 300)
 }
 
@@ -539,20 +540,18 @@ onMounted(async () => {
               class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
 
             <!-- HCP Suggestions Dropdown -->
-            <Teleport to="body">
-              <div v-if="showHcpDropdown && hcpSuggestions.length > 0" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                <div v-for="hcp in hcpSuggestions" :key="hcp.id" @click="selectHcp(hcp)"
-                  class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
-                  <div class="flex items-center justify-between">
-                    <span class="text-sm font-medium text-gray-900">{{ hcp.firstName }} {{ hcp.lastName }}</span>
-                    <span v-if="hcp.state" class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ hcp.state }}</span>
-                  </div>
-                  <div class="text-xs text-gray-500 mt-0.5">
-                    {{ hcp.email || 'No email' }} · {{ hcp.specialtyName || 'No specialty' }}
-                  </div>
+            <div v-if="showHcpDropdown && hcpSuggestions.length > 0" class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div v-for="hcp in hcpSuggestions" :key="hcp.id" @click="selectHcp(hcp)"
+                class="px-4 py-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-gray-900">{{ hcp.firstName }} {{ hcp.lastName }}</span>
+                  <span v-if="hcp.state" class="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{{ hcp.state }}</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-0.5">
+                  {{ hcp.email || 'No email' }} · {{ hcp.specialtyName || 'No specialty' }}
                 </div>
               </div>
-            </Teleport>
+            </div>
 
             <button @click="showNewHcpForm = !showNewHcpForm" class="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium">
               + Create New HCP
