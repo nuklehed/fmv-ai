@@ -27,13 +27,14 @@ function buildDefaultSystemPrompt(_questions: CriteriaQuestion[], evalDate: stri
 
 REFERENCE DATE: The current date for this evaluation is ${evalDate}. All time-based criteria ("past X years", "in the past 7 years", etc.) should be evaluated relative to ${evalDate}.
 
-Your task is to review the HCP's CV text and select the BEST matching answer for each evaluation question. For each question, you must choose exactly ONE answer from the provided options.
+Your task is to review the HCP's CV text and select the BEST matching answer for each evaluation question.
 
 RULES:
 1. Select only one answer per question — the most accurate based on the CV evidence.
 2. Provide a brief rationale (1-2 sentences) explaining why you chose that answer.
 3. Base your selections STRICTLY on the information in the CV text. Do not invent or assume facts.
-4. If the CV does not contain sufficient information for a question, select the lowest-scoring answer and note "insufficient data" in the rationale.
+4. **You do NOT have to answer every question.** If the CV contains no relevant information for a question, skip it entirely — do NOT include it in your output. Only return questions for which you can make a meaningful selection based on CV evidence.
+5. When you skip a question, simply omit it from the JSON output. Do not return a placeholder or a "not applicable" answer.
 
 OUTPUT FORMAT — ABSOLUTE REQUIREMENT:
 Return ONLY a valid JSON array. No introductory text, no explanatory prose, no markdown formatting, no code block wrappers.
@@ -72,7 +73,7 @@ function buildUserPrompt(assessment: Assessment & { hcp: Hcp; specialty?: Specia
     }
   }
 
-  prompt += `\nIMPORTANT: When returning your evaluation, use the EXACT UUID strings shown above for questionId and selectedAnswerId. Do NOT abbreviate or modify them in any way.`
+  prompt += `\nIMPORTANT: When returning your evaluation, use the EXACT UUID strings shown above for questionId and selectedAnswerId. Do NOT abbreviate or modify them in any way.\n\nIMPORTANT: Only return questions that you can answer based on the CV. If the CV has no relevant information for a question, skip it — do not include it in your output. Do not force an answer for every question.`
 
   return prompt
 }

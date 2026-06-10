@@ -95,7 +95,7 @@ function onHcpSearchInput() {
   hcpSearchTimeout = setTimeout(() => fetchHcps(query), 300)
 }
 
-function selectHcp(hcp: HcpOption) {
+async function selectHcp(hcp: HcpOption) {
   selectedHcp.value = hcp
   isNewHcp.value = false
   hcpSearchQuery.value = `${hcp.firstName} ${hcp.lastName}`
@@ -110,7 +110,23 @@ function selectHcp(hcp: HcpOption) {
   editState.value = hcp.state || ''
   editCountry.value = hcp.country || 'US'
   specialtyId.value = hcp.specialtyId || ''
-  resetCvUpload()
+
+  // Check for existing draft — if found, clear CV state so user continues the existing draft
+  try {
+    const existingDraft = await assessmentDomain.findExistingDraftForHcp(hcp.id)
+    if (existingDraft && existingDraft.cvText) {
+      // Existing draft with CV already uploaded — pre-fill it
+      cvUploaded.value = true
+      cvTextLength.value = existingDraft.cvText.length
+      cvFileName.value = 'CV from existing draft'
+      createdAssessmentId.value = existingDraft.id
+      formSuccess.value = `Continuing existing draft assessment for ${hcp.firstName} ${hcp.lastName}`
+    } else {
+      resetCvUpload()
+    }
+  } catch {
+    resetCvUpload()
+  }
 }
 
 // ─── New HCP Creation ─────────────────────────────────────────────
@@ -181,22 +197,29 @@ async function uploadCv() {
   cvUploadProgress.value = 30
 
   try {
-    // Step 1: Create draft
-    const assessment = await assessmentDomain.createDraft(
-      selectedHcp.value.id, specialtyId.value || null, criteriaSetId.value || null
-    )
-    createdAssessmentId.value = assessment.id
+    // Step 1: Check for existing DRAFT for this HCP — reuse it instead of creating a duplicate
+    let draftId: string
+    let existingDraft = await assessmentDomain.findExistingDraftForHcp(selectedHcp.value.id)
+    if (existingDraft) {
+      draftId = existingDraft.id
+    } else {
+      const newDraft = await assessmentDomain.createDraft(
+        selectedHcp.value.id, specialtyId.value || null, criteriaSetId.value || null
+      )
+      draftId = newDraft.id
+    }
+    createdAssessmentId.value = draftId
     cvUploadProgress.value = 60
 
     // Step 2: Upload CV PDF
-    const result = await assessmentDomain.uploadCv(assessment.id, cvFile.value)
+    const result = await assessmentDomain.uploadCv(draftId, cvFile.value)
     cvTextLength.value = result.textLength
     cvUploaded.value = true
     cvUploadProgress.value = 100
     formSuccess.value = `CV uploaded successfully (${cvTextLength.value} characters extracted)`
 
     // Navigate to edit mode with the correct draft ID so submit uses the right assessment
-    router.push(`/assessments/edit/${assessment.id}`)
+    router.push(`/assessments/edit/${draftId}`)
   } catch (error) {
     formError.value = error instanceof Error ? error.message : 'Failed to upload CV'
     cvUploaded.value = false

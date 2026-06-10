@@ -284,6 +284,14 @@ export async function createDraft(hcpId: string, specialtyId?: string | null, cr
   return response.json()
 }
 
+/** Find an existing DRAFT assessment for a given HCP — returns null if none exists */
+export async function findExistingDraftForHcp(hcpId: string): Promise<any | null> {
+  const response = await fetch(`/api/assessments?status=DRAFT&search=${encodeURIComponent(hcpId)}`, { headers: authHeaders() })
+  if (!response.ok) return null
+  const data = await response.json() as { data: Array<{ id: string; hcpId: string; status: string }> }
+  return data.data.find((a: { id: string; hcpId: string; status: string }) => a.hcpId === hcpId && a.status === 'DRAFT') || null
+}
+
 /** Upload CV PDF for an existing draft */
 export async function uploadCv(assessmentId: string, file: File): Promise<{ textLength: number }> {
   const formData = new FormData()
