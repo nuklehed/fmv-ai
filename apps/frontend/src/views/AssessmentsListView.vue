@@ -460,28 +460,46 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       <h4 class="text-sm font-medium text-gray-500 mb-1">AI Evaluation Results</h4>
 
                       <!-- View Mode (read-only AI results display) -->
-                      <div v-if="selectedAssessment.status === 'AI_COMPLETE' || selectedAssessment.status === 'UNDER_REVIEW'" class="space-y-3">
-                        <div v-for="(question, index) in selectedAssessment.criteriaSet.questions" :key="question.id" class="p-3 bg-purple-50 rounded-lg border border-purple-200">
-                          <div class="flex items-start justify-between mb-1">
-                            <span class="text-xs font-medium text-purple-700">Question {{ index + 1 }}</span>
-                            <span v-if="getAiResultForQuestion(question.id)?.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
+                      <div v-if="selectedAssessment.status === 'AI_COMPLETE' || selectedAssessment.status === 'UNDER_REVIEW'" class="space-y-2">
+                        <div v-for="(question, index) in selectedAssessment.criteriaSet.questions" :key="question.id" class="flex justify-between items-start gap-3 p-3 rounded-lg border text-sm">
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                              <span class="text-xs font-medium text-purple-700">Q{{ index + 1 }}</span>
+                              <span class="text-xs text-gray-500 truncate">{{ question.text }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <span v-if="getAiResultForQuestion(question.id)" class="text-xs text-purple-700">
+                                {{ getAiResultForQuestion(question.id)?.selectedAnswerText }} ({{ getAiResultForQuestion(question.id)?.score ?? 0 }} pts)
+                              </span>
+                              <span v-else class="text-xs text-gray-400 italic">
+                                No evidence in CV for this question
+                              </span>
+                              <span v-if="getAiResultForQuestion(question.id)?.isOverride" class="text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded">Override</span>
+                            </div>
+                            <p v-if="hasRealRationale(question.id)" class="text-xs text-gray-500 mt-1 italic">"{{ getAiResultForQuestion(question.id)?.rationale }}"</p>
                           </div>
-                          <p class="text-sm font-medium text-gray-900">{{ question.text }}</p>
-                          <p class="text-xs text-purple-700 mt-1">Selected: {{ getAiResultForQuestion(question.id)?.selectedAnswerText || '—' }} ({{ getAiResultForQuestion(question.id)?.score ?? '?' }} pts)</p>
-                          <p v-if="hasRealRationale(question.id)" class="text-xs text-gray-600 mt-1 italic">"{{ getAiResultForQuestion(question.id)?.rationale }}"</p>
                         </div>
                       </div>
 
                       <!-- View Mode (AI Results Display for other statuses) -->
-                      <div v-else class="space-y-3">
-                        <div v-for="(question, index) in selectedAssessment.criteriaSet.questions" :key="question.id" class="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div class="flex items-start justify-between mb-1">
-                            <span class="text-xs font-medium text-gray-600">Question {{ index + 1 }}</span>
-                            <span v-if="getAiResultForQuestion(question.id)?.isOverride" class="text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">Admin Override</span>
+                      <div v-else class="space-y-2">
+                        <div v-for="(question, index) in selectedAssessment.criteriaSet.questions" :key="question.id" class="flex justify-between items-start gap-3 p-3 rounded-lg border text-sm">
+                          <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-0.5">
+                              <span class="text-xs font-medium text-gray-600">Q{{ index + 1 }}</span>
+                              <span class="text-xs text-gray-500 truncate">{{ question.text }}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                              <span v-if="getAiResultForQuestion(question.id)" class="text-xs text-blue-600">
+                                {{ getAiResultForQuestion(question.id)?.selectedAnswerText }} ({{ getAiResultForQuestion(question.id)?.score ?? 0 }} pts)
+                              </span>
+                              <span v-else class="text-xs text-gray-400 italic">
+                                No evidence in CV for this question
+                              </span>
+                              <span v-if="getAiResultForQuestion(question.id)?.isOverride" class="text-xs bg-orange-100 text-orange-800 px-1.5 py-0.5 rounded">Override</span>
+                            </div>
+                            <p v-if="hasRealRationale(question.id)" class="text-xs text-gray-500 mt-1 italic">{{ getAiResultForQuestion(question.id)?.rationale }}</p>
                           </div>
-                          <p class="text-sm font-medium text-gray-900">{{ question.text }}</p>
-                          <p class="text-xs text-blue-600 mt-1">Selected: {{ getAiResultForQuestion(question.id)?.selectedAnswerText || '—' }} ({{ getAiResultForQuestion(question.id)?.score ?? '?' }} pts)</p>
-                          <p v-if="hasRealRationale(question.id)" class="text-xs text-gray-600 mt-1 italic">{{ getAiResultForQuestion(question.id)?.rationale }}</p>
                         </div>
                       </div>
                     </div>
@@ -489,23 +507,21 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
 
                   <!-- AI Audit (raw LLM data for review) -->
                   <template v-if="selectedAssessment.llmRawResponse || selectedAssessment.llmUserPrompt">
-                    <div class="mb-3 border-t border-gray-200 pt-4">
-                      <h4 class="text-sm font-medium text-gray-500 mb-2">AI Audit</h4>
-                      <div class="space-y-2">
-                        <!-- Raw LLM Response -->
-                        <div v-if="selectedAssessment.llmRawResponse">
-                          <button @click="showRawResponse = !showRawResponse" class="text-xs text-blue-600 hover:text-blue-800 underline">
-                            {{ showRawResponse ? 'Hide' : 'Show' }} raw LLM response ({{ selectedAssessment.llmRawResponse.length }} chars)
-                          </button>
-                          <pre v-if="showRawResponse" class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">{{ selectedAssessment.llmRawResponse }}</pre>
-                        </div>
-                        <!-- User Prompt -->
-                        <div v-if="selectedAssessment.llmUserPrompt">
-                          <button @click="showRawPrompt = !showRawPrompt" class="text-xs text-blue-600 hover:text-blue-800 underline">
-                            {{ showRawPrompt ? 'Hide' : 'Show' }} user prompt sent to AI ({{ selectedAssessment.llmUserPrompt.length }} chars)
-                          </button>
-                          <pre v-if="showRawPrompt" class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">{{ selectedAssessment.llmUserPrompt }}</pre>
-                        </div>
+                    <div class="mt-3 border-t border-gray-200 pt-3">
+                      <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">AI Audit</h4>
+                      <!-- Raw LLM Response -->
+                      <div v-if="selectedAssessment.llmRawResponse" class="mb-2">
+                        <button @click="showRawResponse = !showRawResponse" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                          {{ showRawResponse ? '▼' : '▶' }} Raw LLM response ({{ selectedAssessment.llmRawResponse.length }} chars)
+                        </button>
+                        <pre v-if="showRawResponse" class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">{{ selectedAssessment.llmRawResponse }}</pre>
+                      </div>
+                      <!-- User Prompt -->
+                      <div v-if="selectedAssessment.llmUserPrompt">
+                        <button @click="showRawPrompt = !showRawPrompt" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                          {{ showRawPrompt ? '▼' : '▶' }} User prompt sent to AI ({{ selectedAssessment.llmUserPrompt.length }} chars)
+                        </button>
+                        <pre v-if="showRawPrompt" class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">{{ selectedAssessment.llmUserPrompt }}</pre>
                       </div>
                     </div>
                   </template>
