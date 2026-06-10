@@ -323,72 +323,80 @@ onMounted(() => {
                   <!-- Panel Content -->
                   <div class="flex-1 overflow-y-auto p-6">
                     <!-- HCP Info -->
-                    <div class="mb-3">
-                      <h4 class="text-sm font-medium text-gray-500 mb-1">HCP</h4>
-                      <p class="text-base font-semibold text-gray-900">{{ (selectedAssessment as any).hcp?.firstName || '—' }} {{ (selectedAssessment as any).hcp?.lastName || '—' }}</p>
+                    <div class="mb-4">
+                      <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">HCP</h4>
+                      <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).hcp?.firstName || '—' }} {{ (selectedAssessment as any).hcp?.lastName || '—' }}</p>
                     </div>
 
                     <!-- Status -->
-                    <div class="mb-3">
-                      <h4 class="text-sm font-medium text-gray-500 mb-1">Status</h4>
-                      <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
-                        {{ getStatusLabel(selectedAssessment.status) }}
-                      </span>
-                      <button v-if="selectedAssessment.status === 'AI_PROCESSING'" @click.stop="cancelSelectedAssessment()" :disabled="cancelLoading" class="ml-2 text-xs text-red-600 hover:text-red-900 underline">
-                        {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
-                      </button>
+                    <div class="mb-4">
+                      <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</h4>
+                      <div class="flex items-center">
+                        <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
+                          {{ getStatusLabel(selectedAssessment.status) }}
+                        </span>
+                        <button v-if="selectedAssessment.status === 'AI_PROCESSING'" @click.stop="cancelSelectedAssessment()" :disabled="cancelLoading" class="ml-2 text-xs text-red-600 hover:text-red-900 underline">
+                          {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
+                        </button>
+                      </div>
                     </div>
 
                     <!-- Score -->
-                    <div v-if="selectedAssessment.totalScore !== null" class="mb-3">
-                      <h4 class="text-sm font-medium text-gray-500 mb-1">Total Score</h4>
+                    <div v-if="selectedAssessment.totalScore !== null" class="mb-4">
+                      <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Total Score</h4>
                       <p class="text-2xl font-bold text-gray-900">{{ selectedAssessment.totalScore }}</p>
                     </div>
 
                     <!-- Approved: Tier & Rate -->
                     <template v-if="selectedAssessment.status === 'APPROVED'">
-                      <div class="grid grid-cols-2 gap-3 px-6 py-3 border-t">
-                        <div class="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <h4 class="text-sm font-medium text-green-900 mb-1">Tier</h4>
-                          <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).tierLabel || '—' }}</p>
-                        </div>
-                        <div class="p-3 bg-green-50 rounded-lg border border-green-200">
-                          <h4 class="text-sm font-medium text-green-900 mb-1">Rate</h4>
-                          <p class="text-sm font-semibold text-gray-900">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</p>
+                      <div class="mb-4">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Tier & Rate</h4>
+                        <div class="grid grid-cols-2 gap-3">
+                          <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <h4 class="text-xs font-semibold text-green-700 mb-1">Tier</h4>
+                            <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).tierLabel || '—' }}</p>
+                          </div>
+                          <div class="p-3 bg-green-50 rounded-lg border border-green-200">
+                            <h4 class="text-xs font-semibold text-green-700 mb-1">Rate</h4>
+                            <p class="text-sm font-semibold text-gray-900">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</p>
+                          </div>
                         </div>
                       </div>
-                      <div v-if="selectedAssessment.renewalDate" class="mb-3 p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
-                        <h4 class="text-sm font-medium mb-1">Renewal Status</h4>
+                      <div v-if="selectedAssessment.renewalDate" class="mb-4 p-3 rounded-lg border" :class="getExpiryUrgency(selectedAssessment.renewalDate)?.color || 'bg-gray-50 border-gray-200'">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Renewal Status</h4>
                         <p class="text-sm">{{ getExpiryUrgency(selectedAssessment.renewalDate)?.label }}</p>
                       </div>
                     </template>
 
-                    <!-- Dates: all in one row -->
-                    <div class="grid grid-cols-3 gap-2 text-sm pb-3 px-6">
-                      <div v-if="selectedAssessment.createdAt">
-                        <span class="text-gray-500">Created</span>
-                        <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.createdAt) }}</p>
-                      </div>
-                      <div v-if="selectedAssessment.submittedAt">
-                        <span class="text-gray-500">Submitted</span>
-                        <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.submittedAt) }}</p>
-                      </div>
-                      <div v-if="selectedAssessment.effectiveDate">
-                        <span class="text-gray-500">Effective</span>
-                        <p class="text-gray-900 font-medium">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                    <!-- Dates -->
+                    <div v-if="selectedAssessment.createdAt || selectedAssessment.submittedAt || selectedAssessment.effectiveDate" class="mb-4">
+                      <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dates</h4>
+                      <div class="grid grid-cols-3 gap-3">
+                        <div v-if="selectedAssessment.createdAt">
+                          <p class="text-xs text-gray-500 mb-0.5">Created</p>
+                          <p class="text-sm font-medium text-gray-900">{{ formatDate(selectedAssessment.createdAt) }}</p>
+                        </div>
+                        <div v-if="selectedAssessment.submittedAt">
+                          <p class="text-xs text-gray-500 mb-0.5">Submitted</p>
+                          <p class="text-sm font-medium text-gray-900">{{ formatDate(selectedAssessment.submittedAt) }}</p>
+                        </div>
+                        <div v-if="selectedAssessment.effectiveDate">
+                          <p class="text-xs text-gray-500 mb-0.5">Effective</p>
+                          <p class="text-sm font-medium text-gray-900">{{ formatDate(selectedAssessment.effectiveDate) }}</p>
+                        </div>
                       </div>
                     </div>
 
                     <!-- Rejection Reason -->
-                    <div v-if="selectedAssessment.rejectionReason" class="mb-3">
-                      <h4 class="text-sm text-red-600 mb-1">Rejection Reason</h4>
+                    <div v-if="selectedAssessment.rejectionReason" class="mb-4">
+                      <h4 class="text-xs font-semibold text-red-600 uppercase tracking-wide mb-2">Rejection Reason</h4>
                       <p class="text-sm text-gray-900 bg-red-50 p-3 rounded-lg">{{ selectedAssessment.rejectionReason }}</p>
                     </div>
 
                     <!-- Submitted By -->
-                    <div v-if="(selectedAssessment as any).submittedByUser?.email" class="mb-3 px-6 text-sm">
-                      <h4 class="text-gray-500 mb-1">Submitted By</h4>
-                      <p class="text-gray-900 font-medium">{{ (selectedAssessment as any).submittedByUser.email }}</p>
+                    <div v-if="(selectedAssessment as any).submittedByUser?.email" class="mb-4">
+                      <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Submitted By</h4>
+                      <p class="text-sm font-medium text-gray-900">{{ (selectedAssessment as any).submittedByUser.email }}</p>
                     </div>
                   </div>
 
