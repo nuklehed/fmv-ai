@@ -509,7 +509,6 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                         </div>
                       </div>
                     </div>
-                  </div>
 
                   <!-- AI Audit (raw LLM data for review) -->
                   <template v-if="selectedAssessment.llmRawResponse || selectedAssessment.llmUserPrompt">
@@ -645,6 +644,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       <button @click="deleteDraft(selectedAssessment)" class="w-full px-4 py-2.5 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors">Delete Draft</button>
                     </div>
                   </div>
+                </div>
 
                   <!-- Panel Footer -->
                   <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 space-y-2">
