@@ -72,6 +72,8 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
 
   // Step 3: Call LLM (delegated to LLMClient — swappable provider)
   let llmContent: string
+  // Store the user prompt for audit trail (truncated to 100k chars to avoid bloat)
+  const llmUserPrompt = userPrompt.length > 100000 ? userPrompt.substring(0, 100000) + '\n...[truncated]' : userPrompt
   console.log(`[Worker] Assessment ${assessmentId} — calling LLM`)
   console.log(`[Worker] HCP: ${typedAssessment.hcp.firstName} ${typedAssessment.hcp.lastName}`)
   console.log(`[Worker] CV text length: ${assessment.cvText?.length || 0} chars`)
@@ -104,6 +106,7 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
       data: {
         status: 'AI_FAILED',
         aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `LLM call failed: ${errorMessage}` }]),
+        llmUserPrompt,
         completedAt: new Date()
       }
     })
@@ -117,6 +120,8 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
       data: {
         status: 'AI_FAILED',
         aiResults: JSON.stringify([{ questionId: 'error', selectedAnswerId: null, rationale: `Empty LLM response — model returned no content` }]),
+        llmUserPrompt,
+        llmRawResponse: '',
         completedAt: new Date()
       }
     })
@@ -147,6 +152,8 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
             rationale: `Raw output snippet: ${snippet}`
           }
         ]),
+        llmRawResponse: llmContent,
+        llmUserPrompt,
         completedAt: new Date()
       }
     })
@@ -165,6 +172,8 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     data: {
       status: 'AI_COMPLETE',
       aiResults: JSON.stringify(aiResults),
+      llmRawResponse: llmContent,
+      llmUserPrompt,
       totalScore,
       completedAt: new Date()
     }

@@ -17,6 +17,8 @@ export interface AssessmentListItem {
   status: string
   cvText?: string | null
   aiResults?: unknown | null
+  llmRawResponse?: string | null
+  llmUserPrompt?: string | null
   totalScore?: number | null
   tierLabel?: string | null
   rate?: number | null

@@ -178,6 +178,8 @@ const retryLoading = ref(false)
 const retrySuccess = ref('')
 const cancelLoading = ref(false)
 const showDiagnosticInfo = ref(false)
+const showRawResponse = ref(false)
+const showRawPrompt = ref(false)
 
 async function retryFailedAssessment(assessment: assessmentDomain.AssessmentListItem) {
   if (!confirm(`Retry AI processing for ${assessment.hcp.firstName} ${assessment.hcp.lastName}?`)) return
@@ -484,6 +486,29 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       </div>
                     </div>
                   </div>
+
+                  <!-- AI Audit (raw LLM data for review) -->
+                  <template v-if="selectedAssessment.llmRawResponse || selectedAssessment.llmUserPrompt">
+                    <div class="mb-3 border-t border-gray-200 pt-4">
+                      <h4 class="text-sm font-medium text-gray-500 mb-2">AI Audit</h4>
+                      <div class="space-y-2">
+                        <!-- Raw LLM Response -->
+                        <div v-if="selectedAssessment.llmRawResponse">
+                          <button @click="showRawResponse = !showRawResponse" class="text-xs text-blue-600 hover:text-blue-800 underline">
+                            {{ showRawResponse ? 'Hide' : 'Show' }} raw LLM response ({{ selectedAssessment.llmRawResponse.length }} chars)
+                          </button>
+                          <pre v-if="showRawResponse" class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">{{ selectedAssessment.llmRawResponse }}</pre>
+                        </div>
+                        <!-- User Prompt -->
+                        <div v-if="selectedAssessment.llmUserPrompt">
+                          <button @click="showRawPrompt = !showRawPrompt" class="text-xs text-blue-600 hover:text-blue-800 underline">
+                            {{ showRawPrompt ? 'Hide' : 'Show' }} user prompt sent to AI ({{ selectedAssessment.llmUserPrompt.length }} chars)
+                          </button>
+                          <pre v-if="showRawPrompt" class="mt-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">{{ selectedAssessment.llmUserPrompt }}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
 
                   <!-- Tier & Rate (approved) -->
                   <template v-if="selectedAssessment.status === 'APPROVED'">

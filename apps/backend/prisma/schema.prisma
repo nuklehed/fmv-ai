@@ -133,6 +133,8 @@ model Assessment {
   cvText            String?
   status            String       @default("DRAFT")
   aiResults         String?
+  llmRawResponse    String?     // Raw LLM output for audit/debugging
+  llmUserPrompt     String?     // User prompt sent to LLM for audit/debugging
   totalScore        Int?
   tierLabel         String?      // e.g., "Tier 1" — selected from criteria set thresholds
   rate              String?
