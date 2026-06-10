@@ -307,7 +307,8 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HCP</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AI Score</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specialty</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Completed</th>
               <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -315,7 +316,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-if="assessments.length === 0">
-              <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">No assessments found. Click "Request Assessment" to create one.</td>
+              <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">No assessments found. Click "Request Assessment" to create one.</td>
             </tr>
             <tr v-for="assessment in assessments" :key="assessment.id" :class="['hover:bg-gray-50', assessmentDomain.isActionRequired(assessment) && assessmentDomain.isAdminOrSAUser() ? 'cursor-pointer' : 'cursor-default']" @click="assessmentDomain.isActionRequired(assessment) && assessmentDomain.isAdminOrSAUser() ? navigateToReview(assessment) : openDetailPanel(assessment)">
               <td class="px-6 py-4 whitespace-nowrap">
@@ -334,6 +335,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   !
                 </button>
               </td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ assessment.specialty?.name || '—' }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ assessment.totalScore !== null ? assessment.totalScore : '—' }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ assessmentDomain.formatDate(assessment.submittedAt) }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ assessmentDomain.formatDate(assessment.completedAt) }}</td>

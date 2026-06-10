@@ -11,6 +11,7 @@ export interface AssessmentListItem {
   hcp: { firstName: string; lastName: string; email?: string }
   submittedByUser: { id: string; email: string }
   specialtyId?: string | null
+  specialty?: { id: string; name: string }
   criteriaSetId?: string | null
   criteriaSet?: { questions: CriteriaQuestion[] }
   status: string
