@@ -1,12 +1,1 @@
 sk-unsloth-205535528bc4766d0389a5d9af9fef8b
-
-Follow my previous request up with this eye opening result of the new AI audit       
-links. The AI feels like it *MUST* select an answer even if the CV doesn't support   
-it. It then rationalizes the selection. We have two options, 1) add a Not            
-Applicable option to every question, or 2) explicity tell the AI it doesn't have to  
-answer every question and can simply return no result or whatever works for how we   
-process the results. What do you think?  
-
-Requesting a new assessment for an existing assessment creates a brand new           
-assessment record in the assessments list. I'm not sure that's the intended          
-behavior. Can you look into it?  
