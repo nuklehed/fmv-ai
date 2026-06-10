@@ -115,7 +115,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
     // Verify refresh token
     let decoded: any
     try {
-      decoded = jwt.verify(refreshToken, JWT_SECRET) as { userId: string; type: string }
+      decoded = jwt.verify(refreshToken, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string; type: string }
     } catch (err) {
       res.status(401).json({ error: 'Invalid or expired refresh token' })
       return

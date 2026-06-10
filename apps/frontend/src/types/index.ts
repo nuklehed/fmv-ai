@@ -100,18 +100,6 @@ export interface Notification {
   createdAt: string
 }
 
-export interface SpecialtyRate {
-  id: string
-  specialtyId: string
-  criteriaSetId: string
-  tierLabel: string
-  lowRate: string
-  highRate: string
-  tenantId: string
-  createdAt: string
-  updatedAt: string
-}
-
 export interface ApplicationSetting {
   id: string
   key: string

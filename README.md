@@ -55,10 +55,20 @@ fmv-ai/
    cp apps/frontend/.env.example apps/frontend/.env
    ```
 
-4. **Initialize database**
+4. **Initialize database and seed data**
 
    ```bash
-   npm run db:push
+   npm run db:push               # Create tables
+   npm run db:seed               # Users + basic setup
+   npm run db:seed-fmv-tiers     # FMV HCP Tiers criteria set (10 questions, 51 answers)
+   npm run db:seed-specialties   # Top 10 specialties + link to criteria set
+   npm run db:seed-tiers         # SpecialtyRate entries + tier thresholds
+   npm run db:seed-dev-data      # 60 HCPs, 60 assessments, audit trails, notifications
+   ```
+
+   Or run all at once:
+   ```bash
+   npm run db:push && npm run db:seed && npm run db:seed-fmv-tiers && npm run db:seed-specialties && npm run db:seed-tiers && npm run db:seed-dev-data
    ```
 
 5. **Start development servers**

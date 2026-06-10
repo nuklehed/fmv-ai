@@ -15,7 +15,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:seed-fmv-tiers": "tsx prisma/seed-fmv-tiers.ts",
     "db:seed-specialties": "tsx prisma/seed-top-specialties.ts",
-    "db:seed-tiers": "tsx prisma/seed-tiers.ts"
+    "db:seed-tiers": "tsx prisma/seed-tiers.ts",
+    "db:seed-dev-data": "tsx prisma/seed-dev-data.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",

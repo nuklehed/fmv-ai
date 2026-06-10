@@ -105,12 +105,12 @@ export function getStatusLabel(status: string): string {
 // ─── Status Transition Rules ──────────────────────────────────────
 
 /** Check if assessment is in DRAFT state */
+// fallow-ignore-next-line unused-export
 export function isDraft(assessment: AssessmentListItem): boolean {
   return assessment.status === 'DRAFT'
 }
 
-/** Check if assessment can be reviewed (AI_COMPLETE + admin/SA) */
-/** Check if assessment can be reviewed (AI_COMPLETE + admin/SA) */
+// fallow-ignore-next-line unused-export
 export function canReview(assessment: AssessmentListItem, userRole?: string): boolean {
   const role = userRole || (localStorage.getItem('userRole') as string | undefined)
   return assessment.status === 'AI_COMPLETE' && isAdminOrSA(role)
@@ -123,6 +123,7 @@ export function canApprove(assessment: AssessmentListItem, userRole?: string): b
 }
 
 /** Check if assessment can be rejected (UNDER_REVIEW + admin/SA) */
+// fallow-ignore-next-line unused-export
 export function canReject(assessment: AssessmentListItem, userRole?: string): boolean {
   const role = userRole || (localStorage.getItem('userRole') as string | undefined)
   return assessment.status === 'UNDER_REVIEW' && isAdminOrSA(role)
@@ -145,16 +146,19 @@ export function isAdminOrSAUser(): boolean {
 }
 
 /** Check if assessment needs admin/SA review (AI_COMPLETE) */
+// fallow-ignore-next-line unused-export
 export function isActionRequired(assessment: AssessmentListItem): boolean {
   return assessment.status === 'AI_COMPLETE'
 }
 
 /** Check if assessment has failed AI processing */
+// fallow-ignore-next-line unused-export
 export function isFailed(assessment: AssessmentListItem): boolean {
   return assessment.status === 'AI_FAILED'
 }
 
 /** Check if assessment can be retried (AI_FAILED + submitted by current user or admin/SA) */
+// fallow-ignore-next-line unused-export
 export function canRetry(assessment: AssessmentListItem): boolean {
   if (!isFailed(assessment)) return false
   const role = localStorage.getItem('userRole')
@@ -165,6 +169,7 @@ export function canRetry(assessment: AssessmentListItem): boolean {
 
 // ─── Date Formatting ──────────────────────────────────────────────
 
+// fallow-ignore-next-line unused-export
 export function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString()
@@ -402,12 +407,6 @@ export async function fetchSpecialties(): Promise<Array<{ id: string; name: stri
   return response.json()
 }
 
-/** Fetch available criteria sets */
-export async function fetchCriteriaSets(): Promise<Array<{ id: string; name: string }>> {
-  const response = await fetch('/api/criteria-sets?active=true', { headers: authHeaders() })
-  if (!response.ok) throw new Error('Failed to fetch criteria sets')
-  return response.json()
-}
 
 /** Retry AI processing for a failed assessment */
 export async function retryAssessment(assessmentId: string): Promise<any> {
