@@ -146,6 +146,116 @@ router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 })
 
 /**
+ * GET /api/hcps/:id/profile
+ * Get full HCP profile with complete paginated assessment history.
+ * Returns identity data + all assessments ordered by date desc with frozen criteria snapshots.
+ */
+router.get('/:id/profile', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+    const page = Math.max(1, parseInt(req.query.page as string) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25))
+
+    // Multi-tenant isolation
+    const hcp = await prisma.hcp.findFirst({
+      where: {
+        id,
+        tenantId: req.tenantId!
+      },
+      include: {
+        identifiers: { where: { isActive: true } },
+        specialty: { select: { id: true, name: true } }
+      }
+    })
+
+    if (!hcp) {
+      res.status(404).json({ error: 'HCP not found' })
+      return
+    }
+
+    // Fetch all assessments for this HCP (paginated)
+    const [totalCount, assessments] = await Promise.all([
+      prisma.assessment.count({ where: { hcpId: id } }),
+      prisma.assessment.findMany({
+        where: { hcpId: id },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          criteriaSet: { select: { id: true, name: true } },
+          submittedByUser: { select: { id: true, email: true } }
+        }
+      })
+    ])
+
+    // Build assessment history with frozen data
+    const formattedAssessments = assessments.map(a => ({
+      id: a.id,
+      status: a.status,
+      totalScore: a.totalScore,
+      tierLabel: a.tierLabel,
+      rate: a.rate,
+      renewalDate: a.renewalDate,
+      effectiveDate: a.effectiveDate,
+      submittedAt: a.submittedAt,
+      completedAt: a.completedAt,
+      criteriaSetId: a.criteriaSetId,
+      criteriaSetName: a.criteriaSet?.name ?? null,
+      isActive: a.isActive,
+      supersededAt: a.supersededAt,
+      supersededByAssessmentId: a.supersededByAssessmentId,
+      previousAssessmentId: a.previousAssessmentId,
+      criteriaSnapshot: a.criteriaSnapshot as Record<string, unknown> | null,
+      llmRawResponse: a.llmRawResponse ?? null,
+      llmUserPrompt: a.llmUserPrompt ?? null
+    }))
+
+    // Determine current status for display
+    const activeAssessment = assessments.find(a => a.isActive)
+    let currentStatus: string | null = null
+    if (activeAssessment) {
+      const expires = new Date(activeAssessment.renewalDate!)
+      if (expires > new Date()) {
+        const daysLeft = Math.ceil((expires.getTime() - Date.now()) / 86400000)
+        currentStatus = `Valid through ${activeAssessment.renewalDate?.toISOString().split('T')[0]} (${daysLeft}d)`
+      } else {
+        currentStatus = 'Expired'
+      }
+    } else {
+      currentStatus = null
+    }
+
+    res.json({
+      hcp: {
+        id: hcp.id,
+        firstName: hcp.firstName,
+        lastName: hcp.lastName,
+        email: hcp.email ?? null,
+        phone: hcp.phone ?? null,
+        address: hcp.address ?? null,
+        city: hcp.city ?? null,
+        state: hcp.state ?? null,
+        country: hcp.country ?? 'US',
+        specialtyId: hcp.specialtyId ?? null,
+        specialtyName: hcp.specialty?.name ?? null,
+        identifiers: hcp.identifiers.map(i => ({ type: i.type, value: i.value })),
+        currentStatus
+      },
+      assessments: formattedAssessments,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching HCP profile:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/**
  * POST /api/hcps
  * Create a new HCP with fuzzy duplicate detection
  */

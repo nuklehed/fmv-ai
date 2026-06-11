@@ -61,18 +61,18 @@ model HcpIdentifier {
 }
 
 model Specialty {
-  id            String        @id @default(uuid())
+  id            String          @id @default(uuid())
   name          String
   description   String?
   criteriaSetId String?
-  isActive      Boolean       @default(true)
+  isActive      Boolean         @default(true)
   tenantId      String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  assessments   Assessment[]  @relation("AssessmentSpecialty")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  assessments   Assessment[]    @relation("AssessmentSpecialty")
   hcps          Hcp[]
+  criteriaSet   CriteriaSet?    @relation("SpecialtyCriteriaSet", fields: [criteriaSetId], references: [id])
   rates         SpecialtyRate[]
-  criteriaSet   CriteriaSet?  @relation("SpecialtyCriteriaSet", fields: [criteriaSetId], references: [id])
 
   @@unique([name, tenantId])
   @@index([tenantId, isActive])
@@ -80,19 +80,20 @@ model Specialty {
 }
 
 model CriteriaSet {
-  id            String        @id @default(uuid())
-  name          String
-  description   String?
-  systemPrompt  String?
-  tierThresholds Json?        // [{"label":"Tier 1","minScore":22,"maxScore":35}, ...]
-  isActive      Boolean       @default(true)
-  tenantId      String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  assessments   Assessment[]  @relation("CriteriaSetAssessments")
-  questions     Question[]
-  specialties   Specialty[]   @relation("SpecialtyCriteriaSet")
-  rates         SpecialtyRate[]
+  id             String          @id @default(uuid())
+  name           String
+  description    String?
+  systemPrompt   String?
+  tierThresholds Json?
+  isActive       Boolean         @default(true)
+  tenantId       String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  assessments    Assessment[]    @relation("CriteriaSetAssessments")
+  questions      Question[]
+  specialties    Specialty[]     @relation("SpecialtyCriteriaSet")
+  rates          SpecialtyRate[]
+
   @@index([tenantId, isActive])
 }
 
@@ -125,33 +126,42 @@ model Answer {
 }
 
 model Assessment {
-  id                String       @id @default(uuid())
-  hcpId             String
-  submittedByUserId String
-  specialtyId       String?
-  criteriaSetId     String?
-  cvText            String?
-  status            String       @default("DRAFT")
-  aiResults         String?
-  llmRawResponse    String?     // Raw LLM output for audit/debugging
-  llmUserPrompt     String?     // User prompt sent to LLM for audit/debugging
-  totalScore        Int?
-  tierLabel         String?      // e.g., "Tier 1" — selected from criteria set thresholds
-  rate              String?
-  approvedByUserId  String?
-  rejectionReason   String?
-  tenantId          String
-  effectiveDate     DateTime?
-  renewalDate       DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  submittedAt       DateTime?
-  completedAt       DateTime?
-  approvedByUser    User?        @relation("ApprovedAssessments", fields: [approvedByUserId], references: [id])
-  criteriaSet       CriteriaSet? @relation("CriteriaSetAssessments", fields: [criteriaSetId], references: [id])
-  hcp               Hcp          @relation(fields: [hcpId], references: [id])
-  specialty         Specialty?   @relation("AssessmentSpecialty", fields: [specialtyId], references: [id])
-  submittedByUser   User         @relation("SubmittedAssessments", fields: [submittedByUserId], references: [id])
+  id                        String       @id @default(uuid())
+  hcpId                     String
+  submittedByUserId         String
+  specialtyId               String?
+  criteriaSetId             String?
+  cvText                    String?
+  status                    String       @default("DRAFT")
+  aiResults                 String?
+  totalScore                Int?
+  tierLabel                 String?
+  rate                      String?
+  approvedByUserId          String?
+  rejectionReason           String?
+  tenantId                  String
+  effectiveDate             DateTime?
+  renewalDate               DateTime?
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  submittedAt               DateTime?
+  completedAt               DateTime?
+  llmRawResponse            String?
+  llmUserPrompt             String?
+  isActive                  Boolean      @default(false)
+  supersededAt              DateTime?
+  supersededByAssessmentId  String?
+  previousAssessmentId      String?
+  criteriaSnapshot          Json? // Frozen snapshot of { questions: [...], answers: {...}, scores } at evaluation time
+  approvedByUser            User?        @relation("ApprovedAssessments", fields: [approvedByUserId], references: [id])
+  supersededBy              Assessment?  @relation("SupersessionNewer", fields: [supersededByAssessmentId], references: [id])
+  supersededThisAssessments Assessment[] @relation("SupersessionNewer")
+  supersededThis            Assessment?  @relation("SupersessionOlder", fields: [previousAssessmentId], references: [id])
+  newerAssessments          Assessment[] @relation("SupersessionOlder")
+  criteriaSet               CriteriaSet? @relation("CriteriaSetAssessments", fields: [criteriaSetId], references: [id])
+  hcp                       Hcp          @relation(fields: [hcpId], references: [id])
+  specialty                 Specialty?   @relation("AssessmentSpecialty", fields: [specialtyId], references: [id])
+  submittedByUser           User         @relation("SubmittedAssessments", fields: [submittedByUserId], references: [id])
 
   @@index([hcpId, status])
   @@index([submittedByUserId])
@@ -159,18 +169,17 @@ model Assessment {
 }
 
 model SpecialtyRate {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   specialtyId   String
   criteriaSetId String
-  tierLabel     String   // "Tier 1", "Tier 2", etc.
+  tierLabel     String
   lowRate       String
   highRate      String
   tenantId      String
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  specialty     Specialty @relation(fields: [specialtyId], references: [id])
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
   criteriaSet   CriteriaSet @relation(fields: [criteriaSetId], references: [id])
+  specialty     Specialty   @relation(fields: [specialtyId], references: [id])
 
   @@unique([specialtyId, criteriaSetId, tierLabel])
   @@index([tenantId])

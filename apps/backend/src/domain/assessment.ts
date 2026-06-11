@@ -343,10 +343,45 @@ export class AssessmentDomain {
       throw new Error(`Cannot submit — missing required data: ${missing.join(', ')}`)
     }
 
-    // Transition to AI_PROCESSING
+    // Capture criteria snapshot for historical audit trail
+    let criteriaSnapshot: Record<string, unknown> | null = null
+    if (existing.criteriaSetId) {
+      const criteriaSet = await this.prisma.criteriaSet.findFirst({
+        where: { id: existing.criteriaSetId, isActive: true },
+        include: {
+          questions: {
+            where: { isActive: true },
+            orderBy: { order: 'asc' },
+            include: {
+              answers: { where: { isActive: true }, orderBy: { order: 'asc' } }
+            }
+          }
+        }
+      })
+
+      if (criteriaSet) {
+        criteriaSnapshot = {
+          criteriaSetName: criteriaSet.name,
+          systemPrompt: criteriaSet.systemPrompt,
+          questions: criteriaSet.questions.map(q => ({
+            id: q.id,
+            text: q.text,
+            order: q.order,
+            answers: q.answers.map(a => ({ id: a.id, text: a.text, score: a.score }))
+          })),
+          capturedAt: new Date().toISOString()
+        }
+      }
+    }
+
+    // Transition to AI_PROCESSING (include criteria snapshot)
     const updatedAssessment = await this.prisma.assessment.update({
       where: { id },
-      data: { status: 'AI_PROCESSING', submittedAt: new Date() },
+      data: {
+        status: 'AI_PROCESSING',
+        submittedAt: new Date(),
+        criteriaSnapshot
+      } as any,
       include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
     })
 
@@ -409,10 +444,33 @@ export class AssessmentDomain {
       throw new Error(`Cannot retry — missing required data: ${missing.join(', ')}`)
     }
 
-    // Transition back to AI_PROCESSING
+    // Capture criteria snapshot on retry if not already present
+    const retrySnapshot = existing.criteriaSnapshot ? null : (
+      existing.criteriaSetId ? await this.prisma.criteriaSet.findFirst({
+        where: { id: existing.criteriaSetId, isActive: true },
+        include: {
+          questions: {
+            where: { isActive: true },
+            orderBy: { order: 'asc' },
+            include: { answers: { where: { isActive: true }, orderBy: { order: 'asc' } } }
+          }
+        }
+      }).then(cs => cs ? ({
+        criteriaSetName: cs.name,
+        systemPrompt: cs.systemPrompt,
+        questions: cs.questions.map(q => ({ id: q.id, text: q.text, order: q.order, answers: q.answers.map(a => ({ id: a.id, text: a.text, score: a.score })) })),
+        capturedAt: new Date().toISOString()
+      }) : null) : null
+    )
+
+    // Transition back to AI_PROCESSING (include snapshot on retry)
     const updatedAssessment = await this.prisma.assessment.update({
       where: { id },
-      data: { status: 'AI_PROCESSING', submittedAt: new Date() },
+      data: {
+        status: 'AI_PROCESSING',
+        submittedAt: new Date(),
+        ...(retrySnapshot ? { criteriaSnapshot: retrySnapshot } : {})
+      } as any,
       include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
     })
 
@@ -760,40 +818,85 @@ export class AssessmentDomain {
       endDate.setDate(endDate.getDate() + validityDays)
     }
 
-    const updatedAssessment = await this.prisma.assessment.update({
-      where: { id },
-      data: {
+    // ─── Find existing active approval for same HCP (for auto-supersede) ───
+    const oldActive = await this.prisma.assessment.findFirst({
+      where: {
+        hcpId: existing.hcpId,
         status: 'APPROVED',
-        tierLabel: assignedTierLabel,
-        rate: finalRate as any,
-        approvedByUserId: userId,
-        effectiveDate: startDate,
-        renewalDate: endDate,
-        completedAt: new Date()
+        isActive: true
       },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    // ─── Approve new assessment + auto-supersede old one (atomic) ───
+    const ops = [
+      this.prisma.assessment.updateMany({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          tierLabel: assignedTierLabel,
+          rate: finalRate as any,
+          approvedByUserId: userId,
+          effectiveDate: startDate,
+          renewalDate: endDate,
+          completedAt: new Date(),
+          isActive: true
+        }
+      })
+    ]
+
+    if (oldActive && oldActive.id !== id) {
+      ops.push(
+        this.prisma.assessment.updateMany({
+          where: { id: oldActive.id },
+          data: {
+            isActive: false,
+            supersededAt: new Date(),
+            supersededByAssessmentId: id
+          }
+        })
+      )
+    }
+
+    // updateMany returns { count }, not the records — fetch full record after
+    await this.prisma.$transaction(ops)
+
+    // Fetch full updated assessment with relations
+    const refreshed = await this.prisma.assessment.findUnique({
+      where: { id },
       include: {
         hcp: true,
         submittedByUser: { select: { id: true, email: true } },
         approvedByUser: { select: { id: true, email: true } }
       }
-    })
+    }) as any
 
-    // Create audit trail entry
-    await this.prisma.auditTrail.create({
-      data: {
-        userId,
-        userName: 'Admin',
-        entityType: 'Assessment',
-        entityId: id,
-        action: 'APPROVE',
-        fieldChanged: 'status,tier,rate',
-        oldValue: JSON.stringify({ status: 'UNDER_REVIEW', tierLabel: existing.tierLabel, rate: existing.rate }),
-        newValue: JSON.stringify({ status: 'APPROVED', tierLabel: assignedTierLabel, rate: finalRate }),
-        rationale
-      }
-    })
+    // Create audit trail entry (with supersession info if applicable)
+    const baseAudit = {
+      userId,
+      userName: 'Admin',
+      entityType: 'Assessment' as const,
+      entityId: id,
+      action: oldActive ? 'APPROVE_SUPERSEDED' : 'APPROVE' as const,
+      fieldChanged: 'status,tier,rate' + (oldActive ? ',supersession' : ''),
+      oldValue: JSON.stringify({ status: 'UNDER_REVIEW', tierLabel: existing.tierLabel, rate: existing.rate }),
+      newValue: JSON.stringify({ status: 'APPROVED', tierLabel: assignedTierLabel, rate: finalRate }),
+      rationale
+    }
 
-    // Create notification for BU
+    if (oldActive) {
+      await this.prisma.auditTrail.create({
+        data: {
+          ...baseAudit,
+          fieldChanged: baseAudit.fieldChanged + ',supersession',
+          rationale: `${rationale || ''} [Superseded previous assessment ${oldActive.id}]`
+        }
+      })
+    } else {
+      await this.prisma.auditTrail.create({ data: baseAudit as any })
+    }
+
+    // Create notification for BU (new assessment approved)
     await this.prisma.notification.create({
       data: {
         userId: existing.submittedByUserId,
@@ -803,7 +906,19 @@ export class AssessmentDomain {
       }
     })
 
-    return updatedAssessment
+    // Notify old assessment's submitter if superseded
+    if (oldActive && oldActive.submittedByUserId !== existing.submittedByUserId) {
+      await this.prisma.notification.create({
+        data: {
+          userId: oldActive.submittedByUserId,
+          type: 'ASSESSMENT_SUPERSEDED',
+          title: `Assessment Superseded — ${existing.hcp.firstName} ${existing.hcp.lastName}`,
+          message: `Your previous assessment has been superseded by a newer one (approved on ${refreshed?.submittedAt ? new Date(refreshed.submittedAt).toLocaleDateString() : 'recently'}).` // eslint-disable-line @typescript-eslint/no-unnecessary-condition
+        }
+      })
+    }
+
+    return refreshed
   }
 
   async rejectWithReason(id: string, reason: string, userId: string, tenantId: string): Promise<Assessment> {

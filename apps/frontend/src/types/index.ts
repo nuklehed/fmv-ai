@@ -59,6 +59,60 @@ export interface Assessment {
   updatedAt: string
   submittedAt?: string | null
   completedAt?: string | null
+  // Profile / supersession fields
+  isActive?: boolean
+  supersededAt?: string | null
+  supersededByAssessmentId?: string | null
+  previousAssessmentId?: string | null
+  criteriaSnapshot?: Record<string, unknown> | null
+  llmRawResponse?: string | null
+  llmUserPrompt?: string | null
+}
+
+export interface AssessmentListItem {
+  id: string
+  status: AssessmentStatus
+  totalScore?: number | null
+  tierLabel?: string | null
+  rate?: number | null
+  renewalDate?: string | null
+  effectiveDate?: string | null
+  submittedAt?: string | null
+  completedAt?: string | null
+  criteriaSetId?: string
+  criteriaSetName?: string | null
+  isActive: boolean
+  supersededAt?: string | null
+  supersededByAssessmentId?: string | null
+  previousAssessmentId?: string | null
+  criteriaSnapshot?: Record<string, unknown> | null
+}
+
+export interface HcpProfile {
+  id: string
+  firstName: string
+  lastName: string
+  email: string | null
+  phone: string | null
+  address: string | null
+  city: string | null
+  state: string | null
+  country: string
+  specialtyId: string | null
+  specialtyName: string | null
+  identifiers: Array<{ type: string; value: string }>
+  currentStatus: string | null
+}
+
+export interface HcpProfileResponse {
+  hcp: HcpProfile
+  assessments: AssessmentListItem[]
+  pagination: {
+    page: number
+    limit: number
+    totalCount: number
+    totalPages: number
+  }
 }
 
 export interface CriteriaSet {
@@ -87,6 +141,7 @@ export interface Specialty {
 enum NotificationType {
   ASSESSMENT_APPROVED = 'ASSESSMENT_APPROVED',
   ASSESSMENT_REJECTED = 'ASSESSMENT_REJECTED',
+  ASSESSMENT_SUPERSEDED = 'ASSESSMENT_SUPERSEDED',
   EXPIRY_REMINDER = 'EXPIRY_REMINDER'
 }
 
