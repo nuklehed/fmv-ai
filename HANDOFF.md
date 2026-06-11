@@ -12,7 +12,7 @@
 - [x] Frontend TypeScript types added: `AssessmentListItem`, `HcpProfile`, `HcpProfileResponse`, `NotificationType.ASSESSMENT_SUPERSEDED`
 - [x] Domain layer: `HcpProfileData` interface + `fetchHcpProfile()` API function
 - [x] **#35 — Dashboard Enhancement**: 
-  - **Dashboard (HomeView.vue)**: Shows only APPROVED assessments, grouped by HCP (one record per person). No pagination. Stats cards show active approvals count and expiring-soon alerts. Search-only filter; status dropdown removed. Detail panel simplified for approved view.
+  - **Dashboard (HomeView.vue)**: Pure quick-view — no detail panels. Shows only APPROVED assessments, grouped by HCP (one record per person). No pagination, no row-click expanders. Stats cards show active approvals count and expiring-soon alerts. Search-only filter; status dropdown removed. Table rows have Profile link only (no View/expand buttons).
   - **Active approval warning** in `AssessmentFormView.vue`: Amber banner when selecting an HCP with existing approval, showing current tier/score/rate with "View Profile" / "Continue — Re-assess" buttons. Suppressed when continuing an existing draft or in edit mode.
   - **Backend**: New endpoint `GET /api/hcps/:id/active-assessment` for supersession checks; domain-level `listPaginated()` now supports `groupedByHcp` option via `private listGroupedByHcp()`.
 
