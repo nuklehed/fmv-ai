@@ -11,20 +11,22 @@
 - [x] Criteria snapshot capture in `submitForAI` (freezes questions/answers/scores at evaluation time)
 - [x] Frontend TypeScript types added: `AssessmentListItem`, `HcpProfile`, `HcpProfileResponse`, `NotificationType.ASSESSMENT_SUPERSEDED`
 - [x] Domain layer: `HcpProfileData` interface + `fetchHcpProfile()` API function
+- [x] **#35 — Dashboard Enhancement**: 
+  - **Dashboard (HomeView.vue)**: Shows only APPROVED assessments, grouped by HCP (one record per person). No pagination. Stats cards show active approvals count and expiring-soon alerts. Search-only filter; status dropdown removed. Detail panel simplified for approved view.
+  - **Active approval warning** in `AssessmentFormView.vue`: Amber banner when selecting an HCP with existing approval, showing current tier/score/rate with "View Profile" / "Continue — Re-assess" buttons. Suppressed when continuing an existing draft or in edit mode.
+  - **Backend**: New endpoint `GET /api/hcps/:id/active-assessment` for supersession checks; domain-level `listPaginated()` now supports `groupedByHcp` option via `private listGroupedByHcp()`.
 
 ## What's Left
 
 ### Issue #37 — Frontend Notification System
-The backend now emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
-
-### Issue #37 — Frontend Notification System (new, implied)
-The backend now emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
+The backend emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
 
 ## Key Decisions & Constraints
 - **Single Active Approval:** Only one `isActive=true` per HCP at a time. New assessments supersede old ones on Admin approval (not immediately on submission).
-- **Dashboard Focus:** Dashboard is strictly a quick view; no standalone HCP directory search outside the "Request Assessment" flow.
+- **Dashboard Focus:** Dashboard is strictly a quick view showing approved/non-superseded records — one per HCP. No standalone HCP directory search outside the "Request Assessment" flow.
+- **Assessments Page:** Shows all submitted requests. Toggleable "Group by HCP" mode deduplicates to latest assessment per person (supersedes show-all). Pagination disabled in grouped mode.
 - **Audit Trail Integrity:** Criteria questions/answers are JSON snapshots attached to each assessment — history preserved even if live criteria change.
-- **Profile Access:** BU role or higher can access via Profile links on dashboard rows.
+- **Profile Access:** BU role or higher can access via Profile links on dashboard rows and detail panels.
 
 ## Current State of Codebase
 - All backend builds clean (`npx tsc --noEmit` passes)
@@ -34,9 +36,6 @@ The backend now emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notif
 - Prisma client regenerated with new schema
 
 ## Suggested Skills
-- **tdd** — for building dashboard enhancement (Issue #35) test-first
+- **tdd** — for building Issue #37 notification system test-first
 - **grill-with-docs** — to refine UI layout decisions before coding the profile page
 - **improve-codebase-architecture** — review overall feature coherence after completion
-
-## Next Step
-Issue #35 — dashboard enhancement: add active-approval warning when creating a new assessment for an HCP that already has one. The Profile link infrastructure is already wired up from #34.

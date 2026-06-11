@@ -12,6 +12,8 @@ export interface ListParams {
   limit: number
   search?: string
   statusFilter?: string
+  /** Group results by HCP — returns only the latest assessment per HCP */
+  groupedByHcp?: boolean
 }
 
 export interface ListResult {
@@ -89,6 +91,11 @@ export class AssessmentDomain {
       where.status = params.statusFilter
     }
 
+    // Grouped mode: one assessment per HCP (latest by createdAt)
+    if (params.groupedByHcp) {
+      return this.listGroupedByHcp(where)
+    }
+
     const totalCount = await this.prisma.assessment.count({ where })
 
     const assessments = await this.prisma.assessment.findMany({
@@ -110,6 +117,38 @@ export class AssessmentDomain {
         limit: params.limit,
         totalCount,
         totalPages: Math.ceil(totalCount / params.limit)
+      }
+    }
+  }
+
+  /** Grouped mode: one assessment per HCP (latest by createdAt) */
+  private async listGroupedByHcp(where: Record<string, unknown>): Promise<ListResult> {
+    // Fetch all assessments matching the where clause, ordered newest first
+    const assessments = await this.prisma.assessment.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        hcp: { select: { firstName: true, lastName: true, email: true } },
+        submittedByUser: { select: { id: true, email: true } },
+        specialty: { select: { id: true, name: true } }
+      }
+    }) as any[]
+
+    // Deduplicate by hcpId — keep the latest (first in desc order)
+    const seen = new Set<string>()
+    const deduplicated = assessments.filter(a => {
+      if (seen.has(a.hcpId)) return false
+      seen.add(a.hcpId)
+      return true
+    })
+
+    return {
+      data: deduplicated,
+      pagination: {
+        page: 1,
+        limit: deduplicated.length,
+        totalCount: deduplicated.length,
+        totalPages: 1
       }
     }
   }

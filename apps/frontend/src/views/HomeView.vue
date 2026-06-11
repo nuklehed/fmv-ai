@@ -6,14 +6,10 @@ import * as assessmentDomain from '@/domain/assessment'
 
 const router = useRouter()
 
-// Assessment list state
+// Dashboard state — approved only, grouped by HCP
 const assessments = ref<Assessment[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const statusFilter = ref<string>('')
-const currentPage = ref(1)
-const pageSize = ref(25)
-const totalPages = ref(0)
 const totalCount = ref(0)
 
 // Detail panel state
@@ -21,15 +17,15 @@ const selectedAssessment = ref<Assessment | null>(null)
 const showDetailPanel = ref(false)
 
 
+// Dashboard only shows approved, grouped by HCP — no pagination needed
 async function fetchAssessments() {
   loading.value = true
   try {
-    const params: Record<string, string> = {
-      page: String(currentPage.value),
-      limit: String(pageSize.value)
-    }
+    const params: Record<string, string> = {}
     if (searchQuery.value) params.search = searchQuery.value
-    if (statusFilter.value) params.status = statusFilter.value
+    // Dashboard always filters to APPROVED and groups by HCP for one record per person
+    params.status = 'APPROVED'
+    params.groupedByHcp = 'true'
 
     const queryString = new URLSearchParams(params).toString()
     const url = `/api/assessments?${queryString}`
@@ -37,7 +33,6 @@ async function fetchAssessments() {
     const result = await response.json() as { data: Assessment[]; pagination: { totalCount: number; totalPages: number } }
 
     assessments.value = result.data || []
-    totalPages.value = result.pagination?.totalPages || 0
     totalCount.value = result.pagination?.totalCount || 0
   } catch (error) {
     console.error('Error fetching assessments:', error)
@@ -95,22 +90,10 @@ function getExpiryUrgency(renewalDate?: string | null): { color: string; label: 
   }
 }
 
-function handleSearch() {
-  currentPage.value = 1
-  fetchAssessments()
-}
-
 let searchTimeout: ReturnType<typeof setTimeout> | null = null
 function onSearchInput() {
   if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => handleSearch(), 300)
-}
-
-function goToPage(page: number) {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
-    fetchAssessments()
-  }
+  searchTimeout = setTimeout(() => fetchAssessments(), 300)
 }
 
 async function openDetailPanel(assessment: Assessment) {
@@ -118,26 +101,7 @@ async function openDetailPanel(assessment: Assessment) {
   showDetailPanel.value = true
 }
 
-const cancelLoading = ref(false)
 
-async function cancelAssessment(assessment: Assessment) {
-  const a = assessment as any
-  if (!confirm(`Cancel AI processing for ${a.hcp?.firstName || '?'} ${a.hcp?.lastName || '?'}? This will reset the assessment to DRAFT.`)) return
-  cancelLoading.value = true
-  try {
-    await assessmentDomain.cancelAssessment(assessment.id)
-    await fetchAssessments()
-  } catch (error) {
-    alert(error instanceof Error ? error.message : 'Failed to cancel assessment')
-  } finally {
-    cancelLoading.value = false
-  }
-}
-
-async function cancelSelectedAssessment() {
-  if (!selectedAssessment.value) return
-  await cancelAssessment(selectedAssessment.value)
-}
 
 function closeDetailPanel() {
   showDetailPanel.value = false
@@ -150,18 +114,8 @@ function viewHcpProfile(assessment: Assessment) {
   router.push(`/hcp/${hcpId}/profile`)
 }
 
-// Auto-refresh for AI processing assessments
-const refreshIntervalRef = { current: null as ReturnType<typeof setInterval> | null }
-
-function startAutoRefresh() {
-  refreshIntervalRef.current = setInterval(() => {
-    fetchAssessments()
-  }, 30000) // Every 30 seconds
-}
-
 onMounted(() => {
   fetchAssessments()
-  startAutoRefresh()
 })
 </script>
 
@@ -174,7 +128,7 @@ onMounted(() => {
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-2xl font-bold text-gray-900 mb-1">Dashboard</h2>
-          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} assessments ({{ statusFilter ? 'filtered' : 'all' }})</p>
+          <p class="text-sm text-gray-600">{{ totalCount }} active approvals (one per HCP)</p>
         </div>
         <a
           href="/assessments/new"
@@ -185,26 +139,24 @@ onMounted(() => {
       </div>
 
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white shadow rounded-lg p-4 border-l-4 border-blue-500">
-          <p class="text-sm text-gray-500">Total</p>
-          <p class="text-2xl font-bold text-gray-900">{{ totalCount }}</p>
-        </div>
-        <div class="bg-white shadow rounded-lg p-4 border-l-4 border-yellow-500">
-          <p class="text-sm text-gray-500">In Progress</p>
-          <p class="text-2xl font-bold text-gray-900">{{ assessments.filter(a => ['SUBMITTED', 'AI_PROCESSING', 'AI_COMPLETE'].includes(a.status)).length }}</p>
-        </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="bg-white shadow rounded-lg p-4 border-l-4 border-green-500">
-          <p class="text-sm text-gray-500">Approved</p>
-          <p class="text-2xl font-bold text-gray-900">{{ assessments.filter(a => a.status === 'APPROVED').length }}</p>
+          <p class="text-sm text-gray-500">Active Approvals</p>
+          <p class="text-2xl font-bold text-gray-900">{{ totalCount }}</p>
         </div>
         <div class="bg-white shadow rounded-lg p-4 border-l-4 border-red-500">
           <p class="text-sm text-gray-500">Expiring Soon</p>
           <p class="text-2xl font-bold text-gray-900">{{ assessments.filter(a => { const u = getExpiryUrgency(a.renewalDate); return u && (u.label.includes('days left') || u.label.includes('Expired')) }).length }}</p>
         </div>
+        <a href="/assessments" class="bg-white shadow rounded-lg p-4 border-l-4 border-blue-500 hover:bg-gray-50 cursor-pointer flex items-center">
+          <div>
+            <p class="text-sm text-gray-500">All Requests</p>
+            <p class="text-lg font-bold text-blue-700">Go to Assessments →</p>
+          </div>
+        </a>
       </div>
 
-      <!-- Filters -->
+      <!-- Search -->
       <div class="mb-6 flex items-center space-x-4">
         <input
           v-model="searchQuery"
@@ -213,20 +165,6 @@ onMounted(() => {
           placeholder="Search by HCP name..."
           class="flex-1 max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
-        <select
-          v-model="statusFilter"
-          @change="handleSearch"
-          class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="">All Statuses</option>
-          <option value="DRAFT">Draft</option>
-          <option value="SUBMITTED">Submitted</option>
-          <option value="AI_PROCESSING">AI Processing</option>
-          <option value="AI_COMPLETE">AI Complete</option>
-          <option value="UNDER_REVIEW">Under Review</option>
-          <option value="APPROVED">Approved</option>
-          <option value="REJECTED">Rejected</option>
-        </select>
       </div>
 
       <!-- Loading State -->
@@ -240,7 +178,6 @@ onMounted(() => {
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">HCP</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tier</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
@@ -250,22 +187,13 @@ onMounted(() => {
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-if="assessments.length === 0">
-              <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
-                No assessments found. Click "Request Assessment" to create one.
+              <td colspan="6" class="px-6 py-8 text-center text-sm text-gray-500">
+                No active approvals found. Click "Request Assessment" to create one.
               </td>
             </tr>
             <tr v-for="assessment in assessments" :key="assessment.id" class="hover:bg-gray-50 cursor-pointer" @click="openDetailPanel(assessment)">
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="text-sm font-medium text-gray-900">{{ (assessment as any).hcp?.firstName || '—' }} {{ (assessment as any).hcp?.lastName || '—' }}</div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(assessment.status)]">
-                  <svg v-if="assessment.status === 'AI_PROCESSING'" class="animate-spin -ml-1 mr-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  {{ getStatusLabel(assessment.status) }}
-                </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {{ assessment.totalScore !== null ? assessment.totalScore : '—' }}
@@ -283,9 +211,6 @@ onMounted(() => {
                 <span v-else class="text-xs text-gray-400">—</span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
-                <button v-if="assessment.status === 'AI_PROCESSING'" @click.stop="cancelAssessment(assessment)" :disabled="cancelLoading" class="text-red-600 hover:text-red-900 font-medium mr-3">
-                  {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
-                </button>
                 <button @click="viewHcpProfile(assessment)" class="text-purple-600 hover:text-purple-900 mr-2">Profile</button>
                 <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
               </td>
@@ -293,22 +218,6 @@ onMounted(() => {
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-          <div class="text-sm text-gray-500">
-            Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, totalCount) }} of {{ totalCount }} results
-          </div>
-          <div class="flex space-x-2">
-            <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Previous</button>
-            <template v-for="p in Math.min(5, totalPages)" :key="p">
-              <button @click="goToPage(p)" :class="[
-                'px-3 py-1 border rounded text-sm',
-                p === currentPage ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
-              ]">{{ p }}</button>
-            </template>
-            <button @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Next</button>
-          </div>
-        </div>
       </div>
 
       <!-- ─── Detail Slide-over Panel ────────────────────────────── -->
@@ -346,14 +255,9 @@ onMounted(() => {
                     <!-- Status -->
                     <div class="mb-4">
                       <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Status</h4>
-                      <div class="flex items-center">
-                        <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
-                          {{ getStatusLabel(selectedAssessment.status) }}
-                        </span>
-                        <button v-if="selectedAssessment.status === 'AI_PROCESSING'" @click.stop="cancelSelectedAssessment()" :disabled="cancelLoading" class="ml-2 text-xs text-red-600 hover:text-red-900 underline">
-                          {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
-                        </button>
-                      </div>
+                      <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getStatusColor(selectedAssessment.status)]">
+                        {{ getStatusLabel(selectedAssessment.status) }}
+                      </span>
                     </div>
 
                     <!-- Score -->

@@ -34,7 +34,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
       page: Math.max(1, parseInt(req.query.page as string) || 1),
       limit: Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25)),
       search: req.query.search as string | undefined,
-      statusFilter: req.query.status as string | undefined
+      statusFilter: req.query.status as string | undefined,
+      groupedByHcp: (req.query.groupedByHcp as string) === 'true'
     })
     res.json(result)
   } catch (_error) {

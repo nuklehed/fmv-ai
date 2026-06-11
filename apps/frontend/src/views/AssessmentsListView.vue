@@ -16,6 +16,7 @@ const pageSize = ref(25)
 const totalPages = ref(0)
 const totalCount = ref(0)
 const formError = ref('')
+const groupedByHcp = ref(false)
 
 // ─── Detail Panel State ──────────────────────────────────────────
 
@@ -50,7 +51,8 @@ async function fetchAssessments() {
   try {
     const result = await assessmentDomain.fetchAssessments({
       page: currentPage.value, limit: pageSize.value,
-      search: searchQuery.value || undefined, statusFilter: statusFilter.value || undefined
+      search: searchQuery.value || undefined, statusFilter: statusFilter.value || undefined,
+      groupedByHcp: groupedByHcp.value
     })
     assessments.value = result.data
     totalPages.value = result.pagination.totalPages
@@ -60,6 +62,12 @@ async function fetchAssessments() {
   } finally {
     loading.value = false
   }
+}
+
+function toggleGroupByHcp() {
+  groupedByHcp.value = !groupedByHcp.value
+  currentPage.value = 1
+  fetchAssessments()
 }
 
 function handleSearch() { currentPage.value = 1; fetchAssessments() }
@@ -273,7 +281,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-2xl font-bold text-gray-900 mb-1">Assessments</h2>
-          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} assessments ({{ statusFilter ? 'filtered' : 'all' }})</p>
+          <p class="text-sm text-gray-600">{{ totalCount.toLocaleString() }} {{ groupedByHcp ? 'active records (one per HCP)' : 'assessments' }} ({{ statusFilter ? 'filtered' : 'all' }})</p>
         </div>
         <a href="/assessments/new" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium">+ Request Assessment</a>
       </div>
@@ -295,6 +303,13 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
           </template>
           <option v-for="(label, status) in assessmentDomain.StatusLabels" :key="status" :value="status">{{ label }}</option>
         </select>
+        <button @click="toggleGroupByHcp"
+          :class="['px-3 py-2 border rounded-lg text-sm font-medium transition-colors',
+            groupedByHcp
+              ? 'bg-blue-600 text-white border-blue-600'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50']">
+          {{ groupedByHcp ? '☑ Grouped by HCP' : 'Group by HCP' }}
+        </button>
       </div>
 
       <!-- Loading State -->
@@ -376,8 +391,8 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
           </tbody>
         </table>
 
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+        <!-- Pagination (hidden in grouped mode — all unique HCPs returned on one page) -->
+        <div v-if="!groupedByHcp && totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
           <div class="text-sm text-gray-500">Showing {{ ((currentPage - 1) * pageSize) + 1 }} to {{ Math.min(currentPage * pageSize, totalCount) }} of {{ totalCount }} results</div>
           <div class="flex space-x-2">
             <button @click="goToPage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50">Previous</button>

@@ -63,6 +63,7 @@ export interface ListParams {
   limit: number
   search?: string
   statusFilter?: string
+  groupedByHcp?: boolean
 }
 
 export interface HcpProfileData {
@@ -273,7 +274,8 @@ export async function fetchAssessments(params: ListParams): Promise<ListResult> 
     page: String(params.page),
     limit: String(params.limit),
     ...(params.search ? { search: params.search } : {}),
-    ...(params.statusFilter ? { status: params.statusFilter } : {})
+    ...(params.statusFilter ? { status: params.statusFilter } : {}),
+    ...(params.groupedByHcp ? { groupedByHcp: 'true' } : {})
   })
 
   const response = await fetch(`/api/assessments?${queryParams}`, { headers: authHeaders() })
