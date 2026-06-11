@@ -1,8 +1,34 @@
 import { PrismaClient } from '@prisma/client'
 import type { Assessment, Hcp, Specialty } from '@prisma/client'
+import fs from 'fs'
+import path from 'path'
 import { buildPrompt, type CriteriaQuestion } from './promptBuilder'
 import { createLLMClient } from './llmClient'
 import { parseLLMResponse } from './responseParser'
+
+const LOG_DIR = process.env.LLM_LOG_DIR || path.join(process.cwd(), 'logs')
+let logFile: string | null = null
+
+try {
+  if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true })
+  const dateStr = new Date().toISOString().split('T')[0]
+  logFile = path.join(LOG_DIR, `llm-${dateStr}.log`)
+} catch (e) {
+  console.error('[Worker] Failed to initialize LLM log file:', e)
+}
+
+function logLlm(entry: Record<string, unknown>): void {
+  if (!logFile) return
+  const line = JSON.stringify({
+    ts: new Date().toISOString(),
+    ...entry,
+    ...(entry.promptLength ? { promptChars: entry.promptLength } : {})
+  }) + '\n'
+  try { fs.appendFileSync(logFile, line) }
+  catch (e) {
+    console.error('[Worker] Failed to write LLM log:', e)
+  }
+}
 
 const prisma = new PrismaClient()
 
@@ -72,9 +98,16 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
 
   // Step 3: Call LLM (delegated to LLMClient — swappable provider)
   let llmContent: string
+  const startTime = Date.now()
   // Store the user prompt for audit trail (truncated to 100k chars to avoid bloat)
   const llmUserPrompt = userPrompt.length > 100000 ? userPrompt.substring(0, 100000) + '\n...[truncated]' : userPrompt
-  console.log(`[Worker] Assessment ${assessmentId} — calling LLM`)
+  console.log(`[Worker] Assessment ${assessmentId} — calling LLM (prompt: ${userPrompt.length} chars)`)
+  logLlm({
+    assessmentId,
+    event: 'llm_request_start',
+    promptLength: userPrompt.length,
+    systemPromptLength: systemPrompt.length
+  })
   console.log(`[Worker] HCP: ${typedAssessment.hcp.firstName} ${typedAssessment.hcp.lastName}`)
   console.log(`[Worker] CV text length: ${assessment.cvText?.length || 0} chars`)
   console.log(`[Worker] Questions: ${questions.length}`)
@@ -85,7 +118,13 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
       { role: 'user', content: userPrompt }
     ])
     llmContent = response.content
-    console.log(`[Worker] LLM returned ${llmContent.length} chars of content`)
+    console.log(`[Worker] LLM returned ${llmContent.length} chars of content (${Date.now() - startTime}ms)`)
+    logLlm({
+      assessmentId,
+      event: 'llm_response',
+      contentLength: llmContent.length,
+      durationMs: Date.now() - startTime
+    })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const isNetworkError = String(error).includes('fetch failed') || 
@@ -112,6 +151,14 @@ export async function processAssessmentJob(assessmentId: string, _userId: string
     })
     return
   }
+
+  // Log raw response for debugging (always store — critical for diagnosing empty responses)
+  logLlm({
+    assessmentId,
+    event: 'response_raw_snippet',
+    snippet: llmContent.substring(0, 500) || '(empty)',
+    fullLength: llmContent.length
+  })
 
   if (!llmContent) {
     console.warn('Empty LLM response')

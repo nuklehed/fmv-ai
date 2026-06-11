@@ -256,6 +256,66 @@ router.get('/:id/profile', async (req: AuthenticatedRequest, res: Response): Pro
 })
 
 /**
+ * GET /api/hcps/:id/active-assessment
+ * Lightweight check for any active/pending assessment on an HCP.
+ * Returns the active assessment summary (if any) so callers can warn about supersession.
+ */
+router.get('/:id/active-assessment', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params
+
+    // Multi-tenant isolation
+    const hcp = await prisma.hcp.findFirst({
+      where: { id, tenantId: req.tenantId! }
+    })
+
+    if (!hcp) {
+      res.status(404).json({ error: 'HCP not found' })
+      return
+    }
+
+    // Find active (not superseded) assessments that are approved or have a renewal date
+    const activeAssessments = await prisma.assessment.findMany({
+      where: {
+        hcpId: id,
+        isActive: true,
+        status: { in: ['APPROVED', 'SUBMITTED', 'AI_PROCESSING', 'AI_COMPLETE'] }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 1,
+      select: {
+        id: true,
+        status: true,
+        totalScore: true,
+        tierLabel: true,
+        rate: true,
+        renewalDate: true,
+        effectiveDate: true,
+        submittedAt: true,
+        completedAt: true
+      }
+    })
+
+    const active = activeAssessments[0]
+    res.json({
+      hasActive: !!active,
+      assessment: active ? {
+        id: active.id,
+        status: active.status,
+        totalScore: active.totalScore,
+        tierLabel: active.tierLabel ?? null,
+        rate: active.rate ?? null,
+        renewalDate: active.renewalDate?.toISOString() ?? null,
+        effectiveDate: active.effectiveDate?.toISOString() ?? null
+      } : null
+    })
+  } catch (error) {
+    console.error('Error checking active assessment:', error)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+/**
  * POST /api/hcps
  * Create a new HCP with fuzzy duplicate detection
  */

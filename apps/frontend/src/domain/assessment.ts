@@ -531,3 +531,10 @@ export async function fetchHcpProfile(
   if (!response.ok) throw new Error(`Failed to load HCP profile: ${response.statusText}`)
   return response.json() as Promise<HcpProfileData>
 }
+
+/** Check whether an HCP has any active/pending assessment — used for supersession warnings */
+export async function fetchActiveAssessment(hcpId: string): Promise<{ hasActive: boolean; assessment?: { id: string; status: string; totalScore?: number | null; tierLabel?: string | null; rate?: number | null; renewalDate?: string | null } }> {
+  const response = await fetch(`/api/hcps/${hcpId}/active-assessment`, { headers: authHeaders() })
+  if (!response.ok) return { hasActive: false }
+  return response.json()
+}

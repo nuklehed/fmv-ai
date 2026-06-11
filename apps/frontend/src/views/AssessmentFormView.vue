@@ -70,6 +70,10 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 const isSubmitting = ref(false)
 const isUploadingCv = ref(false)
 
+// Active assessment warning (Issue #35 — supersession awareness)
+const activeAssessmentInfo = ref<{ hasActive: boolean; assessment?: { id: string; status: string; totalScore?: number | null; tierLabel?: string | null; rate?: number | null; renewalDate?: string | null } }>({ hasActive: false })
+const showActiveWarning = ref(false)
+
 const specialties = ref<{ id: string; name: string; criteriaSetId?: string | null }[]>([])
 
 let hcpSearchTimeout: ReturnType<typeof setTimeout> | null = null
@@ -111,22 +115,33 @@ async function selectHcp(hcp: HcpOption) {
   editCountry.value = hcp.country || 'US'
   specialtyId.value = hcp.specialtyId || ''
 
-  // Check for existing draft — if found, clear CV state so user continues the existing draft
+  // Check for active assessments & existing drafts (Issue #35)
+  let hasExistingDraftWithCv = false
   try {
     const existingDraft = await assessmentDomain.findExistingDraftForHcp(hcp.id)
     if (existingDraft && existingDraft.cvText) {
+      hasExistingDraftWithCv = true
       // Existing draft with CV already uploaded — pre-fill it
       cvUploaded.value = true
       cvTextLength.value = existingDraft.cvText.length
       cvFileName.value = 'CV from existing draft'
       createdAssessmentId.value = existingDraft.id
       formSuccess.value = `Continuing existing draft assessment for ${hcp.firstName} ${hcp.lastName}`
-    } else {
-      resetCvUpload()
     }
-  } catch {
-    resetCvUpload()
-  }
+  } catch { /* silent */ }
+
+  // Check active assessments — supersession warning (only in create mode, not when continuing a draft)
+  try {
+    const result = await assessmentDomain.fetchActiveAssessment(hcp.id)
+    activeAssessmentInfo.value = result
+    showActiveWarning.value = !!result.hasActive && !hasExistingDraftWithCv && !isEditMode.value
+  } catch { /* silent */ }
+}
+
+// ─── Active Assessment Warning (Issue #35) ─────────────────────────
+
+function clearActiveWarning() {
+  showActiveWarning.value = false
 }
 
 // ─── New HCP Creation ─────────────────────────────────────────────
@@ -663,6 +678,41 @@ onMounted(async () => {
               <span class="text-gray-500">Specialty:</span><span class="text-gray-900">{{ selectedHcp.specialtyName || '—' }}</span>
             </div>
           </div>
+
+          <!-- Active Assessment Warning (Issue #35) -->
+          <Transition name="slide-fade">
+            <div v-if="showActiveWarning && selectedHcp" class="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg shadow-sm">
+              <div class="flex items-start">
+                <svg class="h-5 w-5 text-amber-500 mt-0.5 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <div class="flex-1">
+                  <p class="text-sm font-semibold text-amber-900 mb-1">This HCP already has an active assessment</p>
+                  <template v-if="activeAssessmentInfo.assessment">
+                    <p class="text-xs text-amber-700 mb-3">
+                      Current approval: <span class="font-medium">{{ activeAssessmentInfo.assessment.tierLabel || '—' }}</span>
+                      · Score: {{ activeAssessmentInfo.assessment.totalScore ?? '—' }}
+                      · Rate: ${{ activeAssessmentInfo.assessment.rate?.toFixed(2) ?? '—' }}
+                    </p>
+                  </template>
+                  <p class="text-xs text-amber-600 mb-3">
+                    Submitting a new assessment will supersede this approval once reviewed and approved.
+                    The current rate remains valid until the new one is officially approved.
+                  </p>
+                  <div class="flex items-center space-x-3">
+                    <button @click="router.push(`/hcp/${selectedHcp.id}/profile`); clearActiveWarning()"
+                      class="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs font-medium transition-colors">
+                      View Profile
+                    </button>
+                    <button @click="clearActiveWarning()"
+                      class="px-3 py-1.5 border border-amber-400 bg-white text-amber-800 rounded-lg hover:bg-amber-50 text-xs font-medium transition-colors">
+                      Continue — Re-assess
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Transition>
         </section>
 
         <!-- Step 2: Edit Contact Info -->
