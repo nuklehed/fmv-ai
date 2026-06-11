@@ -14,10 +14,7 @@
 
 ## What's Left
 
-### Issue #35 — Dashboard Enhancement ✅ DONE
-**Completed 2026-06-11:** Added `GET /api/hcps/:id/active-assessment` backend endpoint and warning banner in `AssessmentFormView.vue`. When selecting an HCP with an active approval, users see an amber alert showing current tier/score/rate with "View Profile" and "Continue — Re-assess" buttons. Warning is suppressed when continuing an existing draft (no duplicate prompts) or in edit mode.
-
-### Issue #37 — Frontend Notification System (new, implied)
+### Issue #37 — Frontend Notification System
 The backend now emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
 
 ### Issue #37 — Frontend Notification System (new, implied)
