@@ -65,6 +65,26 @@ export interface ListParams {
   statusFilter?: string
 }
 
+export interface HcpProfileData {
+  hcp: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string | null
+    phone: string | null
+    address: string | null
+    city: string | null
+    state: string | null
+    country: string
+    specialtyId: string | null
+    specialtyName: string | null
+    identifiers: Array<{ type: string; value: string }>
+    currentStatus: string | null
+  }
+  assessments: AssessmentListItem[]
+  pagination: { page: number; limit: number; totalCount: number; totalPages: number }
+}
+
 export interface ListResult {
   data: AssessmentListItem[]
   pagination: { page: number; limit: number; totalCount: number; totalPages: number }
@@ -498,4 +518,16 @@ export async function updateHcp(hcpId: string, data: {
   if (!response.ok) {
     console.warn('HCP update failed (non-fatal):', response.statusText)
   }
+}
+
+/** Fetch full HCP profile with assessment history */
+export async function fetchHcpProfile(
+  hcpId: string,
+  page = 1,
+  limit = 20
+): Promise<HcpProfileData> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  const response = await fetch(`/api/hcps/${hcpId}/profile?${params}`, { headers: authHeaders() })
+  if (!response.ok) throw new Error(`Failed to load HCP profile: ${response.statusText}`)
+  return response.json() as Promise<HcpProfileData>
 }

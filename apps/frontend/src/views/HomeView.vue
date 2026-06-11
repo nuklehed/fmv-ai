@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Assessment } from '@/types'
 import * as assessmentDomain from '@/domain/assessment'
+
+const router = useRouter()
 
 // Assessment list state
 const assessments = ref<Assessment[]>([])
@@ -141,6 +144,12 @@ function closeDetailPanel() {
   selectedAssessment.value = null
 }
 
+function viewHcpProfile(assessment: Assessment) {
+  const hcpId = (assessment as any).hcp?.id || assessment.hcpId
+  if (!hcpId) return
+  router.push(`/hcp/${hcpId}/profile`)
+}
+
 // Auto-refresh for AI processing assessments
 const refreshIntervalRef = { current: null as ReturnType<typeof setInterval> | null }
 
@@ -277,6 +286,7 @@ onMounted(() => {
                 <button v-if="assessment.status === 'AI_PROCESSING'" @click.stop="cancelAssessment(assessment)" :disabled="cancelLoading" class="text-red-600 hover:text-red-900 font-medium mr-3">
                   {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
                 </button>
+                <button @click="viewHcpProfile(assessment)" class="text-purple-600 hover:text-purple-900 mr-2">Profile</button>
                 <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
               </td>
             </tr>
@@ -325,7 +335,12 @@ onMounted(() => {
                     <!-- HCP Info -->
                     <div class="mb-4">
                       <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">HCP</h4>
-                      <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).hcp?.firstName || '—' }} {{ (selectedAssessment as any).hcp?.lastName || '—' }}</p>
+                      <div class="flex items-center space-x-2">
+                        <p class="text-sm font-semibold text-gray-900">{{ (selectedAssessment as any).hcp?.firstName || '—' }} {{ (selectedAssessment as any).hcp?.lastName || '—' }}</p>
+                        <button v-if="(selectedAssessment as any).hcp?.id" @click.stop="viewHcpProfile(selectedAssessment)" class="text-xs text-purple-600 hover:text-purple-900 underline">
+                          View Profile
+                        </button>
+                      </div>
                     </div>
 
                     <!-- Status -->
@@ -401,7 +416,10 @@ onMounted(() => {
                   </div>
 
                   <!-- Panel Footer -->
-                  <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                  <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 space-y-3">
+                    <button @click.stop="viewHcpProfile(selectedAssessment)" v-if="(selectedAssessment as any).hcp?.id" class="block w-full text-center px-4 py-2.5 border border-purple-300 text-purple-700 rounded-lg hover:bg-purple-50 text-sm font-medium">
+                      HCP Profile
+                    </button>
                     <a href="/assessments/new" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</a>
                   </div>
                 </div>

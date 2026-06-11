@@ -113,6 +113,13 @@ const routes: RouteRecordRaw[] = [
       }
     ]
   },
+  // ─── HCP Profile (BU or higher) ──────────────────────────────
+  {
+    path: '/hcp/:id/profile',
+    name: 'hcpProfile',
+    component: () => import('@/views/HcpProfileView.vue'),
+    meta: { requiresAuth: true, requiresBUOrHigher: true }
+  },
   {
     path: '/login',
     name: 'login',
