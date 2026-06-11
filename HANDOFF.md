@@ -14,8 +14,11 @@
 
 ## What's Left
 
-### Issue #35 — Dashboard Enhancement
-**Goal:** When creating a new assessment, detect if HCP already has an active approval and show a warning dialog with two options: "View profile" or "Need to re-assess". The Profile links in HomeView.vue rows have already been added as part of #34.
+### Issue #35 — Dashboard Enhancement ✅ DONE
+**Completed 2026-06-11:** Added `GET /api/hcps/:id/active-assessment` backend endpoint and warning banner in `AssessmentFormView.vue`. When selecting an HCP with an active approval, users see an amber alert showing current tier/score/rate with "View Profile" and "Continue — Re-assess" buttons. Warning is suppressed when continuing an existing draft (no duplicate prompts) or in edit mode.
+
+### Issue #37 — Frontend Notification System (new, implied)
+The backend now emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
 
 ### Issue #37 — Frontend Notification System (new, implied)
 The backend now emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
