@@ -359,7 +359,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
   <div class="min-h-screen bg-slate-50">
     <!-- Header -->
     <!-- Main Content -->
-    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h2 class="text-2xl font-bold text-slate-900 mb-1">Assessments</h2>
@@ -466,7 +466,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
       <Teleport to="body">
         <Transition name="slideover">
           <div v-if="showDetailPanel && selectedAssessment" class="fixed inset-0 z-50 overflow-hidden">
-            <div class="absolute inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="closeDetailPanel" />
+            <div class="absolute inset-0 bg-slate-500 bg-opacity-75 transition-opacity" @click="closeDetailPanel" />
 
             <div class="fixed inset-y-0 right-0 max-w-lg w-full flex">
               <Transition name="slideover-panel">

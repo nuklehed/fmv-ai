@@ -145,13 +145,13 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-slate-50">
     <!-- Header -->
     <!-- Main Content -->
-    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6">
-        <h2 class="text-2xl font-bold text-gray-900 mb-1">Application Settings</h2>
-        <p class="text-sm text-gray-600">Configure system-wide settings for the FMV AI platform</p>
+        <h2 class="text-2xl font-bold text-slate-900 mb-1">Application Settings</h2>
+        <p class="text-sm text-slate-600">Configure system-wide settings for the FMV AI platform</p>
       </div>
 
       <!-- Error Message -->
@@ -161,7 +161,7 @@ onMounted(() => {
 
       <!-- Loading State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Loading settings...</p>
+        <p class="text-sm text-slate-500">Loading settings...</p>
       </div>
 
       <!-- Settings List -->
@@ -170,8 +170,8 @@ onMounted(() => {
         <div class="bg-white shadow rounded-lg p-6">
           <div class="flex items-start justify-between">
             <div class="flex-1">
-              <h3 class="text-base font-medium text-gray-900">Approval Validity Period</h3>
-              <p class="text-sm text-gray-500 mt-1">{{ getSettingDescription('approvalValidityPeriod') }}</p>
+              <h3 class="text-base font-medium text-slate-900">Approval Validity Period</h3>
+              <p class="text-sm text-slate-500 mt-1">{{ getSettingDescription('approvalValidityPeriod') }}</p>
             </div>
           </div>
           <div class="mt-4 flex items-center space-x-3">
@@ -180,9 +180,9 @@ onMounted(() => {
               type="number"
               :disabled="savingKey === 'approvalValidityPeriod'"
               @blur="handleSave('approvalValidityPeriod')"
-              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-32 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span class="text-sm text-gray-500">days</span>
+            <span class="text-sm text-slate-500">days</span>
             <button
               @click="handleSave('approvalValidityPeriod')"
               :disabled="savingKey === 'approvalValidityPeriod'"
@@ -197,8 +197,8 @@ onMounted(() => {
         <div class="bg-white shadow rounded-lg p-6">
           <div class="flex items-start justify-between">
             <div class="flex-1">
-              <h3 class="text-base font-medium text-gray-900">Expiry Reminder Lead Time</h3>
-              <p class="text-sm text-gray-500 mt-1">{{ getSettingDescription('expiryReminderLeadTime') }}</p>
+              <h3 class="text-base font-medium text-slate-900">Expiry Reminder Lead Time</h3>
+              <p class="text-sm text-slate-500 mt-1">{{ getSettingDescription('expiryReminderLeadTime') }}</p>
             </div>
           </div>
           <div class="mt-4 flex items-center space-x-3">
@@ -207,9 +207,9 @@ onMounted(() => {
               type="number"
               :disabled="savingKey === 'expiryReminderLeadTime'"
               @blur="handleSave('expiryReminderLeadTime')"
-              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-32 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span class="text-sm text-gray-500">days</span>
+            <span class="text-sm text-slate-500">days</span>
             <button
               @click="handleSave('expiryReminderLeadTime')"
               :disabled="savingKey === 'expiryReminderLeadTime'"
@@ -224,8 +224,8 @@ onMounted(() => {
         <div class="bg-white shadow rounded-lg p-6">
           <div class="flex items-start justify-between">
             <div class="flex-1">
-              <h3 class="text-base font-medium text-gray-900">Default Tier Percentile</h3>
-              <p class="text-sm text-gray-500 mt-1">Business decision for rate calculation when approving assessments. Used to interpolate a rate between lowRate and highRate (default: 50th percentile).</p>
+              <h3 class="text-base font-medium text-slate-900">Default Tier Percentile</h3>
+              <p class="text-sm text-slate-500 mt-1">Business decision for rate calculation when approving assessments. Used to interpolate a rate between lowRate and highRate (default: 50th percentile).</p>
             </div>
           </div>
           <div class="mt-4 flex items-center space-x-3">
@@ -236,9 +236,9 @@ onMounted(() => {
               max="100"
               :disabled="savingKey === 'defaultTierPercentile'"
               @blur="handleSave('defaultTierPercentile')"
-              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-32 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span class="text-sm text-gray-500">percentile</span>
+            <span class="text-sm text-slate-500">percentile</span>
             <button
               @click="handleSave('defaultTierPercentile')"
               :disabled="savingKey === 'defaultTierPercentile'"
@@ -258,9 +258,9 @@ onMounted(() => {
                 @change="handleSave('roundTierRateToNearest5')"
                 class="sr-only peer"
               />
-              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
             </label>
-            <span class="text-sm text-gray-700">Round resulting rate to nearest $5 increment</span>
+            <span class="text-sm text-slate-700">Round resulting rate to nearest $5 increment</span>
           </div>
         </div>
 
@@ -268,8 +268,8 @@ onMounted(() => {
         <div class="bg-white shadow rounded-lg p-6">
           <div class="flex items-start justify-between">
             <div class="flex-1">
-              <h3 class="text-base font-medium text-gray-900">Number of Tiers</h3>
-              <p class="text-sm text-gray-500 mt-1">How many tier levels to use for assessment scoring (e.g., 3 = Gold/Silver/Bronze). Each criteria set will have this many tiers with contiguous score ranges.</p>
+              <h3 class="text-base font-medium text-slate-900">Number of Tiers</h3>
+              <p class="text-sm text-slate-500 mt-1">How many tier levels to use for assessment scoring (e.g., 3 = Gold/Silver/Bronze). Each criteria set will have this many tiers with contiguous score ranges.</p>
             </div>
           </div>
           <div class="mt-4 flex items-center space-x-3">
@@ -280,9 +280,9 @@ onMounted(() => {
               max="20"
               :disabled="savingKey === 'numberOfTiers'"
               @blur="handleSaveNumberOfTiers()"
-              class="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              class="w-32 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <span class="text-sm text-gray-500">tiers</span>
+            <span class="text-sm text-slate-500">tiers</span>
             <button
               @click="handleSaveNumberOfTiers()"
               :disabled="savingKey === 'numberOfTiers'"
@@ -295,21 +295,21 @@ onMounted(() => {
 
         <!-- Notification Preferences (System-wide) -->
         <div class="bg-white shadow rounded-lg p-6">
-          <h3 class="text-base font-medium text-gray-900">Notification Channels</h3>
-          <p class="text-sm text-gray-500 mt-1">Default notification channels for all users. Users can override these in their personal settings.</p>
+          <h3 class="text-base font-medium text-slate-900">Notification Channels</h3>
+          <p class="text-sm text-slate-500 mt-1">Default notification channels for all users. Users can override these in their personal settings.</p>
           <div class="mt-4 space-y-3">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-700">In-app notifications</span>
+              <span class="text-sm text-slate-700">In-app notifications</span>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" checked disabled class="sr-only peer" />
-                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-700">Email notifications</span>
+              <span class="text-sm text-slate-700">Email notifications</span>
               <label class="relative inline-flex items-center cursor-pointer">
                 <input type="checkbox" disabled class="sr-only peer" />
-                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                <div class="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
               </label>
             </div>
           </div>
@@ -319,9 +319,7 @@ onMounted(() => {
       <!-- Info Card -->
       <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div class="flex">
-          <svg class="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
-          </svg>
+          <i class="pi pi-info-circle h-5 w-5 text-blue-400 mt-0.5"></i>
           <div class="ml-3">
             <p class="text-sm text-blue-700">
               Settings are saved automatically when you click "Save". Changes take effect immediately for new assessments.

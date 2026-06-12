@@ -349,14 +349,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-slate-50">
     <!-- Header -->
     <!-- Main Content -->
-    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-1">Criteria Sets Management</h2>
-          <p class="text-sm text-gray-600">Manage evaluation criteria for AI assessment (Admin/Superadmin)</p>
+          <h2 class="text-2xl font-bold text-slate-900 mb-1">Criteria Sets Management</h2>
+          <p class="text-sm text-slate-600">Manage evaluation criteria for AI assessment (Admin/Superadmin)</p>
         </div>
         <button
           @click="showAddModal = true"
@@ -373,7 +373,7 @@ onMounted(() => {
           @input="handleSearch"
           type="text"
           placeholder="Search by name or description..."
-          class="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          class="w-full max-w-md px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
       </div>
 
@@ -384,32 +384,28 @@ onMounted(() => {
 
       <!-- Loading State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Loading criteria sets...</p>
+        <p class="text-sm text-slate-500">Loading criteria sets...</p>
       </div>
 
       <!-- Tree View -->
       <div v-if="!loading" class="space-y-4">
         <div v-for="cs in criteriaSets" :key="cs.id" class="bg-white shadow rounded-lg overflow-hidden">
-          <!-- Criteria Set Header -->
-          <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+          <!-- Criteria set header -->
+          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
             <div class="flex items-center space-x-3">
-              <button @click="toggleExpand(cs.id)" class="text-gray-500 hover:text-gray-700">
+              <button @click="toggleExpand(cs.id)" class="text-slate-500 hover:text-slate-700">
                 <!-- Expand/Collapse icon -->
-                <svg v-if="!expandedSets.has(cs.id)" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-                <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                </svg>
+                <i v-if="!expandedSets.has(cs.id)" class="pi pi-chevron-right w-5 h-5"></i>
+                <i v-else class="pi pi-chevron-down w-5 h-5"></i>
               </button>
-              <span class="text-lg font-semibold text-gray-900">{{ cs.name }}</span>
+              <span class="text-lg font-semibold text-slate-900">{{ cs.name }}</span>
               <span :class="[
                 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
                 cs.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
               ]">
                 {{ cs.isActive ? 'Active' : 'Inactive' }}
               </span>
-              <span class="text-sm text-gray-500">{{ cs.questions.length }} question{{ cs.questions.length !== 1 ? 's' : '' }}</span>
+              <span class="text-sm text-slate-500">{{ cs.questions.length }} question{{ cs.questions.length !== 1 ? 's' : '' }}</span>
             </div>
             <div class="flex items-center space-x-2">
               <!-- System Prompt button (SA-only) -->
@@ -429,8 +425,8 @@ onMounted(() => {
           </div>
 
           <!-- Description -->
-          <div v-if="cs.description" class="px-6 py-2 bg-gray-50 border-b border-gray-100">
-            <p class="text-sm text-gray-600">{{ cs.description }}</p>
+          <div v-if="cs.description" class="px-6 py-2 bg-slate-50 border-b border-slate-100">
+            <p class="text-sm text-slate-600">{{ cs.description }}</p>
           </div>
 
           <!-- Questions Tree (expanded) -->
@@ -443,16 +439,16 @@ onMounted(() => {
                 + Add Question
               </button>
 
-              <div v-if="cs.questions.length === 0" class="text-sm text-gray-400 italic pl-4">
+              <div v-if="cs.questions.length === 0" class="text-sm text-slate-400 italic pl-4">
                 No questions yet. Click "Add Question" to create one.
               </div>
 
               <!-- Questions -->
-              <div v-for="question in cs.questions" :key="question.id" class="border border-gray-200 rounded-lg p-4 ml-4">
+              <div v-for="question in cs.questions" :key="question.id" class="border border-slate-200 rounded-lg p-4 ml-4">
                 <div class="flex items-start justify-between mb-3">
                   <div class="flex-1">
-                    <p class="text-sm font-medium text-gray-900">{{ question.text }}</p>
-                    <span class="text-xs text-gray-500">Order: {{ question.order }}</span>
+                    <p class="text-sm font-medium text-slate-900">{{ question.text }}</p>
+                    <span class="text-xs text-slate-500">Order: {{ question.order }}</span>
                   </div>
                   <div class="flex items-center space-x-2 ml-4">
                     <button @click="openEditQuestionModal(question, cs.id)" class="text-blue-600 hover:text-blue-900 text-xs">Edit</button>
@@ -470,15 +466,15 @@ onMounted(() => {
                     + Add Answer
                   </button>
 
-                  <div v-if="question.answers.length === 0" class="text-xs text-gray-400 italic pl-2">
+                  <div v-if="question.answers.length === 0" class="text-xs text-slate-400 italic pl-2">
                     No answers yet. Click "Add Answer" to create one.
                   </div>
 
                   <!-- Answer items -->
-                  <div v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" class="flex items-center justify-between bg-gray-50 rounded px-3 py-2 ml-2">
+                  <div v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" class="flex items-center justify-between bg-slate-50 rounded px-3 py-2 ml-2">
                     <div class="flex items-center space-x-3 flex-1">
                       <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{{ answer.score }}</span>
-                      <span class="text-sm text-gray-700">{{ answer.text }}</span>
+                      <span class="text-sm text-slate-700">{{ answer.text }}</span>
                     </div>
                     <div class="flex items-center space-x-2">
                       <button @click="openEditAnswerModal(answer, question.id, cs.id)" class="text-blue-600 hover:text-blue-900 text-xs">Edit</button>
@@ -494,8 +490,8 @@ onMounted(() => {
 
         <!-- Empty State -->
         <div v-if="criteriaSets.length === 0" class="bg-white shadow rounded-lg p-8 text-center">
-          <p class="text-sm text-gray-500 mb-2">No criteria sets found.</p>
-          <p class="text-xs text-gray-400">Click "Add Criteria Set" to create one.</p>
+          <p class="text-sm text-slate-500 mb-2">No criteria sets found.</p>
+          <p class="text-xs text-slate-400">Click "Add Criteria Set" to create one.</p>
         </div>
       </div>
 
@@ -506,25 +502,25 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showAddModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showAddModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showAddModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Add New Criteria Set</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-4">Add New Criteria Set</h3>
                   <form @submit.prevent="handleAdd" class="space-y-4">
                     <div>
-                      <label for="add-name" class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                      <input id="add-name" v-model="formName" type="text" required placeholder="e.g., Prescriber Evaluation" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="add-name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                      <input id="add-name" v-model="formName" type="text" required placeholder="e.g., Prescriber Evaluation" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label for="add-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                      <textarea id="add-description" v-model="formDescription" rows="3" placeholder="Optional description..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="add-description" class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                      <textarea id="add-description" v-model="formDescription" rows="3" placeholder="Optional description..." class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleAdd" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Create</button>
-                  <button @click="showAddModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showAddModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -537,25 +533,25 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showEditModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showEditModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showEditModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Criteria Set</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-4">Edit Criteria Set</h3>
                   <form @submit.prevent="handleUpdate" class="space-y-4">
                     <div>
-                      <label for="edit-name" class="block text-sm font-medium text-gray-700 mb-1">Name *</label>
-                      <input id="edit-name" v-model="formName" type="text" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="edit-name" class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+                      <input id="edit-name" v-model="formName" type="text" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label for="edit-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                      <textarea id="edit-description" v-model="formDescription" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="edit-description" class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                      <textarea id="edit-description" v-model="formDescription" rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleUpdate" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save Changes</button>
-                  <button @click="showEditModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showEditModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -568,22 +564,22 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showPromptModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showPromptModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showPromptModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-1">Edit System Prompt</h3>
-                  <p class="text-xs text-purple-600 mb-4">⚠️ SA-only — Misconfiguration affects all downstream scoring</p>
+                  <h3 class="text-lg font-medium text-slate-900 mb-1">Edit System Prompt</h3>
+                  <p class="text-xs text-slate-500 mb-4"><i class="pi pi-lock text-purple-500 mr-1"></i>SA only — misconfiguration affects all downstream scoring</p>
                   <form @submit.prevent="handleUpdatePrompt" class="space-y-4">
                     <div>
-                      <label for="prompt-text" class="block text-sm font-medium text-gray-700 mb-1">System Prompt *</label>
+                      <label for="prompt-text" class="block text-sm font-medium text-slate-700 mb-1">System Prompt *</label>
                       <textarea id="prompt-text" v-model="newSystemPrompt" rows="8" placeholder="Enter the system prompt that guides AI evaluation..." class="w-full px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 font-mono text-sm" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleUpdatePrompt" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm">Save Prompt</button>
-                  <button @click="showPromptModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showPromptModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -596,25 +592,25 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showAddQuestionModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showAddQuestionModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showAddQuestionModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Add Question</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-4">Add Question</h3>
                   <form @submit.prevent="handleAddQuestion" class="space-y-4">
                     <div>
-                      <label for="q-text" class="block text-sm font-medium text-gray-700 mb-1">Question Text *</label>
-                      <textarea id="q-text" v-model="questionText" rows="3" required placeholder="e.g., How many years of clinical experience does this HCP have?" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="q-text" class="block text-sm font-medium text-slate-700 mb-1">Question Text *</label>
+                      <textarea id="q-text" v-model="questionText" rows="3" required placeholder="e.g., How many years of clinical experience does this HCP have?" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label for="q-order" class="block text-sm font-medium text-gray-700 mb-1">Order (optional)</label>
-                      <input id="q-order" v-model.number="questionOrder" type="number" min="0" placeholder="Leave blank to append at end" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="q-order" class="block text-sm font-medium text-slate-700 mb-1">Order (optional)</label>
+                      <input id="q-order" v-model.number="questionOrder" type="number" min="0" placeholder="Leave blank to append at end" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleAddQuestion" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Add Question</button>
-                  <button @click="showAddQuestionModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showAddQuestionModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -627,25 +623,25 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showEditQuestionModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showEditQuestionModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showEditQuestionModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Question</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-4">Edit Question</h3>
                   <form @submit.prevent="handleUpdateQuestion" class="space-y-4">
                     <div>
-                      <label for="eq-text" class="block text-sm font-medium text-gray-700 mb-1">Question Text *</label>
-                      <textarea id="eq-text" v-model="questionText" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="eq-text" class="block text-sm font-medium text-slate-700 mb-1">Question Text *</label>
+                      <textarea id="eq-text" v-model="questionText" rows="3" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label for="eq-order" class="block text-sm font-medium text-gray-700 mb-1">Order</label>
-                      <input id="eq-order" v-model.number="questionOrder" type="number" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="eq-order" class="block text-sm font-medium text-slate-700 mb-1">Order</label>
+                      <input id="eq-order" v-model.number="questionOrder" type="number" min="0" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleUpdateQuestion" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save Changes</button>
-                  <button @click="showEditQuestionModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showEditQuestionModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -658,25 +654,25 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showAddAnswerModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showAddAnswerModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showAddAnswerModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Add Answer</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-4">Add Answer</h3>
                   <form @submit.prevent="handleAddAnswer" class="space-y-4">
                     <div>
-                      <label for="a-text" class="block text-sm font-medium text-gray-700 mb-1">Answer Text *</label>
-                      <textarea id="a-text" v-model="answerText" rows="3" required placeholder="e.g., 1-5 years of clinical experience" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="a-text" class="block text-sm font-medium text-slate-700 mb-1">Answer Text *</label>
+                      <textarea id="a-text" v-model="answerText" rows="3" required placeholder="e.g., 1-5 years of clinical experience" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label for="a-score" class="block text-sm font-medium text-gray-700 mb-1">Score *</label>
-                      <input id="a-score" v-model.number="answerScore" type="number" min="0" required placeholder="e.g., 1" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="a-score" class="block text-sm font-medium text-slate-700 mb-1">Score *</label>
+                      <input id="a-score" v-model.number="answerScore" type="number" min="0" required placeholder="e.g., 1" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleAddAnswer" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Add Answer</button>
-                  <button @click="showAddAnswerModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showAddAnswerModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -689,25 +685,25 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showEditAnswerModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showEditAnswerModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showEditAnswerModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-4">Edit Answer</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-4">Edit Answer</h3>
                   <form @submit.prevent="handleUpdateAnswer" class="space-y-4">
                     <div>
-                      <label for="ea-text" class="block text-sm font-medium text-gray-700 mb-1">Answer Text *</label>
-                      <textarea id="ea-text" v-model="answerText" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="ea-text" class="block text-sm font-medium text-slate-700 mb-1">Answer Text *</label>
+                      <textarea id="ea-text" v-model="answerText" rows="3" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div>
-                      <label for="ea-score" class="block text-sm font-medium text-gray-700 mb-1">Score *</label>
-                      <input id="ea-score" v-model.number="answerScore" type="number" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      <label for="ea-score" class="block text-sm font-medium text-slate-700 mb-1">Score *</label>
+                      <input id="ea-score" v-model.number="answerScore" type="number" min="0" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleUpdateAnswer" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save Changes</button>
-                  <button @click="showEditAnswerModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showEditAnswerModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
@@ -720,15 +716,15 @@ onMounted(() => {
         <Transition name="modal">
           <div v-if="showThresholdsModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showThresholdsModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showThresholdsModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-1">Edit Tier Thresholds</h3>
+                  <h3 class="text-lg font-medium text-slate-900 mb-1">Edit Tier Thresholds</h3>
                   <p class="text-xs text-emerald-600 mb-4">SA-only — Defines score ranges for each tier in this criteria set</p>
 
                   <!-- Current thresholds summary -->
-                  <div v-if="editingItem?.tierThresholds && editingItem.tierThresholds.length > 0" class="mb-4 p-3 bg-gray-50 rounded-md">
-                    <p class="text-xs font-medium text-gray-600 mb-2">Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
+                  <div v-if="editingItem?.tierThresholds && editingItem.tierThresholds.length > 0" class="mb-4 p-3 bg-slate-50 rounded-md">
+                    <p class="text-xs font-medium text-slate-600 mb-2">Current ranges ({{ tierThresholds.length }}/{{ maxTiers }}):</p>
                     <div class="flex flex-wrap gap-2 items-center">
                       <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">Max: {{ getMaxScore() }}</span>
                       <span v-for="t in editingItem.tierThresholds" :key="t.label" class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-800">
@@ -736,25 +732,25 @@ onMounted(() => {
                       </span>
                     </div>
                   </div>
-                  <p v-else class="text-xs text-gray-500 mb-4">No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
+                  <p v-else class="text-xs text-slate-500 mb-4">No tiers configured yet ({{ tierThresholds.length }}/{{ maxTiers }})</p>
 
                   <form @submit.prevent="handleUpdateThresholds" class="space-y-4">
                     <!-- Thresholds table -->
                     <div class="overflow-x-auto">
-                      <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                      <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
                           <tr>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tier Label</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Min Score</th>
-                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Max Score</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-slate-500">Tier Label</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-slate-500">Min Score</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-slate-500">Max Score</th>
                             <th class="px-3 py-2 w-10"></th>
                           </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white divide-y divide-slate-200">
                           <tr v-for="(tier, index) in tierThresholds" :key="index">
-                            <td class="px-3 py-2"><input v-model="tier.label" type="text" required placeholder="e.g. Tier 1" class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
-                            <td class="px-3 py-2"><input v-model.number="tier.minScore" type="number" min="0" required class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
-                            <td class="px-3 py-2"><input v-model.number="tier.maxScore" type="number" min="0" required class="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
+                            <td class="px-3 py-2"><input v-model="tier.label" type="text" required placeholder="e.g. Tier 1" class="w-full px-2 py-1 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
+                            <td class="px-3 py-2"><input v-model.number="tier.minScore" type="number" min="0" required class="w-full px-2 py-1 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
+                            <td class="px-3 py-2"><input v-model.number="tier.maxScore" type="number" min="0" required class="w-full px-2 py-1 border border-slate-300 rounded text-sm focus:ring-2 focus:ring-emerald-500" /></td>
                             <td class="px-3 py-2 text-center">
                               <button type="button" @click="removeTierRow(index)" :disabled="tierThresholds.length <= 1"
                                 class="text-red-600 hover:text-red-900 disabled:opacity-30 disabled:cursor-not-allowed text-sm">
@@ -771,15 +767,15 @@ onMounted(() => {
                         class="text-sm text-emerald-600 hover:text-emerald-900 font-medium disabled:opacity-30 disabled:cursor-not-allowed">
                         + Add Tier
                       </button>
-                      <span v-if="tierThresholds.length >= maxTiers" class="text-xs text-gray-500">Maximum {{ maxTiers }} tiers set in Settings</span>
+                      <span v-if="tierThresholds.length >= maxTiers" class="text-xs text-slate-500">Maximum {{ maxTiers }} tiers set in Settings</span>
                     </div>
 
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleUpdateThresholds" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:ml-3 sm:w-auto sm:text-sm">Save Thresholds</button>
-                  <button @click="showThresholdsModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showThresholdsModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>

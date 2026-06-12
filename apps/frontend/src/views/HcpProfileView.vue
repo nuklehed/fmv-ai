@@ -79,7 +79,7 @@ const pendingCount = computed(() => {
 
 /** Current status text for the identity section */
 const currentStatusText = computed(() => {
-  if (!activeAssessment.value) return { label: 'No valid assessment', color: 'bg-gray-100 text-gray-800' }
+  if (!activeAssessment.value) return { label: 'No valid assessment', color: 'bg-slate-100 text-slate-800' }
   const renewalDate = activeAssessment.value.renewalDate
   if (!renewalDate) return { label: `Valid — ${activeAssessment.value.tierLabel || 'N/A'}`, color: 'bg-green-100 text-green-800' }
 
@@ -129,7 +129,7 @@ const expiryUrgencyColor = computed(() => {
 
 function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
-    DRAFT: 'bg-gray-100 text-gray-800',
+    DRAFT: 'bg-slate-100 text-slate-800',
     SUBMITTED: 'bg-blue-100 text-blue-800',
     AI_PROCESSING: 'bg-yellow-100 text-yellow-800',
     AI_COMPLETE: 'bg-purple-100 text-purple-800',
@@ -137,7 +137,7 @@ function getStatusColor(status: string): string {
     APPROVED: 'bg-green-100 text-green-800',
     REJECTED: 'bg-red-100 text-red-800'
   }
-  return colors[status] || 'bg-gray-100 text-gray-800'
+  return colors[status] || 'bg-slate-100 text-slate-800'
 }
 
 function getStatusLabel(status: string): string {
@@ -200,19 +200,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-slate-50">
     <!-- Header / Navigation -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
-      <div class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+    <header class="bg-white shadow-sm border-b border-slate-200">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <button @click="router.back()" class="text-gray-400 hover:text-gray-600 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
+          <button @click="router.back()" class="text-slate-400 hover:text-slate-600 transition-colors">
+            <i class="pi pi-arrow-left w-5 h-5"></i>
           </button>
           <div>
-            <h1 class="text-xl font-semibold text-gray-900">{{ hcpName }}</h1>
-            <p v-if="profile?.hcp?.specialtyName" class="text-sm text-gray-500">
+            <h1 class="text-xl font-semibold text-slate-900">{{ hcpName }}</h1>
+            <p v-if="profile?.hcp?.specialtyName" class="text-sm text-slate-500">
               {{ profile.hcp.specialtyName }} · {{ currentStatusText.label }}
             </p>
           </div>
@@ -227,23 +225,21 @@ onMounted(() => {
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Error State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-12 text-center">
-        <svg class="mx-auto h-8 w-8 text-gray-400 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+        <svg class="mx-auto h-8 w-8 text-slate-400 animate-spin mb-3" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <p class="text-sm text-gray-500">Loading HCP profile…</p>
+        <p class="text-sm text-slate-500">Loading HCP profile…</p>
       </div>
 
       <!-- Error Display -->
       <div v-else-if="profileError" class="bg-white shadow rounded-lg p-8 text-center">
-        <svg class="mx-auto h-10 w-10 text-red-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <i class="pi pi-times-circle mx-auto h-10 w-10 text-red-400 mb-3"></i>
         <p class="text-sm text-red-600 mb-3">{{ profileError }}</p>
-        <button @click="fetchProfile" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium">
+        <button @click="fetchProfile" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium">
           Retry
         </button>
       </div>
@@ -252,8 +248,8 @@ onMounted(() => {
       <div v-else-if="profile" class="space-y-6">
         <!-- ─── Section 1: Identity Card ────────────────────── -->
         <div class="bg-white shadow rounded-lg overflow-hidden">
-          <div class="px-6 py-5 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-900">Identity</h2>
+          <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-900">Identity</h2>
             <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', currentStatusText.color]">
               {{ currentStatusText.label }}
             </span>
@@ -262,46 +258,46 @@ onMounted(() => {
           <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Name & Specialty -->
             <div>
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Name</h4>
-              <p class="text-lg font-semibold text-gray-900">{{ hcpName }}</p>
-              <p v-if="profile.hcp.specialtyName" class="text-sm text-gray-500 mt-1">{{ profile.hcp.specialtyName }}</p>
+              <h4 class="text-xs font-semibold text-slate-500 mb-2">Name</h4>
+              <p class="text-lg font-semibold text-slate-900">{{ hcpName }}</p>
+              <p v-if="profile.hcp.specialtyName" class="text-sm text-slate-500 mt-1">{{ profile.hcp.specialtyName }}</p>
             </div>
 
             <!-- Contact Info -->
             <div>
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Contact</h4>
+              <h4 class="text-xs font-semibold text-slate-500 mb-2">Contact</h4>
               <ul v-if="profile.hcp.email || profile.hcp.phone" class="space-y-1">
-                <li v-if="profile.hcp.email" class="text-sm text-gray-900">{{ profile.hcp.email }}</li>
-                <li v-if="profile.hcp.phone" class="text-sm text-gray-900">{{ profile.hcp.phone }}</li>
+                <li v-if="profile.hcp.email" class="text-sm text-slate-900">{{ profile.hcp.email }}</li>
+                <li v-if="profile.hcp.phone" class="text-sm text-slate-900">{{ profile.hcp.phone }}</li>
               </ul>
-              <p v-if="!profile.hcp.email && !profile.hcp.phone" class="text-sm text-gray-400">—</p>
+              <p v-if="!profile.hcp.email && !profile.hcp.phone" class="text-sm text-slate-400">—</p>
             </div>
 
             <!-- Address -->
             <div>
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Location</h4>
-              <p v-if="profile.hcp.city || profile.hcp.country" class="text-sm text-gray-900">
+              <h4 class="text-xs font-semibold text-slate-500 mb-2">Location</h4>
+              <p v-if="profile.hcp.city || profile.hcp.country" class="text-sm text-slate-900">
                 {{ [profile.hcp.city, profile.hcp.state, profile.hcp.country].filter(Boolean).join(', ') }}
               </p>
-              <p v-else class="text-sm text-gray-400">—</p>
+              <p v-else class="text-sm text-slate-400">—</p>
             </div>
 
             <!-- External Identifiers -->
             <div class="md:col-span-3">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Identifiers</h4>
+              <h4 class="text-xs font-semibold text-slate-500 mb-2">Identifiers</h4>
               <div v-if="profile.hcp.identifiers?.length" class="flex flex-wrap gap-2">
                 <span v-for="id in profile.hcp.identifiers" :key="id.type + id.value"
-                  class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                  class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                   <span class="font-semibold mr-1">{{ id.type }}:</span> {{ id.value }}
                 </span>
               </div>
-              <p v-else class="text-sm text-gray-400">No identifiers on file</p>
+              <p v-else class="text-sm text-slate-400">No identifiers on file</p>
             </div>
 
             <!-- Account Created -->
             <div class="md:col-span-3 border-t pt-4 mt-1">
-              <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Account</h4>
-              <p class="text-sm text-gray-600">
+              <h4 class="text-xs font-semibold text-slate-500 mb-2">Account</h4>
+              <p class="text-sm text-slate-600">
                 Created {{ formatDate(profile.hcp.createdAt) }} · Last updated {{ formatDate(profile.hcp.updatedAt) }}
               </p>
             </div>
@@ -312,34 +308,32 @@ onMounted(() => {
         <div class="bg-white shadow rounded-lg overflow-hidden">
           <button
             @click="showSummary = !showSummary"
-            class="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            class="w-full px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors"
           >
-            <h2 class="text-base font-semibold text-gray-900">Summary</h2>
-            <svg :class="['w-5 h-5 text-gray-400 transition-transform duration-200', showSummary ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-            </svg>
+            <h2 class="text-base font-semibold text-slate-900">Summary</h2>
+            <i :class="['pi pi-chevron-down w-5 h-5 text-slate-400 transition-transform duration-200', showSummary ? 'rotate-180' : '']"></i>
           </button>
 
-          <div v-show="showSummary" class="border-t border-gray-200 px-6 py-5">
+          <div v-show="showSummary" class="border-t border-slate-200 px-6 py-5">
             <!-- Stats Cards -->
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
               <div class="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <p class="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">Total Assessments</p>
-                <p class="text-2xl font-bold text-gray-900">{{ totalAssessmentsCount }}</p>
+                <p class="text-xs font-semibold text-slate-500 mb-1">Total Assessments</p>
+                <p class="text-2xl font-bold text-slate-900">{{ totalAssessmentsCount }}</p>
               </div>
               <div class="p-4 bg-green-50 rounded-lg border border-green-200">
-                <p class="text-xs font-semibold text-green-700 uppercase tracking-wide mb-1">Approved</p>
-                <p class="text-2xl font-bold text-gray-900">{{ approvedCount }}</p>
+                <p class="text-xs font-semibold text-slate-500 mb-1">Approved</p>
+                <p class="text-2xl font-bold text-slate-900">{{ approvedCount }}</p>
               </div>
               <div class="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <p class="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-1">In Progress</p>
-                <p class="text-2xl font-bold text-gray-900">{{ pendingCount }}</p>
+                <p class="text-xs font-semibold text-slate-500 mb-1">In Progress</p>
+                <p class="text-2xl font-bold text-slate-900">{{ pendingCount }}</p>
               </div>
             </div>
 
             <!-- Active Assessment Details -->
             <div v-if="activeAssessment" :class="['rounded-lg border p-4', expiryUrgencyColor]">
-              <h3 class="text-xs font-semibold uppercase tracking-wide mb-3 opacity-75">Current Approval</h3>
+              <h3 class="text-xs font-semibold text-slate-500 mb-3 opacity-75">Current Approval</h3>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <p class="text-xs opacity-75">Score</p>
@@ -363,51 +357,47 @@ onMounted(() => {
 
             <!-- No Active Assessment -->
             <div v-else-if="totalAssessmentsCount > 0" class="rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-              <h3 class="text-xs font-semibold text-yellow-700 uppercase tracking-wide mb-1">No Active Approval</h3>
+              <h3 class="text-xs font-semibold text-slate-500 mb-1">No Active Approval</h3>
               <p class="text-sm text-yellow-800">All assessments for this HCP have been superseded or are pending review.</p>
             </div>
 
             <!-- Empty State -->
-            <div v-if="totalAssessmentsCount === 0" class="rounded-lg border border-gray-200 bg-gray-50 p-6 text-center">
-              <svg class="mx-auto h-10 w-10 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <p class="text-sm text-gray-600">No assessments have been submitted for this HCP yet.</p>
+            <div v-if="totalAssessmentsCount === 0" class="rounded-lg border border-slate-200 bg-slate-50 p-6 text-center">
+              <i class="pi pi-user-minus mx-auto h-10 w-10 text-slate-400 mb-3"></i>
+              <p class="text-sm text-slate-600">No assessments have been submitted for this HCP yet.</p>
             </div>
           </div>
         </div>
 
         <!-- ─── Section 3: Assessment Timeline Table ────────── -->
         <div class="bg-white shadow rounded-lg overflow-hidden">
-          <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 class="text-base font-semibold text-gray-900">Assessment History</h2>
-            <p class="text-sm text-gray-500">{{ totalAssessmentsCount }} records</p>
+          <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <h2 class="text-base font-semibold text-slate-900">Assessment History</h2>
+            <p class="text-sm text-slate-500">{{ totalAssessmentsCount }} records</p>
           </div>
 
           <!-- Empty Timeline -->
           <div v-if="profile.assessments.length === 0" class="px-6 py-12 text-center">
-            <svg class="mx-auto h-8 w-8 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <p class="text-sm text-gray-500">No assessments in history.</p>
+            <i class="pi pi-history mx-auto h-8 w-8 text-slate-300 mb-2"></i>
+            <p class="text-sm text-slate-500">No assessments in history.</p>
           </div>
 
           <!-- Timeline Table -->
           <div v-else class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
+            <table class="min-w-full divide-y divide-slate-200">
+              <thead class="bg-slate-50">
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tier</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Renewal</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Criteria Set</th>
-                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500">Date</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500">Status</th>
+                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500">Score</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500">Tier</th>
+                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500">Rate</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500">Renewal</th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 hidden lg:table-cell">Criteria Set</th>
+                  <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500">Actions</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
+              <tbody class="bg-white divide-y divide-slate-200">
                 <tr v-for="assessment in profile.assessments" :key="assessment.id"
                   :class="[
                     'transition-colors',
@@ -418,11 +408,8 @@ onMounted(() => {
                   <!-- Active indicator row -->
                   <td class="px-6 py-4 whitespace-nowrap" :rowspan="1">
                     <div class="flex items-center space-x-2">
-                      <svg v-if="assessment.status === 'APPROVED' && !assessment.supersededAt"
-                        class="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
-                      </svg>
-                      <span class="text-sm font-medium text-gray-900">{{ formatDate(assessment.completedAt || assessment.submittedAt || assessment.createdAt) }}</span>
+                      <i v-if="assessment.status === 'APPROVED' && !assessment.supersededAt" class="pi pi-check-circle w-4 h-4 text-green-500 flex-shrink-0"></i>
+                      <span class="text-sm font-medium text-slate-900">{{ formatDate(assessment.completedAt || assessment.submittedAt || assessment.createdAt) }}</span>
                     </div>
                   </td>
 
@@ -436,16 +423,16 @@ onMounted(() => {
                   <!-- Score -->
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
                     <template v-if="assessment.totalScore !== null">{{ assessment.totalScore }}</template>
-                    <span v-else class="text-gray-400">—</span>
+                    <span v-else class="text-slate-400">—</span>
                   </td>
 
                   <!-- Tier -->
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
                     {{ assessment.tierLabel || '—' }}
                   </td>
 
                   <!-- Rate -->
-                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-gray-900">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-slate-900">
                     ${{ assessment.rate?.toFixed(2) ?? '—' }}
                   </td>
 
@@ -454,11 +441,11 @@ onMounted(() => {
                     <template v-if="assessment.renewalDate && assessment.status === 'APPROVED'">
                       {{ formatDate(assessment.renewalDate) }}
                     </template>
-                    <span v-else class="text-gray-400">—</span>
+                    <span v-else class="text-slate-400">—</span>
                   </td>
 
                   <!-- Criteria Set Name (hidden on mobile) -->
-                  <td class="px-6 py-4 text-sm text-gray-500 hidden lg:table-cell">
+                  <td class="px-6 py-4 text-sm text-slate-500 hidden lg:table-cell">
                     {{ assessment.criteriaSetName || '—' }}
                   </td>
 
@@ -475,21 +462,21 @@ onMounted(() => {
           </div>
 
           <!-- Pagination -->
-          <div v-if="totalPages > 1" class="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between">
-            <div class="text-sm text-gray-500">
+          <div v-if="totalPages > 1" class="bg-white px-4 py-3 border-t border-slate-200 flex items-center justify-between">
+            <div class="text-sm text-slate-500">
               Showing {{ ((page - 1) * limit) + 1 }} to {{ Math.min(page * limit, totalAssessmentsCount) }} of {{ totalAssessmentsCount }} results
             </div>
             <div class="flex space-x-2">
               <button @click="goToPage(page - 1)" :disabled="page === 1"
-                class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50 transition-colors">Previous</button>
+                class="px-3 py-1 border border-slate-300 rounded text-sm disabled:opacity-50 hover:bg-slate-50 transition-colors">Previous</button>
               <template v-for="p in Math.min(5, totalPages)" :key="p">
                 <button @click="goToPage(p)" :class="[
                   'px-3 py-1 border rounded text-sm',
-                  p === page ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-gray-50'
+                  p === page ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-slate-50'
                 ]">{{ p }}</button>
               </template>
               <button @click="goToPage(page + 1)" :disabled="page === totalPages"
-                class="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 hover:bg-gray-50 transition-colors">Next</button>
+                class="px-3 py-1 border border-slate-300 rounded text-sm disabled:opacity-50 hover:bg-slate-50 transition-colors">Next</button>
             </div>
           </div>
         </div>

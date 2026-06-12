@@ -138,20 +138,20 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
-    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="min-h-screen bg-slate-50">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Header -->
       <div class="mb-6 flex items-center justify-between">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-1">Tier Rates Management</h2>
-          <p class="text-sm text-gray-600">Configure rate ranges per specialty and tier</p>
+          <h2 class="text-2xl font-bold text-slate-900 mb-1">Tier Rates Management</h2>
+          <p class="text-sm text-slate-600">Configure rate ranges per specialty and tier</p>
         </div>
       </div>
 
       <!-- Criteria Set Selector -->
       <div class="mb-6 flex items-center gap-4">
-        <label class="text-sm font-medium text-gray-700">Criteria Set:</label>
-        <select v-model="selectedCriteriaSetId" @change="fetchRates" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select min-w-[200px]">
+        <label class="text-sm font-medium text-slate-700">Criteria Set:</label>
+        <select v-model="selectedCriteriaSetId" @change="fetchRates" class="px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select min-w-[200px]">
           <option value="">— Select —</option>
           <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
         </select>
@@ -164,40 +164,40 @@ onMounted(async () => {
 
       <!-- Loading State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Loading tier rates...</p>
+        <p class="text-sm text-slate-500">Loading tier rates...</p>
       </div>
 
       <!-- Matrix Table -->
       <div v-else-if="selectedCriteriaSetId && tableSpecialties.length > 0" class="bg-white shadow rounded-lg overflow-hidden">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
+        <table class="min-w-full divide-y divide-slate-200">
+          <thead class="bg-slate-50">
             <!-- Tier label row (merged over Min/Max) -->
             <tr>
               <th></th>
               <template v-for="label in tierLabels" :key="label">
-                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider" colspan="2">{{ label }}</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-slate-500" colspan="2">{{ label }}</th>
               </template>
               <th></th>
             </tr>
             <!-- Min / Max sub-row -->
             <tr>
-              <th class="px-6 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10" rowspan="2">Specialty</th>
+              <th class="px-6 py-2 text-left text-xs font-medium text-slate-500 sticky left-0 bg-slate-50 z-10" rowspan="2">Specialty</th>
               <template v-for="label in tierLabels" :key="label">
-                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Min</th>
-                <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Max</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-slate-500">Min</th>
+                <th class="px-4 py-2 text-center text-xs font-medium text-slate-500">Max</th>
               </template>
-              <th class="px-6 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider" rowspan="2">Action</th>
+              <th class="px-6 py-2 text-right text-xs font-medium text-slate-500" rowspan="2">Action</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
+          <tbody class="bg-white divide-y divide-slate-200">
             <tr v-for="specialty in tableSpecialties" :key="specialty.id" :class="{ 'bg-yellow-50': !hasRates(specialty.id) }">
-              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 sticky left-0 bg-white z-10">{{ specialty.name }}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 sticky left-0 bg-white z-10">{{ specialty.name }}</td>
 
               <template v-for="label in tierLabels" :key="label">
-                <td class="px-4 py-4 text-center text-sm text-gray-700">
+                <td class="px-4 py-4 text-center text-sm text-slate-700">
                   {{ formatRate(ratesMap.get(specialty.id)?.[label]?.lowRate ?? '—') }}
                 </td>
-                <td class="px-4 py-4 text-center text-sm text-gray-700">
+                <td class="px-4 py-4 text-center text-sm text-slate-700">
                   {{ formatRate(ratesMap.get(specialty.id)?.[label]?.highRate ?? '—') }}
                 </td>
               </template>
@@ -214,7 +214,7 @@ onMounted(async () => {
 
       <!-- Empty State -->
       <div v-else class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Select a criteria set to configure tier rates</p>
+        <p class="text-sm text-slate-500">Select a criteria set to configure tier rates</p>
       </div>
 
       <!-- ─── Edit Rate Modal ─────────────────────────────────────── -->
@@ -222,31 +222,31 @@ onMounted(async () => {
         <Transition name="modal">
           <div v-if="showEditModal" class="fixed inset-0 z-50 overflow-y-auto">
             <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" @click="showEditModal = false" />
+              <div class="fixed inset-0 transition-opacity bg-slate-500 bg-opacity-75" @click="showEditModal = false" />
               <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full">
                 <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <h3 class="text-lg font-medium text-gray-900 mb-1">Edit Rates</h3>
-                  <p v-if="editingSpecialty" class="text-sm text-gray-600">{{ editingSpecialty.name }}</p>
+                  <h3 class="text-lg font-medium text-slate-900 mb-1">Edit Rates</h3>
+                  <p v-if="editingSpecialty" class="text-sm text-slate-600">{{ editingSpecialty.name }}</p>
 
                   <form @submit.prevent="handleSave" class="mt-4 space-y-3">
-                    <table class="min-w-full divide-y divide-gray-200">
-                      <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-slate-200">
+                      <thead class="bg-slate-50">
                         <tr>
-                          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
-                          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Min Rate ($)</th>
-                          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Max Rate ($)</th>
+                          <th class="px-3 py-2 text-left text-xs font-medium text-slate-500 uppercase">Tier</th>
+                          <th class="px-3 py-2 text-center text-xs font-medium text-slate-500 uppercase">Min Rate ($)</th>
+                          <th class="px-3 py-2 text-center text-xs font-medium text-slate-500 uppercase">Max Rate ($)</th>
                         </tr>
                       </thead>
-                      <tbody class="bg-white divide-y divide-gray-200">
+                      <tbody class="bg-white divide-y divide-slate-200">
                         <tr v-for="label in tierLabels" :key="label">
-                          <td class="px-3 py-2 text-sm font-medium text-gray-900">{{ label }}</td>
+                          <td class="px-3 py-2 text-sm font-medium text-slate-900">{{ label }}</td>
                           <td class="px-3 py-2">
                             <input v-model.number="edits[label].lowRate" type="number" step="5" min="0" required
-                              class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-2 focus:ring-blue-500" />
+                              class="w-full px-2 py-1 border border-slate-300 rounded text-sm text-center focus:ring-2 focus:ring-blue-500" />
                           </td>
                           <td class="px-3 py-2">
                             <input v-model.number="edits[label].highRate" type="number" step="5" min="0" required
-                              class="w-full px-2 py-1 border border-gray-300 rounded text-sm text-center focus:ring-2 focus:ring-blue-500" />
+                              class="w-full px-2 py-1 border border-slate-300 rounded text-sm text-center focus:ring-2 focus:ring-blue-500" />
                           </td>
                         </tr>
                       </tbody>
@@ -255,9 +255,9 @@ onMounted(async () => {
                     <div v-if="formError" class="text-red-600 text-sm">{{ formError }}</div>
                   </form>
                 </div>
-                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <div class="bg-slate-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button @click="handleSave" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">Save All</button>
-                  <button @click="showEditModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
+                  <button @click="showEditModal = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-slate-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancel</button>
                 </div>
               </div>
             </div>
