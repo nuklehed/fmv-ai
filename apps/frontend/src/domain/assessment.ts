@@ -8,7 +8,7 @@ export interface CriteriaQuestion {
 
 export interface AssessmentListItem {
   id: string
-  hcp: { firstName: string; lastName: string; email?: string }
+  hcp: { id: string; firstName: string; lastName: string; email?: string }
   submittedByUser: { id: string; email: string }
   specialtyId?: string | null
   specialty?: { id: string; name: string }
@@ -167,6 +167,13 @@ export function isCurrentUser(userId: string | null | undefined): boolean {
 export function isAdminOrSAUser(): boolean {
   const role = localStorage.getItem('userRole')
   return role === 'ADMIN' || role === 'SA'
+}
+
+/** Check if current user has BU role or higher (BU, ADMIN, SA) */
+// fallow-ignore-next-line unused-export
+export function hasBuRole(): boolean {
+  const role = localStorage.getItem('userRole')
+  return role === 'BU' || role === 'ADMIN' || role === 'SA'
 }
 
 /** Check if assessment needs admin/SA review (AI_COMPLETE) */

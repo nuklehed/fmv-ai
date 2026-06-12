@@ -169,7 +169,7 @@ onMounted(() => {
                 <span v-else class="text-xs text-gray-400">—</span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right">
-                <button @click.stop="viewHcpProfile(assessment)" class="text-purple-600 hover:text-purple-900 font-medium">Profile</button>
+                <button @click.stop="viewHcpProfile(assessment)" class="text-purple-600 hover:text-purple-900 text-sm font-medium">Profile</button>
               </td>
             </tr>
           </tbody>

@@ -90,6 +90,88 @@ function startAutoRefresh() {
   }, 30000)
 }
 
+// ─── Actions Menu (kebab dropdown per row) ───────────────────────
+
+type ActionMenuItem =
+  | { label: string; icon: string; command?: (() => void) | undefined; routerLink?: string | undefined }
+  | { separator: true }
+
+// ─── Actions Menu (click-positioned overlay) ─────────────────────
+
+interface MenuPosition {
+  top: string
+  left: string
+}
+
+const menuOpen = ref(false)
+const menuAssessment = ref<assessmentDomain.AssessmentListItem | null>(null)
+const menuPos = ref<MenuPosition>({ top: '0px', left: '0px' })
+
+function buildMenuItems(assessment: assessmentDomain.AssessmentListItem): ActionMenuItem[] {
+  const items: ActionMenuItem[] = []
+
+  if (assessmentDomain.isDraft(assessment)) {
+    items.push({ label: assessmentDomain.isCurrentUser(assessment.submittedByUser.id) ? 'Continue' : 'Edit', icon: 'pi pi-pencil', command: () => navigateToEditDraft(assessment.id) })
+    items.push({ separator: true })
+    items.push({ label: 'Delete', icon: 'pi pi-trash', command: () => deleteDraft(assessment) })
+  } else {
+    // Profile (BU+ only)
+    if (assessmentDomain.hasBuRole()) {
+      items.push({ label: 'Profile', icon: 'pi pi-user', routerLink: `/hcp/${assessment.hcp.id}/profile` })
+    }
+    // Review
+    if (assessment.status === 'UNDER_REVIEW' && assessmentDomain.isAdminOrSAUser()) {
+      items.push({ label: 'Review', icon: 'pi pi-check-circle', routerLink: `/assessments/${assessment.id}/review` })
+    }
+    // Cancel / Retry
+    if (assessment.status === 'AI_PROCESSING') {
+      items.push({ label: 'Cancel', icon: 'pi pi-times', command: () => cancelAssessment(assessment) })
+    }
+    if (assessmentDomain.isFailed(assessment) && assessmentDomain.canRetry(assessment)) {
+      items.push({ label: 'Retry', icon: 'pi pi-sync', command: () => retryFailedAssessment(assessment) })
+    }
+    // View details
+    items.push({ separator: true })
+    items.push({ label: 'View Details', icon: 'pi pi-eye', command: () => openDetailPanel(assessment) })
+  }
+
+  return items
+}
+
+function toggleMenu(event: Event, assessment: assessmentDomain.AssessmentListItem): void {
+  if (menuOpen.value && menuAssessment.value?.id === assessment.id) {
+    // Close if same row clicked again
+    menuOpen.value = false
+    return
+  }
+  const tdRect = (event.target as HTMLElement).closest('td')?.getBoundingClientRect()
+  const btnRect = (event.target as HTMLElement).getBoundingClientRect()
+  if (tdRect && btnRect) {
+    // Fixed positioning is viewport-relative, so use getBoundingClientRect() directly
+    menuPos.value = { top: `${btnRect.bottom}px`, left: `${Math.min(btnRect.right - 160, tdRect.right - 160)}px` }
+  }
+  menuAssessment.value = assessment
+  menuOpen.value = true
+}
+
+function handleMenuAction(item: ActionMenuItem): void {
+  if ('separator' in item) return
+  if (item.routerLink) {
+    router.push(item.routerLink)
+  } else if (item.command) {
+    item.command()
+  }
+}
+
+function closeMenu(): void {
+  menuOpen.value = false
+}
+
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+  if (menuOpen.value && !(e.target as HTMLElement).closest('[data-menu-btn]')) closeMenu()
+})
+
 // ─── Detail Panel ────────────────────────────────────────────────
 
 async function openDetailPanel(assessment: assessmentDomain.AssessmentListItem) {
@@ -296,7 +378,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
         <input v-model="searchQuery" @input="onSearchInput" type="text" placeholder="Search by HCP name..."
           class="flex-1 max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
         <select v-model="statusFilter" @change="handleSearch"
-          class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
           <option value="">All Statuses</option>
           <template v-if="assessmentDomain.isAdminOrSAUser()">
             <option value="AI_COMPLETE">⚠️ Needs Review</option>
@@ -356,36 +438,12 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
               <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ assessment.totalScore !== null ? assessment.totalScore : '—' }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ assessmentDomain.formatDate(assessment.submittedAt) }}</td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ assessmentDomain.formatDate(assessment.completedAt) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2" @click.stop>
-                <!-- DRAFT status actions -->
-                <template v-if="assessmentDomain.isDraft(assessment)">
-                  <button @click="navigateToEditDraft(assessment.id)" class="text-blue-600 hover:text-blue-900 font-medium mr-3">
-                    {{ assessmentDomain.isCurrentUser(assessment.submittedByUser.id) ? 'Continue' : 'Edit' }}
-                  </button>
-                  <button @click.stop="deleteDraft(assessment)" class="text-red-600 hover:text-red-900">Delete</button>
-                </template>
-                <!-- Non-DRAFT status actions -->
-                <template v-else>
-                  <!-- UNDER_REVIEW: show review + view buttons -->
-                  <template v-if="assessment.status === 'UNDER_REVIEW' && assessmentDomain.isAdminOrSAUser()">
-                    <router-link :to="`/assessments/${assessment.id}/review`" class="text-purple-600 hover:text-purple-900 font-medium mr-3">
-                      Review
-                    </router-link>
-                  </template>
-                  <!-- AI_PROCESSING: show cancel button + view -->
-                  <template v-if="assessment.status === 'AI_PROCESSING'">
-                    <button @click.stop="cancelAssessment(assessment)" :disabled="cancelLoading" class="text-red-600 hover:text-red-900 font-medium mr-3">
-                      {{ cancelLoading ? 'Cancelling...' : 'Cancel' }}
-                    </button>
-                  </template>
-                  <!-- AI_FAILED: show retry button + view -->
-                  <template v-if="assessmentDomain.isFailed(assessment) && assessmentDomain.canRetry(assessment)">
-                    <button @click.stop="retryFailedAssessment(assessment)" :disabled="retryLoading" class="text-orange-600 hover:text-orange-900 font-medium mr-3">
-                      {{ retryLoading ? 'Retrying...' : 'Retry' }}
-                    </button>
-                  </template>
-                  <button @click="openDetailPanel(assessment)" class="text-blue-600 hover:text-blue-900">View</button>
-                </template>
+              <td class="px-6 py-4 whitespace-nowrap text-right">
+                <!-- Kebab menu button (one icon per row) -->
+                <button @click.stop="toggleMenu($event, assessment)" data-menu-btn
+                  class="p-1.5 rounded-md hover:bg-gray-100 text-gray-300 hover:text-gray-600 transition-colors">
+                  <i class="pi pi-ellipsis-v"></i>
+                </button>
               </td>
             </tr>
           </tbody>
@@ -416,6 +474,10 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                   <!-- Panel Header -->
                   <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
                     <h3 class="text-lg font-semibold text-gray-900">Assessment Details</h3>
+                    <router-link v-if="assessmentDomain.hasBuRole()" :to="`/hcp/${selectedAssessment.hcp.id}/profile`" class="inline-flex items-center px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-md text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors">
+                      <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                      View Profile
+                    </router-link>
                     <button @click="closeDetailPanel" class="text-gray-400 hover:text-gray-600">
                       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
@@ -426,7 +488,13 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                     <!-- HCP Info -->
                     <div class="mb-4">
                       <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">HCP</h4>
-                      <p class="text-sm font-semibold text-gray-900">{{ selectedAssessment.hcp.firstName }} {{ selectedAssessment.hcp.lastName }}</p>
+                      <template v-if="assessmentDomain.hasBuRole()">
+                        <router-link :to="`/hcp/${selectedAssessment.hcp.id}/profile`" class="inline-flex items-center text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+                          {{ selectedAssessment.hcp.firstName }} {{ selectedAssessment.hcp.lastName }}
+                          <svg class="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </router-link>
+                      </template>
+                      <p v-else class="text-sm font-semibold text-gray-900">{{ selectedAssessment.hcp.firstName }} {{ selectedAssessment.hcp.lastName }}</p>
                       <p v-if="selectedAssessment.hcp.email" class="text-sm text-gray-600">{{ selectedAssessment.hcp.email }}</p>
                     </div>
 
@@ -608,7 +676,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
 
                     <div class="mb-3">
                       <label for="approve-tier" class="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Tier</label>
-                      <select id="approve-tier" v-model="approveTierId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                      <select id="approve-tier" v-model="approveTierId" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select">
                         <option value="">Auto-assign based on score</option>
                         <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">{{ tier.name }}</option>
                       </select>
@@ -674,6 +742,30 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
             </div>
           </div>
         </Transition>
+      </Teleport>
+
+      <!-- Actions dropdown overlay -->
+      <Teleport to="body">
+        <div v-if="menuOpen && menuAssessment" :style="{ position: 'fixed', top: menuPos.top, left: menuPos.left, zIndex: 9999 }"
+          class="bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-48">
+          <template v-for="(item, idx) in buildMenuItems(menuAssessment)" :key="idx">
+            <!-- Separator -->
+            <div v-if="'separator' in item" class="border-t border-gray-100 my-1" />
+            <!-- Menu item: router link -->
+            <router-link v-else-if="item.routerLink" :to="item.routerLink"
+              @click="closeMenu()"
+              class="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+              <i :class="[item.icon, 'w-4 h-4']" />
+              {{ item.label }}
+            </router-link>
+            <!-- Menu item: action command -->
+            <button v-else @click.stop="handleMenuAction(item); closeMenu()"
+              class="flex items-center gap-2 px-3 py-2 w-full text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700">
+              <i :class="[item.icon, 'w-4 h-4']" />
+              {{ item.label }}
+            </button>
+          </template>
+        </div>
       </Teleport>
     </main>
   </div>

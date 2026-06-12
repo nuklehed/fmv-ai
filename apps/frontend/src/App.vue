@@ -80,8 +80,8 @@ function getNotificationIcon(type: string): string {
   const icons: Record<string, string> = {
     ASSESSMENT_APPROVED: '✅',
     ASSESSMENT_REJECTED: '❌',
-    CERTIFICATE_EXPIRING: '⚠️',
-    ASSESSMENT_AI_COMPLETE: '🤖'
+    ASSESSMENT_SUPERSEDED: '⬆️',
+    EXPIRY_REMINDER: '⚠️'
   }
   return icons[type] || '🔔'
 }
