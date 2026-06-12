@@ -151,7 +151,7 @@ onMounted(async () => {
       <!-- Criteria Set Selector -->
       <div class="mb-6 flex items-center gap-4">
         <label class="text-sm font-medium text-gray-700">Criteria Set:</label>
-        <select v-model="selectedCriteriaSetId" @change="fetchRates" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]">
+        <select v-model="selectedCriteriaSetId" @change="fetchRates" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select min-w-[200px]">
           <option value="">— Select —</option>
           <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
         </select>

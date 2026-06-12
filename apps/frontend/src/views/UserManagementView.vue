@@ -216,7 +216,7 @@ onMounted(fetchUsers)
                     </div>
                     <div>
                       <label for="add-role" class="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-                      <select id="add-role" v-model="addRole" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select id="add-role" v-model="addRole" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
                         <option value="BU">Business User (BU)</option>
                         <option value="ADMIN">Administrator</option>
                       </select>
@@ -252,7 +252,7 @@ onMounted(fetchUsers)
                   <form @submit.prevent="handleUpdate" class="space-y-4 mt-4">
                     <div>
                       <label for="edit-role" class="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-                      <select id="edit-role" v-model="editRole" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <select id="edit-role" v-model="editRole" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
                         <option value="BU">Business User (BU)</option>
                         <option value="ADMIN">Administrator</option>
                         <option value="SA">Superadmin (SA)</option>

@@ -645,7 +645,7 @@ onMounted(async () => {
                 <div>
                   <label for="new-hcp-specialty" class="block text-xs font-medium text-gray-700 mb-1">Specialty</label>
                   <select id="new-hcp-specialty" v-model="newHcpForm.specialtyId"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm form-select">
                     <option value="">Select specialty...</option>
                     <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
                   </select>
@@ -769,7 +769,7 @@ onMounted(async () => {
             <div>
               <label for="specialty" class="block text-sm font-medium text-gray-700 mb-1">Specialty</label>
               <select id="specialty" v-model="specialtyId"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select">
                 <option value="">Select specialty...</option>
                 <option v-for="s in specialties" :key="s.id" :value="s.id">{{ s.name }}</option>
               </select>

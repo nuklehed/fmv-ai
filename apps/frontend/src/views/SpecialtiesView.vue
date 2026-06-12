@@ -269,7 +269,7 @@ onMounted(() => {
                         id="add-criteria-set"
                         v-model="formCriteriaSetId"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select"
                       >
                         <option value="">Select a criteria set...</option>
                         <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
@@ -348,7 +348,7 @@ onMounted(() => {
                         id="edit-criteria-set"
                         v-model="formCriteriaSetId"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select"
                       >
                         <option value="">Select a criteria set...</option>
                         <option v-for="cs in criteriaSets" :key="cs.id" :value="cs.id">{{ cs.name }}</option>
