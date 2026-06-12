@@ -365,7 +365,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
           <h2 class="text-2xl font-bold text-slate-900 mb-1">Assessments</h2>
           <p class="text-sm text-slate-600">{{ totalCount.toLocaleString() }} {{ groupedByHcp ? 'active records (one per HCP)' : 'assessments' }} ({{ statusFilter ? 'filtered' : 'all' }})</p>
         </div>
-        <a href="/assessments/new" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium">+ Request Assessment</a>
+        <router-link :to="{ name: 'assessmentNew' }" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 text-sm font-medium">+ Request Assessment</router-link>
       </div>
 
       <!-- Error Message -->
@@ -791,7 +791,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                         <i v-if="!retryLoading" class="pi pi-sync mr-1"></i>
                         {{ retryLoading ? 'Retrying...' : 'Retry AI Processing' }}
                       </button>
-                      <a href="/assessments/new" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</a>
+                      <router-link :to="{ name: 'assessmentNew', query: { hcpId: selectedAssessment.hcp.id } }" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</router-link>
                     </div>
                   </div>
                 </div>

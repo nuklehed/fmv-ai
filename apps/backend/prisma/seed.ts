@@ -124,6 +124,36 @@ async function main() {
         { id: 'a6', questionId: 'q2', text: 'More than 5 years', score: 5, order: 3 }
       ]
     })
+
+    // Link active specialties to this criteria set (if not already linked)
+    const specialties = await prisma.specialty.findMany({ where: { tenantId, isActive: true } })
+    for (const specialty of specialties) {
+      if (!specialty.criteriaSetId) {
+        await prisma.specialty.update({
+          where: { id: specialty.id },
+          data: { criteriaSetId: cs.id }
+        })
+      }
+    }
+
+    // Create tier rate entries for this criteria set (same tiers as FMV)
+    const tierRates = [
+      { tierLabel: 'Tier 1', lowRate: 445, highRate: 645 },
+      { tierLabel: 'Tier 2', lowRate: 245, highRate: 445 },
+      { tierLabel: 'Tier 3', lowRate: 50, highRate: 245 }
+    ]
+    for (const specialty of specialties) {
+      for (const tier of tierRates) {
+        const existing = await prisma.specialtyRate.findFirst({
+          where: { specialtyId: specialty.id, criteriaSetId: cs.id, tierLabel: tier.tierLabel }
+        })
+        if (!existing) {
+          await prisma.specialtyRate.create({
+            data: { specialtyId: specialty.id, criteriaSetId: cs.id, tierLabel: tier.tierLabel, lowRate: tier.lowRate, highRate: tier.highRate, tenantId }
+          })
+        }
+      }
+    }
   }
 
   // Create default application settings if none exist

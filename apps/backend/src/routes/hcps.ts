@@ -26,17 +26,16 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
 
     // Search across name and identifiers
     if (search && typeof search === 'string' && search.length > 0) {
-      const lowerSearch = search.toLowerCase()
       where.OR = [
-        { firstName: { contains: lowerSearch } },
-        { lastName: { contains: lowerSearch } },
-        { email: { contains: lowerSearch } },
-        { city: { contains: lowerSearch } },
-        { state: { contains: lowerSearch } },
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+        { state: { contains: search, mode: 'insensitive' } },
         {
           identifiers: {
             some: {
-              value: { contains: lowerSearch },
+              value: { contains: search, mode: 'insensitive' },
               isActive: true
             }
           }

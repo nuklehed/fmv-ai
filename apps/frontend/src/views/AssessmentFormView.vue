@@ -462,11 +462,39 @@ watch(specialtyId, (newSpecialtyId) => {
   }
 })
 
+// ─── Pre-select HCP from query param (sidebar navigation) ─────────
+
+async function preselectHcpFromQuery(hcpId: string) {
+  try {
+    const hcp = await assessmentDomain.fetchHcpProfile(hcpId)
+    selectHcp({
+      id: hcp.hcp.id,
+      firstName: hcp.hcp.firstName,
+      lastName: hcp.hcp.lastName,
+      email: hcp.hcp.email || '',
+      phone: hcp.hcp.phone || '',
+      address: hcp.hcp.address || '',
+      city: hcp.hcp.city || '',
+      state: hcp.hcp.state || '',
+      country: hcp.hcp.country,
+      specialtyId: hcp.hcp.specialtyId || '',
+      specialtyName: hcp.hcp.specialtyName || ''
+    })
+    formSuccess.value = `Pre-selected ${hcp.hcp.firstName} ${hcp.hcp.lastName} from profile`
+  } catch {
+    // HCP not found — silently ignore, user can search manually
+  }
+}
+
 // ─── Lifecycle ─────────────────────────────────────────────────────
 
 onMounted(async () => {
   try { specialties.value = await assessmentDomain.fetchSpecialties() } catch { /* silent */ }
   if (isEditMode.value) loadDraft()
+  else {
+    const hcpId = route.query.hcpId as string | undefined
+    if (hcpId) preselectHcpFromQuery(hcpId)
+  }
 })
 </script>
 
