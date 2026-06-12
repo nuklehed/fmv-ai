@@ -19,8 +19,8 @@ const savingApprove = ref(false)
 const formError = ref('')
 const successMessage = ref('')
 
-// Review mode: false = Phase 1 (read-only), true = Phase 2 (editable + approve)
-const isReviewing = ref(false)
+// Review mode
+const isReviewing = ref(false) // Phase 2 — editable review
 
 // Override state per question
 interface OverrideEntry {
@@ -32,10 +32,47 @@ interface OverrideEntry {
 const overrides = ref<OverrideEntry[]>([])
 
 // Tier/rate state
-const availableTiers = ref<Array<{ id: string; name: string; lowRate: number; highRate: number }>>([])
+interface TierInfo {
+  id: string
+  name: string
+  lowRate: number
+  highRate: number
+  defaultRate: number // auto-calculated at configured percentile of range
+  minScore: number | null
+  maxScore: number | null
+}
+const availableTiers = ref<TierInfo[]>([])
 const approveTierId = ref('')
 const approveRateOverride = ref('')
 const approveRationale = ref('')
+const rateError = ref('')
+const defaultTierPercentile = ref(50) // fallback, loaded from settings
+const roundTierRateToNearest5 = ref(true) // fallback, loaded from settings
+
+/** Round a value to the nearest $5 */
+function roundToNearest5(value: number): number {
+  return Math.round(value / 5) * 5
+}
+
+/** Calculate default rate for a tier at configured percentile of range */
+function calcDefaultRate(low: number, high: number, percentile?: number): number {
+  const p = percentile ?? defaultTierPercentile.value
+  const range = high - low
+  let result = low + (range * p / 100)
+  if (roundTierRateToNearest5.value) {
+    result = roundToNearest5(result)
+  }
+  return result
+}
+
+/** Format rate as dollar string */
+function formatRate(value: number | null | undefined): string {
+  if (value == null) return '—'
+  return `$${value.toFixed(2)}`
+}
+
+/** Display label for the default rate column (e.g. "Default (75%)") */
+const defaultRateLabel = computed(() => `Default (${defaultTierPercentile.value}%)`)
 
 // ─── Computed ──────────────────────────────────────────────────
 
@@ -70,6 +107,46 @@ const adminScore = computed(() => {
 
 /** Zero-score flag — prevents auto-approval, requires manual review */
 const isZeroScore = computed(() => adminScore.value !== null && adminScore.value === 0)
+
+/** Selected tier info for display */
+const selectedTierInfo = computed<TierInfo | null>(() => {
+  if (!approveTierId.value) return null
+  // id and name are both the label string, so match by either
+  return availableTiers.value.find(t => t.id === approveTierId.value || t.name === approveTierId.value) || null
+})
+
+/** Whether the assessment is already approved (read-only view) */
+const isApproved = computed(() => assessment.value?.status === 'APPROVED')
+
+/** Tier that matches the admin score (for auto-assign highlight) */
+const autoAssignedTierId = computed<string | null>(() => {
+  const score = adminScore.value
+  if (score == null) return null
+  const tier = availableTiers.value.find(t =>
+    t.minScore != null && t.maxScore != null &&
+    score >= t.minScore && score <= t.maxScore
+  )
+  return tier ? tier.id : null
+})
+
+/** Round rate input to nearest $5 on blur */
+/** Round to nearest $5 and validate against tier range */
+function roundAndValidateRate(): void {
+  const raw = parseFloat(approveRateOverride.value)
+  if (isNaN(raw) || !approveRateOverride.value.trim()) { rateError.value = ''; return }
+
+  // Only round when the user has finished typing (not on every keystroke)
+  const rounded = roundToNearest5(raw)
+  approveRateOverride.value = String(rounded)
+
+  // Validate against selected tier range
+  const tier = selectedTierInfo.value
+  if (tier && (rounded < tier.lowRate || rounded > tier.highRate)) {
+    rateError.value = `Rate must be within ${formatRate(tier.lowRate)}–${formatRate(tier.highRate)}`
+  } else {
+    rateError.value = ''
+  }
+}
 
 /** Handle answer change — clear rationale when reverting to AI's choice */
 function onAnswerChange(_questionId: string, index: number): void {
@@ -125,6 +202,8 @@ async function fetchAssessment() {
       })
     }
 
+    await loadDefaultTierPercentile()
+    await loadRoundTierRateSetting()
     await loadTiers()
   } catch {
     formError.value = 'Failed to load assessment'
@@ -133,16 +212,51 @@ async function fetchAssessment() {
   }
 }
 
+/** Load the configured default tier percentile from application settings */
+/** Load the configured default tier percentile from application settings */
+async function loadDefaultTierPercentile(): Promise<void> {
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch('/api/application-settings/defaultTierPercentile', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (response.ok) {
+      const setting = await response.json()
+      defaultTierPercentile.value = Number(setting.value) ?? 50
+    }
+  } catch { /* use default */ }
+}
+
+/** Load the rounding preference from application settings */
+async function loadRoundTierRateSetting(): Promise<void> {
+  try {
+    const token = localStorage.getItem('accessToken')
+    const response = await fetch('/api/application-settings/roundTierRateToNearest5', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (response.ok) {
+      const setting = await response.json()
+      roundTierRateToNearest5.value = setting.value === true || setting.value === 'true' || Number(setting.value) === 1
+    } else {
+      // Default: on (true)
+      roundTierRateToNearest5.value = true
+    }
+  } catch { /* default to true */ }
+}
+
 async function loadTiers() {
   try {
     const criteriaSetId = assessment.value?.criteriaSetId
     if (criteriaSetId) {
       const data = await assessmentDomain.fetchTierThresholds(criteriaSetId)
-      availableTiers.value = data.thresholds.map((t: any) => ({
+      availableTiers.value = data.thresholds.map((t: any): TierInfo => ({
         id: t.label,
         name: t.label,
-        lowRate: 0,
-        highRate: 0
+        lowRate: Number(t.lowRate),
+        highRate: Number(t.highRate),
+        defaultRate: calcDefaultRate(Number(t.lowRate), Number(t.highRate)),
+        minScore: t.minScore ?? null,
+        maxScore: t.maxScore ?? null
       }))
     }
   } catch { /* silent */ }
@@ -239,6 +353,55 @@ onMounted(() => { fetchAssessment() })
         <p class="text-sm text-gray-500">Loading assessment...</p>
       </div>
 
+      <!-- Approved: read-only summary of the approved assessment -->
+      <div v-else-if="assessment && isApproved" class="space-y-6">
+        <!-- Score Banner -->
+        <div class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-semibold text-gray-900 mb-4">Assessment Approved</h2>
+          <div class="flex items-center space-x-8">
+            <div>
+              <p class="text-sm text-gray-500">Approved Score</p>
+              <p class="text-3xl font-bold text-green-700">{{ assessment.totalScore ?? '—' }}</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Tier</p>
+              <p class="text-xl font-semibold text-gray-900">{{ assessment.tierLabel || '—' }}</p>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Rate</p>
+              <p class="text-xl font-semibold text-green-700">${{ (assessment.rate as number | null)?.toFixed(2) ?? '—' }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Results Cards (read-only) -->
+        <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
+          <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-base font-medium text-gray-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+
+            <!-- AI's Selection -->
+            <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div class="flex items-start space-x-3">
+                <svg class="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z" /></svg>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
+                  <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-gray-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Back button -->
+        <div class="flex justify-center pt-4">
+          <router-link to="/assessments"
+            class="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors">
+            ← Back to Assessments
+          </router-link>
+        </div>
+      </div>
+
       <!-- Phase 1: Read-only AI Results (before clicking Start Review) -->
       <div v-else-if="assessment && !isReviewing" class="space-y-6">
         <!-- Score Banner -->
@@ -325,7 +488,7 @@ onMounted(() => { fetchAssessment() })
                 :id="`answer-${question.id}`"
                 v-model="overrides[index].selectedAnswerId"
                 @change="onAnswerChange(question.id, index)"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select"
               >
                 <option value="">Select answer...</option>
                 <option v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" :value="answer.id">
@@ -362,25 +525,86 @@ onMounted(() => { fetchAssessment() })
             </div>
           </div>
 
+          <!-- Tier reference table -->
+          <div v-if="availableTiers.length > 0" class="mb-4 overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead>
+                <tr class="border-b border-gray-200">
+                  <th class="px-3 py-2 text-left font-medium text-gray-500">Tier</th>
+                  <th class="px-3 py-2 text-right font-medium text-gray-500">Score Range</th>
+                  <th class="px-3 py-2 text-right font-medium text-gray-500">Rate Range</th>
+                  <th class="px-3 py-2 text-right font-medium text-gray-500">{{ defaultRateLabel }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="tier in availableTiers" :key="tier.id"
+                  :class="[
+                    'border-b border-gray-100',
+                    approveTierId === tier.id || autoAssignedTierId === tier.id
+                      ? 'bg-blue-50 ring-2 ring-inset ring-blue-300'
+                      : 'hover:bg-gray-50'
+                  ]">
+                  <td class="px-3 py-2 font-medium text-gray-900">{{ tier.name }}</td>
+                  <td v-if="tier.minScore != null && tier.maxScore != null" class="px-3 py-2 text-right text-gray-600">
+                    {{ tier.minScore }}–{{ tier.maxScore }}
+                    <span v-if="autoAssignedTierId === tier.id"
+                      class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-200 text-blue-800">
+                      auto
+                    </span>
+                  </td>
+                  <td v-else class="px-3 py-2 text-right text-gray-400">—</td>
+                  <td class="px-3 py-2 text-right text-gray-600">{{ formatRate(tier.lowRate) }} – {{ formatRate(tier.highRate) }}</td>
+                  <td class="px-3 py-2 text-right font-medium text-green-700">{{ formatRate(tier.defaultRate) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Tier selection -->
           <div class="space-y-4">
             <div>
               <label for="approve-tier" class="block text-sm font-medium text-gray-700 mb-1">Tier</label>
               <select id="approve-tier" v-model="approveTierId" :disabled="isZeroScore"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed">
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select disabled:opacity-50 disabled:cursor-not-allowed">
                 <option value="">Auto-assign based on score</option>
-                <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">{{ tier.name }}</option>
+                <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">
+                  {{ tier.name }}
+                  <template v-if="tier.minScore != null && tier.maxScore != null"> — {{ tier.minScore }}–{{ tier.maxScore }}</template>
+                </option>
               </select>
-              <p v-if="isZeroScore" class="text-xs text-red-600 mt-1">Tier auto-assign disabled for zero-score assessments</p>
+              <p v-if="autoAssignedTierId && !approveTierId && !isZeroScore"
+                class="text-xs text-blue-600 mt-1">
+                → Score {{ adminScore }} would auto-assign to
+                <strong>{{ availableTiers.find(t => t.id === autoAssignedTierId)?.name }}</strong>
+              </p>
             </div>
 
+            <!-- Rate Override -->
             <div>
-              <label for="rate-override" class="block text-sm font-medium text-gray-700 mb-1">Rate Override (optional)</label>
-              <input id="rate-override" v-model="approveRateOverride" type="number" step="0.01" placeholder="Override calculated rate" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <label for="rate-override" class="block text-sm font-medium text-gray-700 mb-1">
+                FMV Rate (optional)
+                <span v-if="selectedTierInfo" class="text-gray-500 font-normal">
+                  — range: {{ formatRate(selectedTierInfo.lowRate) }}–{{ formatRate(selectedTierInfo.highRate) }}, default: <strong>{{ formatRate(selectedTierInfo.defaultRate) }}</strong>
+                </span>
+              </label>
+              <div class="flex items-center gap-2">
+                <div class="relative flex-1">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input id="rate-override" v-model="approveRateOverride"
+                    type="number" step="5" min="0"
+                    @blur="roundAndValidateRate"
+                    placeholder="Auto-calculated if left blank"
+                    class="w-full pl-7 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select" />
+                </div>
+              </div>
+              <p v-if="rateError" class="text-xs text-red-600 mt-1">{{ rateError }}</p>
             </div>
 
+            <!-- Approval Rationale -->
             <div>
               <label for="approve-rationale" class="block text-sm font-medium text-gray-700 mb-1">Approval Rationale (optional)</label>
-              <textarea id="approve-rationale" v-model="approveRationale" rows="2" placeholder="Explain approval decision..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+              <textarea id="approve-rationale" v-model="approveRationale" rows="2" placeholder="Explain approval decision..."
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
           </div>
         </div>

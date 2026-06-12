@@ -17,9 +17,7 @@
   - **Backend**: New endpoint `GET /api/hcps/:id/active-assessment` for supersession checks; domain-level `listPaginated()` now supports `groupedByHcp` option via `private listGroupedByHcp()`.
 
 ## What's Left
-
-### Issue #37 — Frontend Notification System
-The backend emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notification badge/list handling for the new type.
+**None.** All issues (#33, #34, #35, #36, #37) are closed.
 
 ## Key Decisions & Constraints
 - **Single Active Approval:** Only one `isActive=true` per HCP at a time. New assessments supersede old ones on Admin approval (not immediately on submission).
@@ -35,7 +33,4 @@ The backend emits `ASSESSMENT_SUPERSEDED` notifications. Need frontend notificat
 - Database already has the 5 new columns and FK constraints applied (procedural migration ran via `$executeRawUnsafe`)
 - Prisma client regenerated with new schema
 
-## Suggested Skills
-- **tdd** — for building Issue #37 notification system test-first
-- **grill-with-docs** — to refine UI layout decisions before coding the profile page
-- **improve-codebase-architecture** — review overall feature coherence after completion
+**Design Principles** — now captured as a standalone skill: [`.agents/skills/design-principles/SKILL.md`](.agents/skills/design-principles/SKILL.md). Covers typography (Tailwind defaults only), 3-role color palette, whitespace-first layout, and pre-generation checklist.

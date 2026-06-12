@@ -104,7 +104,7 @@ export class AssessmentDomain {
       skip: (params.page - 1) * params.limit,
       take: params.limit,
       include: {
-        hcp: { select: { firstName: true, lastName: true, email: true } },
+        hcp: { select: { id: true, firstName: true, lastName: true, email: true } },
         submittedByUser: { select: { id: true, email: true } },
         specialty: { select: { id: true, name: true } }
       }
@@ -128,7 +128,7 @@ export class AssessmentDomain {
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        hcp: { select: { firstName: true, lastName: true, email: true } },
+        hcp: { select: { id: true, firstName: true, lastName: true, email: true } },
         submittedByUser: { select: { id: true, email: true } },
         specialty: { select: { id: true, name: true } }
       }
@@ -832,9 +832,26 @@ export class AssessmentDomain {
 
     if (!specialtyRate) throw new Error(`No rate defined for ${assignedTierLabel} in this specialty. Please set rates first.`)
 
-    // Calculate rate based on percentile or use override
+    // Calculate rate based on configured percentile or use override
     const range = Number(specialtyRate.highRate) - Number(specialtyRate.lowRate)
-    finalRate = rateOverride !== undefined ? rateOverride : (Number(specialtyRate.lowRate) + (range * 50 / 100))
+    if (rateOverride !== undefined && finalRate === null) {
+      finalRate = rateOverride
+    } else if (finalRate === null) {
+      const pctSetting = await this.prisma.applicationSetting.findFirst({
+        where: { key: 'defaultTierPercentile', tenantId }
+      })
+      const percentile = pctSetting ? Number(pctSetting.value) : 50
+      finalRate = Number(specialtyRate.lowRate) + (range * percentile / 100)
+
+      // Optionally round to nearest $5
+      const roundingSetting = await this.prisma.applicationSetting.findFirst({
+        where: { key: 'roundTierRateToNearest5', tenantId }
+      })
+      const doRound = roundingSetting ? (roundingSetting.value === 'true' || Number(roundingSetting.value) === 1) : true
+      if (doRound) {
+        finalRate = Math.round(finalRate / 5) * 5
+      }
+    }
 
     // Validate rate is within tier bounds if override provided
     if (rateOverride !== undefined && finalRate !== null) {

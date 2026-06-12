@@ -17,6 +17,7 @@ const savingKey = ref<string | null>(null)
 const approvalValidityPeriod = ref<number>(defaultValues.approvalValidityPeriod as number)
 const expiryReminderLeadTime = ref<number>(defaultValues.expiryReminderLeadTime as number)
 const defaultTierPercentile = ref<number>(50)
+const roundTierRateToNearest5 = ref<boolean>(true)
 const numberOfTiers = ref<number>(3)
 
 async function fetchSettings() {
@@ -37,6 +38,7 @@ async function fetchSettings() {
       if (s.key === 'approvalValidityPeriod') approvalValidityPeriod.value = Number(s.value ?? defaultValues.approvalValidityPeriod)
       if (s.key === 'expiryReminderLeadTime') expiryReminderLeadTime.value = Number(s.value ?? defaultValues.expiryReminderLeadTime)
       if (s.key === 'defaultTierPercentile') defaultTierPercentile.value = Number(s.value ?? 50)
+      if (s.key === 'roundTierRateToNearest5') roundTierRateToNearest5.value = Boolean(JSON.parse(String(s.value ?? 'true')))
     })
 
     // Fetch tier config separately
@@ -81,6 +83,8 @@ async function handleSave(key: string) {
       value = expiryReminderLeadTime.value
     } else if (key === 'defaultTierPercentile') {
       value = defaultTierPercentile.value
+    } else if (key === 'roundTierRateToNearest5') {
+      value = roundTierRateToNearest5.value as unknown
     }
 
     const response = await fetch(`/api/application-settings/${key}`, {
@@ -242,6 +246,21 @@ onMounted(() => {
             >
               {{ savingKey === 'defaultTierPercentile' ? 'Saving...' : 'Save' }}
             </button>
+          </div>
+
+          <!-- Rounding checkbox -->
+          <div class="mt-4 flex items-center space-x-3">
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                v-model="roundTierRateToNearest5"
+                :disabled="savingKey === 'roundTierRateToNearest5'"
+                @change="handleSave('roundTierRateToNearest5')"
+                class="sr-only peer"
+              />
+              <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+            <span class="text-sm text-gray-700">Round resulting rate to nearest $5 increment</span>
           </div>
         </div>
 
