@@ -52,14 +52,14 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     })
 
     // Group rates by specialty
-    const specialtyRatesMap = new Map<string, Record<string, { lowRate: string; highRate: string }>>()
+    const specialtyRatesMap = new Map<string, Record<string, { lowRate: number | null; highRate: number | null }>>()
     for (const rate of rates) {
       if (!specialtyRatesMap.has(rate.specialtyId)) {
         specialtyRatesMap.set(rate.specialtyId, {})
       }
       specialtyRatesMap.get(rate.specialtyId)![rate.tierLabel] = {
-        lowRate: rate.lowRate,
-        highRate: rate.highRate
+        lowRate: Number(rate.lowRate),
+        highRate: Number(rate.highRate)
       }
     }
 
@@ -155,8 +155,8 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
         specialtyId,
         criteriaSetId,
         tierLabel,
-        lowRate: String(lowRate),
-        highRate: String(highRate),
+        lowRate,
+        highRate,
         tenantId: req.tenantId!
       },
       include: {
@@ -197,8 +197,8 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response): Promise<voi
 
     const updateData: Record<string, unknown> = {}
     if (tierLabel !== undefined) updateData.tierLabel = tierLabel
-    if (lowRate !== undefined) updateData.lowRate = String(lowRate)
-    if (highRate !== undefined) updateData.highRate = String(highRate)
+    if (lowRate !== undefined) updateData.lowRate = lowRate
+    if (highRate !== undefined) updateData.highRate = highRate
 
     const updated = await prisma.specialtyRate.update({
       where: { id },

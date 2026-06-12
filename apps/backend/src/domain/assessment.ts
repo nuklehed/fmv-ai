@@ -807,7 +807,6 @@ export class AssessmentDomain {
 
     // Determine tier label and rate from SpecialtyRate
     let assignedTierLabel: string | null = tierLabel || existing.tierLabel
-    let finalRate: number | null = existing.rate as number | null
 
     if (!assignedTierLabel) {
       // Auto-assign based on score matching thresholds
@@ -832,11 +831,15 @@ export class AssessmentDomain {
 
     if (!specialtyRate) throw new Error(`No rate defined for ${assignedTierLabel} in this specialty. Please set rates first.`)
 
-    // Calculate rate based on configured percentile or use override
+    // Calculate final rate — user override > auto-calc from SpecialtyRate range
     const range = Number(specialtyRate.highRate) - Number(specialtyRate.lowRate)
-    if (rateOverride !== undefined && finalRate === null) {
+    let finalRate: number | null = null
+
+    if (rateOverride != null && typeof rateOverride === 'number') {
+      // User explicitly entered a rate — use it directly
       finalRate = rateOverride
-    } else if (finalRate === null) {
+    } else {
+      // No user override — auto-calculate from SpecialtyRate range at configured percentile
       const pctSetting = await this.prisma.applicationSetting.findFirst({
         where: { key: 'defaultTierPercentile', tenantId }
       })
@@ -853,11 +856,10 @@ export class AssessmentDomain {
       }
     }
 
-    // Validate rate is within tier bounds if override provided
-    if (rateOverride !== undefined && finalRate !== null) {
-      if (finalRate < Number(specialtyRate.lowRate) || finalRate > Number(specialtyRate.highRate)) {
-        throw new Error('Rate must be within tier bounds')
-      }
+    // Validate rate is within tier bounds
+    if (finalRate != null &&
+        (finalRate < Number(specialtyRate.lowRate) || finalRate > Number(specialtyRate.highRate))) {
+      throw new Error('Rate must be within tier bounds')
     }
 
     // Calculate renewal date based on approval validity period (default 2 years)

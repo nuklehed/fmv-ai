@@ -136,7 +136,7 @@ model Assessment {
   aiResults                 String?
   totalScore                Int?
   tierLabel                 String?
-  rate                      String?
+  rate                      Decimal?   @db.Decimal(10,2)
   approvedByUserId          String?
   rejectionReason           String?
   tenantId                  String
@@ -173,8 +173,8 @@ model SpecialtyRate {
   specialtyId   String
   criteriaSetId String
   tierLabel     String
-  lowRate       String
-  highRate      String
+  lowRate       Decimal    @db.Decimal(10,2)
+  highRate      Decimal    @db.Decimal(10,2)
   tenantId      String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
