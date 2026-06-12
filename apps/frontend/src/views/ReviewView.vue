@@ -322,13 +322,13 @@ onMounted(() => { fetchAssessment() })
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div class="min-h-screen bg-slate-50">
     <!-- Header -->
-    <header class="bg-white border-b border-gray-200 px-6 py-4">
-      <div class="max-w-[96rem] mx-auto flex items-center justify-between">
+    <header class="bg-white border-b border-slate-200 px-6 py-4">
+      <div class="max-w-7xl mx-auto flex items-center justify-between">
         <div>
           <router-link to="/assessments" class="text-sm text-blue-600 hover:text-blue-800 mb-1 inline-block">← Back to Assessments</router-link>
-          <h1 v-if="assessment" class="text-xl font-bold text-gray-900">
+          <h1 v-if="assessment" class="text-xl font-bold text-slate-900">
             Review Assessment — {{ assessment.hcp.firstName }} {{ assessment.hcp.lastName }}
           </h1>
         </div>
@@ -339,7 +339,7 @@ onMounted(() => { fetchAssessment() })
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-[96rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Messages -->
       <div v-if="successMessage" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
         <p class="text-sm text-green-700">{{ successMessage }}</p>
@@ -350,25 +350,25 @@ onMounted(() => { fetchAssessment() })
 
       <!-- Loading State -->
       <div v-if="loading" class="bg-white shadow rounded-lg p-8 text-center">
-        <p class="text-sm text-gray-500">Loading assessment...</p>
+        <p class="text-sm text-slate-500">Loading assessment...</p>
       </div>
 
       <!-- Approved: read-only summary of the approved assessment -->
       <div v-else-if="assessment && isApproved" class="space-y-6">
         <!-- Score Banner -->
         <div class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Assessment Approved</h2>
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">Assessment Approved</h2>
           <div class="flex items-center space-x-8">
             <div>
-              <p class="text-sm text-gray-500">Approved Score</p>
+              <p class="text-sm text-slate-500">Approved Score</p>
               <p class="text-3xl font-bold text-green-700">{{ assessment.totalScore ?? '—' }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">Tier</p>
-              <p class="text-xl font-semibold text-gray-900">{{ assessment.tierLabel || '—' }}</p>
+              <p class="text-sm text-slate-500">Tier</p>
+              <p class="text-xl font-semibold text-slate-900">{{ assessment.tierLabel || '—' }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">Rate</p>
+              <p class="text-sm text-slate-500">Rate</p>
               <p class="text-xl font-semibold text-green-700">${{ (assessment.rate as number | null)?.toFixed(2) ?? '—' }}</p>
             </div>
           </div>
@@ -377,16 +377,16 @@ onMounted(() => { fetchAssessment() })
         <!-- AI Results Cards (read-only) -->
         <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
           <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-base font-medium text-gray-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+            <h3 class="text-base font-medium text-slate-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
 
             <!-- AI's Selection -->
             <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4">
               <div class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z" /></svg>
+                <i class="pi pi-sparkles text-purple-600 mt-0.5 flex-shrink-0"></i>
                 <div class="flex-1">
                   <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
                   <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
-                  <p v-if="getAiRationale(question.id)" class="text-xs text-gray-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
                 </div>
               </div>
             </div>
@@ -396,7 +396,7 @@ onMounted(() => { fetchAssessment() })
         <!-- Back button -->
         <div class="flex justify-center pt-4">
           <router-link to="/assessments"
-            class="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors">
+            class="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium transition-colors">
             ← Back to Assessments
           </router-link>
         </div>
@@ -406,10 +406,10 @@ onMounted(() => { fetchAssessment() })
       <div v-else-if="assessment && !isReviewing" class="space-y-6">
         <!-- Score Banner -->
         <div class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">AI Evaluation Results</h2>
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">AI Evaluation Results</h2>
           <div class="flex items-center space-x-8">
             <div>
-              <p class="text-sm text-gray-500">AI Total Score</p>
+              <p class="text-sm text-slate-500">AI Total Score</p>
               <p class="text-3xl font-bold text-purple-700">{{ aiScore ?? '—' }}</p>
             </div>
           </div>
@@ -418,16 +418,16 @@ onMounted(() => { fetchAssessment() })
         <!-- AI Results Cards -->
         <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
           <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-base font-medium text-gray-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+            <h3 class="text-base font-medium text-slate-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
 
             <!-- AI's Selection -->
             <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4">
               <div class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z" /></svg>
+                <i class="pi pi-sparkles text-purple-600 mt-0.5 flex-shrink-0"></i>
                 <div class="flex-1">
                   <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
                   <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
-                  <p v-if="getAiRationale(question.id)" class="text-xs text-gray-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
                 </div>
               </div>
             </div>
@@ -450,15 +450,15 @@ onMounted(() => { fetchAssessment() })
       <div v-else-if="assessment && isReviewing" class="space-y-6">
         <!-- Score Banner -->
         <div class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-lg font-semibold text-gray-900 mb-4">Review & Approve</h2>
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">Review & Approve</h2>
           <div class="flex items-center space-x-8">
             <div>
-              <p class="text-sm text-gray-500">AI Score</p>
+              <p class="text-sm text-slate-500">AI Score</p>
               <p class="text-3xl font-bold text-purple-700">{{ aiScore ?? '—' }}</p>
             </div>
-            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+            <i class="pi pi-arrow-right text-slate-400 text-xl"></i>
             <div>
-              <p class="text-sm text-gray-500">Admin Score</p>
+              <p class="text-sm text-slate-500">Admin Score</p>
               <p class="text-3xl font-bold text-blue-700">{{ adminScore ?? '—' }}</p>
             </div>
           </div>
@@ -467,46 +467,46 @@ onMounted(() => { fetchAssessment() })
         <!-- Question Cards (Editable) -->
         <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
           <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-base font-medium text-gray-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+            <h3 class="text-base font-medium text-slate-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
 
             <!-- AI's Selection (read-only) -->
             <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
               <div class="flex items-start space-x-3">
-                <svg class="w-5 h-5 text-purple-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-2h2v2zm0-4H9V5h2v4z" /></svg>
+                <i class="pi pi-sparkles text-purple-600 mt-0.5 flex-shrink-0"></i>
                 <div class="flex-1">
                   <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
                   <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
-                  <p v-if="getAiRationale(question.id)" class="text-xs text-gray-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
                 </div>
               </div>
             </div>
 
             <!-- Admin Selection -->
             <div>
-              <label :for="`answer-${question.id}`" class="block text-sm font-medium text-gray-700 mb-1">Your Answer</label>
+              <label :for="`answer-${question.id}`" class="block text-sm font-medium text-slate-700 mb-1">Your Answer</label>
               <select
                 :id="`answer-${question.id}`"
                 v-model="overrides[index].selectedAnswerId"
                 @change="onAnswerChange(question.id, index)"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select"
               >
                 <option value="">Select answer...</option>
                 <option v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" :value="answer.id">
                   {{ answer.text }} ({{ answer.score }} pts)
-                  <span v-if="isAnswerSameAsAI(question.id, answer.id)" class="text-gray-400 text-xs"> ← AI choice</span>
+                  <span v-if="isAnswerSameAsAI(question.id, answer.id)" class="text-slate-400 text-xs"> ← AI choice</span>
                 </option>
               </select>
             </div>
 
             <!-- Admin Rationale (shown when different from AI's choice) -->
             <div v-if="overrides[index].selectedAnswerId && !isAnswerSameAsAI(question.id, overrides[index].selectedAnswerId)" class="mt-3">
-              <label :for="`rationale-${question.id}`" class="block text-sm font-medium text-gray-700 mb-1">Rationale (optional)</label>
+              <label :for="`rationale-${question.id}`" class="block text-sm font-medium text-slate-700 mb-1">Rationale (optional)</label>
               <input
                 :id="`rationale-${question.id}`"
                 v-model="overrides[index].rationale"
                 type="text"
                 placeholder="Why this answer?"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -514,11 +514,11 @@ onMounted(() => { fetchAssessment() })
 
         <!-- Tier & Rate Section -->
         <div class="bg-white shadow rounded-lg p-6">
-          <h3 class="text-base font-medium text-gray-900 mb-4">Tier & Rate</h3>
+          <h3 class="text-base font-medium text-slate-900 mb-4">Tier & Rate</h3>
 
           <!-- Zero-score warning -->
           <div v-if="isZeroScore" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-            <svg class="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>
+            <i class="pi pi-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0"></i>
             <div>
               <p class="text-sm font-semibold text-red-900">Manual Review Required</p>
               <p class="text-xs text-red-700 mt-1">Score is zero — auto-approval is disabled. Please provide a rationale before approving.</p>
@@ -529,31 +529,31 @@ onMounted(() => { fetchAssessment() })
           <div v-if="availableTiers.length > 0" class="mb-4 overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead>
-                <tr class="border-b border-gray-200">
-                  <th class="px-3 py-2 text-left font-medium text-gray-500">Tier</th>
-                  <th class="px-3 py-2 text-right font-medium text-gray-500">Score Range</th>
-                  <th class="px-3 py-2 text-right font-medium text-gray-500">Rate Range</th>
-                  <th class="px-3 py-2 text-right font-medium text-gray-500">{{ defaultRateLabel }}</th>
+                <tr class="border-b border-slate-200">
+                  <th class="px-3 py-2 text-left font-medium text-slate-500">Tier</th>
+                  <th class="px-3 py-2 text-right font-medium text-slate-500">Score Range</th>
+                  <th class="px-3 py-2 text-right font-medium text-slate-500">Rate Range</th>
+                  <th class="px-3 py-2 text-right font-medium text-slate-500">{{ defaultRateLabel }}</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="tier in availableTiers" :key="tier.id"
                   :class="[
-                    'border-b border-gray-100',
+                    'border-b border-slate-100',
                     approveTierId === tier.id || autoAssignedTierId === tier.id
                       ? 'bg-blue-50 ring-2 ring-inset ring-blue-300'
-                      : 'hover:bg-gray-50'
+                      : 'hover:bg-slate-50'
                   ]">
-                  <td class="px-3 py-2 font-medium text-gray-900">{{ tier.name }}</td>
-                  <td v-if="tier.minScore != null && tier.maxScore != null" class="px-3 py-2 text-right text-gray-600">
+                  <td class="px-3 py-2 font-medium text-slate-900">{{ tier.name }}</td>
+                  <td v-if="tier.minScore != null && tier.maxScore != null" class="px-3 py-2 text-right text-slate-600">
                     {{ tier.minScore }}–{{ tier.maxScore }}
                     <span v-if="autoAssignedTierId === tier.id"
                       class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-200 text-blue-800">
                       auto
                     </span>
                   </td>
-                  <td v-else class="px-3 py-2 text-right text-gray-400">—</td>
-                  <td class="px-3 py-2 text-right text-gray-600">{{ formatRate(tier.lowRate) }} – {{ formatRate(tier.highRate) }}</td>
+                  <td v-else class="px-3 py-2 text-right text-slate-400">—</td>
+                  <td class="px-3 py-2 text-right text-slate-600">{{ formatRate(tier.lowRate) }} – {{ formatRate(tier.highRate) }}</td>
                   <td class="px-3 py-2 text-right font-medium text-green-700">{{ formatRate(tier.defaultRate) }}</td>
                 </tr>
               </tbody>
@@ -563,9 +563,9 @@ onMounted(() => { fetchAssessment() })
           <!-- Tier selection -->
           <div class="space-y-4">
             <div>
-              <label for="approve-tier" class="block text-sm font-medium text-gray-700 mb-1">Tier</label>
+              <label for="approve-tier" class="block text-sm font-medium text-slate-700 mb-1">Tier</label>
               <select id="approve-tier" v-model="approveTierId" :disabled="isZeroScore"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select disabled:opacity-50 disabled:cursor-not-allowed">
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select disabled:opacity-50 disabled:cursor-not-allowed">
                 <option value="">Auto-assign based on score</option>
                 <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">
                   {{ tier.name }}
@@ -581,20 +581,20 @@ onMounted(() => { fetchAssessment() })
 
             <!-- Rate Override -->
             <div>
-              <label for="rate-override" class="block text-sm font-medium text-gray-700 mb-1">
+              <label for="rate-override" class="block text-sm font-medium text-slate-700 mb-1">
                 FMV Rate (optional)
-                <span v-if="selectedTierInfo" class="text-gray-500 font-normal">
+                <span v-if="selectedTierInfo" class="text-slate-500 font-normal">
                   — range: {{ formatRate(selectedTierInfo.lowRate) }}–{{ formatRate(selectedTierInfo.highRate) }}, default: <strong>{{ formatRate(selectedTierInfo.defaultRate) }}</strong>
                 </span>
               </label>
               <div class="flex items-center gap-2">
                 <div class="relative flex-1">
-                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
                   <input id="rate-override" v-model="approveRateOverride"
                     type="number" step="5" min="0"
                     @blur="roundAndValidateRate"
                     placeholder="Auto-calculated if left blank"
-                    class="w-full pl-7 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select" />
+                    class="w-full ps-6 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select" />
                 </div>
               </div>
               <p v-if="rateError" class="text-xs text-red-600 mt-1">{{ rateError }}</p>
@@ -602,16 +602,16 @@ onMounted(() => { fetchAssessment() })
 
             <!-- Approval Rationale -->
             <div>
-              <label for="approve-rationale" class="block text-sm font-medium text-gray-700 mb-1">Approval Rationale (optional)</label>
+              <label for="approve-rationale" class="block text-sm font-medium text-slate-700 mb-1">Approval Rationale (optional)</label>
               <textarea id="approve-rationale" v-model="approveRationale" rows="2" placeholder="Explain approval decision..."
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
           </div>
         </div>
 
         <!-- Action Buttons -->
         <div class="flex justify-between items-center pt-4">
-          <router-link to="/assessments" class="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium transition-colors">Cancel</router-link>
+          <router-link to="/assessments" class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium transition-colors">Cancel</router-link>
           <button
             @click="saveAndApprove"
             :disabled="savingApprove || !adminScore"
