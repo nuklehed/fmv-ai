@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useToast } from 'primevue/usetoast'
 import { useRouter, useRoute } from 'vue-router'
 import * as assessmentDomain from '@/domain/assessment'
 
 const router = useRouter()
 const route = useRoute()
+const toast = useToast()
 
 // ─── State ──────────────────────────────────────────────────────
 
@@ -17,7 +19,6 @@ const loading = ref(true)
 const savingReview = ref(false)
 const savingApprove = ref(false)
 const formError = ref('')
-const successMessage = ref('')
 
 // Review mode
 const isReviewing = ref(false) // Phase 2 — editable review
@@ -180,6 +181,32 @@ function isAnswerSameAsAI(questionId: string, answerId: string): boolean {
   return result?.selectedAnswerId === answerId
 }
 
+function getAiAnswerText(question: any): string {
+  if (!assessment.value?.aiResults) return '—'
+  const results = JSON.parse(assessment.value.aiResults as string)
+  const result = results.find((r: any) => r.questionId === question.id)
+  if (!result) return '—'
+
+  const answers = question.answers || []
+  const answer = answers.find((a: any) => a.id === result.selectedAnswerId)
+  return answer?.text || '—'
+}
+
+function getAiScoreForQuestion(question: any): number {
+  if (!assessment.value?.aiResults) return 0
+  const results = JSON.parse(assessment.value.aiResults as string)
+  const result = results.find((r: any) => r.questionId === question.id)
+  if (!result) return 0
+
+  const answers = question.answers || []
+  const answer = answers.find((a: any) => a.id === result.selectedAnswerId)
+  return answer?.score ?? 0
+}
+
+function getSortedAnswers(answers: any[]): any[] {
+  return [...(answers || [])].sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
+}
+
 // ─── API Operations ────────────────────────────────────────────
 
 async function fetchAssessment() {
@@ -212,7 +239,6 @@ async function fetchAssessment() {
   }
 }
 
-/** Load the configured default tier percentile from application settings */
 /** Load the configured default tier percentile from application settings */
 async function loadDefaultTierPercentile(): Promise<void> {
   try {
@@ -280,9 +306,11 @@ async function startReview() {
 
     // Call backend to transition status to UNDER_REVIEW
     await assessmentDomain.startReview(assessment.value.id)
+    toast.add({ severity: 'success', summary: 'Review Started', detail: 'You can now edit the AI evaluation results.', life: 8000 })
     isReviewing.value = true
   } catch (error) {
     formError.value = error instanceof Error ? error.message : 'Failed to start review'
+    toast.add({ severity: 'error', summary: 'Error', detail: formError.value, life: 5000 })
   } finally {
     savingReview.value = false
   }
@@ -307,10 +335,12 @@ async function saveAndApprove() {
       rateOverride: approveRateOverride.value ? parseFloat(approveRateOverride.value) : null,
       rationale: approveRationale.value || null
     })
-    successMessage.value = 'Review saved — assessment approved'
+    toast.add({ severity: 'success', summary: 'Assessment Approved', detail: 'Review saved successfully.', life: 8000 })
     setTimeout(() => router.push('/assessments'), 2000)
   } catch (error) {
-    formError.value = error instanceof Error ? error.message : 'Failed to save review'
+    const errMessage = error instanceof Error ? error.message : 'Failed to save review'
+    formError.value = errMessage
+    toast.add({ severity: 'error', summary: 'Save Failed', detail: errMessage, life: 5000 })
   } finally {
     savingApprove.value = false
   }
@@ -325,11 +355,11 @@ onMounted(() => { fetchAssessment() })
   <div class="min-h-screen bg-slate-50">
     <!-- Header -->
     <header class="bg-white border-b border-slate-200 px-6 py-4">
-      <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <div>
           <router-link to="/assessments" class="text-sm text-blue-600 hover:text-blue-800 mb-1 inline-block">← Back to Assessments</router-link>
           <h1 v-if="assessment" class="text-xl font-bold text-slate-900">
-            Review Assessment — {{ assessment.hcp.firstName }} {{ assessment.hcp.lastName }}
+            Review — {{ assessment.hcp.firstName }} {{ assessment.hcp.lastName }}
           </h1>
         </div>
         <span :class="['inline-flex items-center px-3 py-1 rounded-full text-sm font-medium', assessmentDomain.getStatusColor(assessment?.status || '')]">
@@ -339,12 +369,11 @@ onMounted(() => { fetchAssessment() })
     </header>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <!-- Messages -->
-      <div v-if="successMessage" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4">
-        <p class="text-sm text-green-700">{{ successMessage }}</p>
-      </div>
-      <div v-if="formError && !loading" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+    <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+
+      <!-- Error Message -->
+      <div v-if="formError && !loading" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
+        <i class="pi pi-times-circle h-5 w-5 text-red-400 mt-0.5 mr-3 shrink-0"></i>
         <p class="text-sm text-red-600">{{ formError }}</p>
       </div>
 
@@ -353,48 +382,54 @@ onMounted(() => { fetchAssessment() })
         <p class="text-sm text-slate-500">Loading assessment...</p>
       </div>
 
-      <!-- Approved: read-only summary of the approved assessment -->
+      <!-- ═══════════════════════════════════════════════════════════
+           APPROVED: Read-only summary
+           ═══════════════════════════════════════════════════════════ -->
       <div v-else-if="assessment && isApproved" class="space-y-6">
-        <!-- Score Banner -->
-        <div class="bg-white shadow rounded-lg p-6">
+        <!-- Score & Tier Summary -->
+        <section class="bg-white shadow rounded-lg p-6">
           <h2 class="text-lg font-semibold text-slate-900 mb-4">Assessment Approved</h2>
-          <div class="flex items-center space-x-8">
+          <div class="flex items-center gap-8">
             <div>
               <p class="text-sm text-slate-500">Approved Score</p>
-              <p class="text-3xl font-bold text-green-700">{{ assessment.totalScore ?? '—' }}</p>
+              <p class="text-2xl font-bold text-green-700">{{ assessment.totalScore ?? '—' }}</p>
             </div>
             <div>
               <p class="text-sm text-slate-500">Tier</p>
-              <p class="text-xl font-semibold text-slate-900">{{ assessment.tierLabel || '—' }}</p>
+              <p class="text-2xl font-semibold text-slate-900">{{ assessment.tierLabel || '—' }}</p>
             </div>
             <div>
               <p class="text-sm text-slate-500">Rate</p>
-              <p class="text-xl font-semibold text-green-700">${{ (assessment.rate as number | null)?.toFixed(2) ?? '—' }}</p>
+              <p class="text-2xl font-semibold text-green-700">${{ (assessment.rate != null ? Number(assessment.rate) : null)?.toFixed(2) ?? '—' }}</p>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- AI Results Cards (read-only) -->
-        <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
-          <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-base font-medium text-slate-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+        <!-- AI Results (read-only) -->
+        <section class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">AI Evaluation</h2>
+          <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
+            <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="border border-slate-200 rounded-lg p-4">
+              <h3 class="text-sm font-medium text-slate-900 mb-3">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold mr-2">{{ index + 1 }}</span>
+                {{ question.text }}
+              </h3>
 
-            <!-- AI's Selection -->
-            <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <div class="flex items-start space-x-3">
-                <i class="pi pi-sparkles text-purple-600 mt-0.5 flex-shrink-0"></i>
+              <!-- AI's Selection -->
+              <div v-if="assessment.aiResults" class="flex items-start gap-3">
+                <i class="pi pi-sparkles text-slate-500 mt-0.5 flex-shrink-0"></i>
                 <div class="flex-1">
-                  <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
-                  <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
-                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                  <p class="text-sm font-medium text-slate-700 mb-1">{{ getAiAnswerText(question) }}</p>
+                  <p class="text-xs text-slate-500">{{ getAiScoreForQuestion(question) }} pts</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-500 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Back button -->
-        <div class="flex justify-center pt-4">
+        <div class="flex justify-center">
           <router-link to="/assessments"
             class="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm font-medium transition-colors">
             ← Back to Assessments
@@ -402,131 +437,147 @@ onMounted(() => { fetchAssessment() })
         </div>
       </div>
 
-      <!-- Phase 1: Read-only AI Results (before clicking Start Review) -->
+      <!-- ═══════════════════════════════════════════════════════════
+           PHASE 1: Read-only AI Results (before "Start Review")
+           ═══════════════════════════════════════════════════════════ -->
       <div v-else-if="assessment && !isReviewing" class="space-y-6">
         <!-- Score Banner -->
-        <div class="bg-white shadow rounded-lg p-6">
+        <section class="bg-white shadow rounded-lg p-6">
           <h2 class="text-lg font-semibold text-slate-900 mb-4">AI Evaluation Results</h2>
-          <div class="flex items-center space-x-8">
+          <div class="flex items-center gap-8">
             <div>
               <p class="text-sm text-slate-500">AI Total Score</p>
-              <p class="text-3xl font-bold text-purple-700">{{ aiScore ?? '—' }}</p>
+              <p class="text-3xl font-bold text-slate-900">{{ aiScore ?? '—' }}</p>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- AI Results Cards -->
-        <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
-          <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-base font-medium text-slate-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+        <section class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">Detailed Results</h2>
+          <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
+            <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="border border-slate-200 rounded-lg p-4">
+              <h3 class="text-sm font-medium text-slate-900 mb-3">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold mr-2">{{ index + 1 }}</span>
+                {{ question.text }}
+              </h3>
 
-            <!-- AI's Selection -->
-            <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-              <div class="flex items-start space-x-3">
-                <i class="pi pi-sparkles text-purple-600 mt-0.5 flex-shrink-0"></i>
+              <!-- AI's Selection -->
+              <div class="flex items-start gap-3">
+                <i class="pi pi-sparkles text-slate-500 mt-0.5 flex-shrink-0"></i>
                 <div class="flex-1">
-                  <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
-                  <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
-                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                  <p class="text-sm font-medium text-slate-700 mb-1">{{ getAiAnswerText(question) }}</p>
+                  <p class="text-xs text-slate-500">{{ getAiScoreForQuestion(question) }} pts</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-500 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Start Review Button -->
-        <div class="flex justify-center pt-4">
+        <div class="flex justify-center pt-2">
           <button
             @click="startReview"
             :disabled="savingReview"
-            class="px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 text-sm font-medium transition-colors"
+            class="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium transition-colors"
           >
             {{ savingReview ? 'Starting...' : 'Start Review' }}
           </button>
         </div>
       </div>
 
-      <!-- Phase 2: Editable + Approve (after clicking Start Review) -->
+      <!-- ═══════════════════════════════════════════════════════════
+           PHASE 2: Editable Review + Approve
+           ═══════════════════════════════════════════════════════════ -->
       <div v-else-if="assessment && isReviewing" class="space-y-6">
-        <!-- Score Banner -->
-        <div class="bg-white shadow rounded-lg p-6">
+        <!-- Score Comparison Banner -->
+        <section class="bg-white shadow rounded-lg p-6">
           <h2 class="text-lg font-semibold text-slate-900 mb-4">Review & Approve</h2>
-          <div class="flex items-center space-x-8">
-            <div>
-              <p class="text-sm text-slate-500">AI Score</p>
-              <p class="text-3xl font-bold text-purple-700">{{ aiScore ?? '—' }}</p>
+          <div class="flex items-center gap-4">
+            <div class="flex-1 text-center">
+              <p class="text-sm text-slate-500 mb-1">AI Score</p>
+              <p class="text-3xl font-bold text-slate-900">{{ aiScore ?? '—' }}</p>
             </div>
             <i class="pi pi-arrow-right text-slate-400 text-xl"></i>
-            <div>
-              <p class="text-sm text-slate-500">Admin Score</p>
+            <div class="flex-1 text-center">
+              <p class="text-sm text-slate-500 mb-1">Admin Score</p>
               <p class="text-3xl font-bold text-blue-700">{{ adminScore ?? '—' }}</p>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Question Cards (Editable) -->
-        <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
-          <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-base font-medium text-slate-900 mb-3">{{ `Q${index + 1}: ${question.text}` }}</h3>
+        <section class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">Evaluate Each Question</h2>
+          <p class="text-sm text-slate-500 mb-6">Review the AI's selections below. Change any answer to override the AI's recommendation.</p>
 
-            <!-- AI's Selection (read-only) -->
-            <div v-if="assessment.aiResults" class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-              <div class="flex items-start space-x-3">
-                <i class="pi pi-sparkles text-purple-600 mt-0.5 flex-shrink-0"></i>
+          <div v-if="assessment.criteriaSet?.questions" class="space-y-4">
+            <div v-for="(question, index) in assessment.criteriaSet.questions" :key="question.id" class="border border-slate-200 rounded-lg p-4">
+              <!-- Question header -->
+              <h3 class="text-sm font-medium text-slate-900 mb-3">
+                <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-600 text-xs font-bold mr-2">{{ index + 1 }}</span>
+                {{ question.text }}
+              </h3>
+
+              <!-- AI's Selection (read-only) -->
+              <div v-if="assessment.aiResults" class="mb-3 flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                <i class="pi pi-sparkles text-slate-500 mt-0.5 flex-shrink-0"></i>
                 <div class="flex-1">
-                  <p class="text-sm font-medium text-purple-900 mb-1">AI Selected: {{ getAiAnswerText(question, assessment) }}</p>
-                  <p class="text-xs text-purple-700">{{ getAiScore(question, assessment) }} pts</p>
-                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-600 mt-2 italic">"{{ getAiRationale(question.id) }}"</p>
+                  <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-0.5">AI Selection</p>
+                  <p class="text-sm font-medium text-slate-700">{{ getAiAnswerText(question) }}</p>
+                  <p class="text-xs text-slate-500">{{ getAiScoreForQuestion(question) }} pts</p>
+                  <p v-if="getAiRationale(question.id)" class="text-xs text-slate-500 mt-1 italic">"{{ getAiRationale(question.id) }}"</p>
                 </div>
               </div>
-            </div>
 
-            <!-- Admin Selection -->
-            <div>
-              <label :for="`answer-${question.id}`" class="block text-sm font-medium text-slate-700 mb-1">Your Answer</label>
-              <select
-                :id="`answer-${question.id}`"
-                v-model="overrides[index].selectedAnswerId"
-                @change="onAnswerChange(question.id, index)"
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select"
-              >
-                <option value="">Select answer...</option>
-                <option v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" :value="answer.id">
-                  {{ answer.text }} ({{ answer.score }} pts)
-                  <span v-if="isAnswerSameAsAI(question.id, answer.id)" class="text-slate-400 text-xs"> ← AI choice</span>
-                </option>
-              </select>
-            </div>
+              <!-- Admin Selection -->
+              <div>
+                <label :for="`answer-${question.id}`" class="block text-sm font-medium text-slate-700 mb-1">Your Answer</label>
+                <select
+                  :id="`answer-${question.id}`"
+                  v-model="overrides[index].selectedAnswerId"
+                  @change="onAnswerChange(question.id, index)"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select"
+                >
+                  <option value="">Select answer...</option>
+                  <option v-for="answer in getSortedAnswers(question.answers)" :key="answer.id" :value="answer.id">
+                    {{ answer.text }} ({{ answer.score }} pts)
+                    <span v-if="isAnswerSameAsAI(question.id, answer.id)" class="text-slate-400 text-xs"> ← AI choice</span>
+                  </option>
+                </select>
+              </div>
 
-            <!-- Admin Rationale (shown when different from AI's choice) -->
-            <div v-if="overrides[index].selectedAnswerId && !isAnswerSameAsAI(question.id, overrides[index].selectedAnswerId)" class="mt-3">
-              <label :for="`rationale-${question.id}`" class="block text-sm font-medium text-slate-700 mb-1">Rationale (optional)</label>
-              <input
-                :id="`rationale-${question.id}`"
-                v-model="overrides[index].rationale"
-                type="text"
-                placeholder="Why this answer?"
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
+              <!-- Admin Rationale (shown when different from AI's choice) -->
+              <div v-if="overrides[index].selectedAnswerId && !isAnswerSameAsAI(question.id, overrides[index].selectedAnswerId)" class="mt-3">
+                <label :for="`rationale-${question.id}`" class="block text-sm font-medium text-slate-700 mb-1">Rationale (optional)</label>
+                <input
+                  :id="`rationale-${question.id}`"
+                  v-model="overrides[index].rationale"
+                  type="text"
+                  placeholder="Why this answer?"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        <!-- Tier & Rate Section -->
-        <div class="bg-white shadow rounded-lg p-6">
-          <h3 class="text-base font-medium text-slate-900 mb-4">Tier & Rate</h3>
+        <!-- Tier & Rate -->
+        <section class="bg-white shadow rounded-lg p-6">
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">Tier & Rate</h2>
 
           <!-- Zero-score warning -->
-          <div v-if="isZeroScore" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
-            <i class="pi pi-exclamation-triangle text-red-600 mt-0.5 flex-shrink-0"></i>
+          <div v-if="isZeroScore" class="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start">
+            <i class="pi pi-exclamation-triangle h-5 w-5 text-red-400 mt-0.5 mr-3 shrink-0"></i>
             <div>
-              <p class="text-sm font-semibold text-red-900">Manual Review Required</p>
-              <p class="text-xs text-red-700 mt-1">Score is zero — auto-approval is disabled. Please provide a rationale before approving.</p>
+              <p class="text-sm font-semibold text-red-900 mb-1">Manual Review Required</p>
+              <p class="text-xs text-red-700">Score is zero — auto-approval is disabled. Please provide a rationale before approving.</p>
             </div>
           </div>
 
           <!-- Tier reference table -->
-          <div v-if="availableTiers.length > 0" class="mb-4 overflow-x-auto">
+          <div v-if="availableTiers.length > 0" class="mb-6 overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead>
                 <tr class="border-b border-slate-200">
@@ -541,7 +592,7 @@ onMounted(() => { fetchAssessment() })
                   :class="[
                     'border-b border-slate-100',
                     approveTierId === tier.id || autoAssignedTierId === tier.id
-                      ? 'bg-blue-50 ring-2 ring-inset ring-blue-300'
+                      ? 'bg-blue-50'
                       : 'hover:bg-slate-50'
                   ]">
                   <td class="px-3 py-2 font-medium text-slate-900">{{ tier.name }}</td>
@@ -565,7 +616,7 @@ onMounted(() => { fetchAssessment() })
             <div>
               <label for="approve-tier" class="block text-sm font-medium text-slate-700 mb-1">Tier</label>
               <select id="approve-tier" v-model="approveTierId" :disabled="isZeroScore"
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select disabled:opacity-50 disabled:cursor-not-allowed">
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed form-select">
                 <option value="">Auto-assign based on score</option>
                 <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">
                   {{ tier.name }}
@@ -594,7 +645,7 @@ onMounted(() => { fetchAssessment() })
                     type="number" step="5" min="0"
                     @blur="roundAndValidateRate"
                     placeholder="Auto-calculated if left blank"
-                    class="w-full ps-6 pr-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent form-select" />
+                    class="w-full ps-6 pr-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                 </div>
               </div>
               <p v-if="rateError" class="text-xs text-red-600 mt-1">{{ rateError }}</p>
@@ -607,50 +658,22 @@ onMounted(() => { fetchAssessment() })
                 class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Action Buttons -->
-        <div class="flex justify-between items-center pt-4">
-          <router-link to="/assessments" class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium transition-colors">Cancel</router-link>
-          <button
-            @click="saveAndApprove"
-            :disabled="savingApprove || !adminScore"
-            class="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium transition-colors"
-          >
-            {{ savingApprove ? 'Saving...' : 'Save Review & Approve' }}
-          </button>
-        </div>
+        <section class="bg-white shadow rounded-lg p-6">
+          <div class="flex items-center justify-between">
+            <router-link to="/assessments" class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 text-sm font-medium transition-colors">Cancel</router-link>
+            <button
+              @click="saveAndApprove"
+              :disabled="savingApprove || !adminScore"
+              class="px-6 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm font-medium transition-colors"
+            >
+              {{ savingApprove ? 'Saving...' : 'Save Review & Approve' }}
+            </button>
+          </div>
+        </section>
       </div>
     </main>
   </div>
 </template>
-
-<script lang="ts">
-// Helper functions for template use
-function getAiAnswerText(question: any, assessment: any): string {
-  if (!assessment.aiResults) return '—'
-  const results = JSON.parse(assessment.aiResults as string)
-  const result = results.find((r: any) => r.questionId === question.id)
-  if (!result) return '—'
-
-  // Find the answer text from criteria set
-  const answers = question.answers || []
-  const answer = answers.find((a: any) => a.id === result.selectedAnswerId)
-  return answer?.text || '—'
-}
-
-function getAiScore(question: any, assessment: any): number {
-  if (!assessment.aiResults) return 0
-  const results = JSON.parse(assessment.aiResults as string)
-  const result = results.find((r: any) => r.questionId === question.id)
-  if (!result) return 0
-
-  const answers = question.answers || []
-  const answer = answers.find((a: any) => a.id === result.selectedAnswerId)
-  return answer?.score ?? 0
-}
-
-function getSortedAnswers(answers: any[]): any[] {
-  return [...(answers || [])].sort((a, b) => (a.score ?? 0) - (b.score ?? 0))
-}
-</script>
