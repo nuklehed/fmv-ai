@@ -388,7 +388,6 @@ onMounted(() => { fetchAssessment() })
       <div v-else-if="assessment && isApproved" class="space-y-6">
         <!-- Score & Tier Summary -->
         <section class="bg-white shadow rounded-lg p-6">
-          <h2 class="text-lg font-semibold text-slate-900 mb-4">Assessment Approved</h2>
           <div class="grid grid-cols-3 gap-6">
             <div>
               <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Score</p>
