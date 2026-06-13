@@ -33,4 +33,40 @@
 - Database already has the 5 new columns and FK constraints applied (procedural migration ran via `$executeRawUnsafe`)
 - Prisma client regenerated with new schema
 
-**Design Principles** — now captured as a standalone skill: [`.agents/skills/design-principles/SKILL.md`](.agents/skills/design-principles/SKILL.md). Covers typography (Tailwind defaults only), 3-role color palette, whitespace-first layout, and pre-generation checklist.
+---
+
+# HANDOFF — ReviewView Redesign
+
+**Date:** 2026-06-13  
+**Branch:** `feature/reviewview-redesign` (unpushed)
+
+## What's Done
+- [x] Redesigned `ReviewView.vue` for consistency with design principles
+- [x] All sections wrapped in `bg-white shadow rounded-lg p-6` containers
+- [x] Scores are neutral (slate) — distinguished by weight/size, not color
+- [x] Color reserved for semantic purposes only: red (errors/warnings), blue (CTAs/active links)
+- [x] Removed in-page "back to assessments" links (navbar navigation is sufficient)
+- [x] Removed redundant "Assessment Approved" header (status badge in page header covers it)
+- [x] Phase 2 score comparison: side-by-side `bg-slate-50` cards with `text-4xl`
+- [x] Approved view: 3-column grid with uppercase tracking labels
+- [x] Question cards: `divide-y` instead of individual borders
+- [x] Helper functions moved into `<script setup>` (no more bottom `<script lang="ts">`)
+- [x] Loading state: spinner icon
+- [x] TypeScript builds clean — no new errors
+
+## Key Design Decisions
+- **Scores are data, not good/bad** — all scores/rates use `text-slate-900`
+- **Red only for errors/warnings** — form errors, zero-score alert, rate validation errors
+- **Blue only for primary actions** — CTA buttons, active row highlights, nav links
+- **No green on scores** — the old green on approved score/rate was misleading (a low score isn't "success")
+- **No purple** — AI results use neutral slate with sparkle icon, not a full purple brand
+
+## How to Review
+```bash
+git diff HEAD~3 -- apps/frontend/src/views/ReviewView.vue
+```
+
+## If You Don't Like It
+```bash
+git checkout feature/reviewview-redesign~3 -- apps/frontend/src/views/ReviewView.vue
+```
