@@ -23,7 +23,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
     if (search && typeof search === 'string' && search.length > 0) {
       where.OR = [
         { email: { contains: search.toLowerCase() } },
-        { role: { equals: search.toUpperCase() as any } }
+        { role: { equals: search.toUpperCase() } }
       ]
     }
 

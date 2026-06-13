@@ -6,69 +6,69 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/',
     name: 'home',
-    component: () => import('@/views/HomeView.vue'),
+    component: () => import('@/views/dashboard/Home.vue'),
     meta: { requiresAuth: true }
   },
   {
     path: '/assessments',
     name: 'assessments',
-    component: () => import('@/views/AssessmentsListView.vue'),
+    component: () => import('@/views/assessment/AssessmentList.vue'),
     meta: { requiresAuth: true, requiresBUOrHigher: true }
   },
   {
     path: '/assessments/new',
     name: 'assessmentNew',
-    component: () => import('@/views/AssessmentFormView.vue'),
+    component: () => import('@/views/assessment/AssessmentForm.vue'),
     meta: { requiresAuth: true, requiresBUOrHigher: true }
   },
   {
     path: '/assessments/edit/:id',
     name: 'assessmentEdit',
-    component: () => import('@/views/AssessmentFormView.vue'),
+    component: () => import('@/views/assessment/AssessmentForm.vue'),
     meta: { requiresAuth: true, requiresBUOrHigher: true }
   },
   {
     path: '/assessments/:id/review',
     name: 'assessmentReview',
-    component: () => import('@/views/ReviewView.vue'),
+    component: () => import('@/views/assessment/AssessmentReview.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
   {
     path: '/specialties',
     name: 'specialties',
-    component: () => import('@/views/SpecialtiesView.vue'),
+    component: () => import('@/views/settings/Specialties.vue'),
     meta: { requiresAuth: true, requiresSA: true }
   },
   {
     path: '/criteria-sets',
     name: 'criteriaSets',
-    component: () => import('@/views/CriteriaSetsView.vue'),
+    component: () => import('@/views/settings/CriteriaSets.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
   {
     path: '/users',
     name: 'userManagement',
-    component: () => import('@/views/UserManagementView.vue'),
+    component: () => import('@/views/settings/UserManagement.vue'),
     meta: { requiresAuth: true, requiresSA: true }
   },
   {
     path: '/tiers',
     name: 'tierManagement',
-    component: () => import('@/views/TierManagementView.vue'),
+    component: () => import('@/views/settings/TierRates.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true }
   },
   // ─── Settings (notification settings for all users) ───────────────
   {
     path: '/settings',
     name: 'settingsHome',
-    component: () => import('@/views/SettingsView.vue'),
+    component: () => import('@/views/settings/NotificationSettings.vue'),
     meta: { requiresAuth: true }
   },
   // ─── Settings Control Center (Admin/SA only, sidebar layout) ──────
   {
     path: '/settings/control-center',
     name: 'settingsControlCenter',
-    component: () => import('@/views/SettingsControlCenterView.vue'),
+    component: () => import('@/views/settings/SettingsDashboard.vue'),
     meta: { requiresAuth: true, requiresAdminOrSA: true },
     children: [
       {
@@ -78,37 +78,37 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'notifications',
         name: 'settingsNotifications',
-        component: () => import('@/views/SettingsView.vue'),
+        component: () => import('@/views/settings/NotificationSettings.vue'),
         meta: { requiresAuth: true }
       },
       {
         path: 'specialties',
         name: 'settingsSpecialties',
-        component: () => import('@/views/SpecialtiesView.vue'),
+        component: () => import('@/views/settings/Specialties.vue'),
         meta: { requiresAuth: true, requiresSA: true }
       },
       {
         path: 'criteria-sets',
         name: 'settingsCriteriaSets',
-        component: () => import('@/views/CriteriaSetsView.vue'),
+        component: () => import('@/views/settings/CriteriaSets.vue'),
         meta: { requiresAuth: true, requiresAdminOrSA: true }
       },
       {
         path: 'tiers',
         name: 'settingsTiers',
-        component: () => import('@/views/TierManagementView.vue'),
+        component: () => import('@/views/settings/TierRates.vue'),
         meta: { requiresAuth: true, requiresAdminOrSA: true }
       },
       {
         path: 'users',
         name: 'settingsUsers',
-        component: () => import('@/views/UserManagementView.vue'),
+        component: () => import('@/views/settings/UserManagement.vue'),
         meta: { requiresAuth: true, requiresSA: true }
       },
       {
         path: 'application-settings',
         name: 'settingsAppSettings',
-        component: () => import('@/views/ApplicationSettingsView.vue'),
+        component: () => import('@/views/settings/ApplicationSettings.vue'),
         meta: { requiresAuth: true, requiresSA: true }
       }
     ]
@@ -117,13 +117,13 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/hcp/:id/profile',
     name: 'hcpProfile',
-    component: () => import('@/views/HcpProfileView.vue'),
+    component: () => import('@/views/hcp/HcpProfile.vue'),
     meta: { requiresAuth: true, requiresBUOrHigher: true }
   },
   {
     path: '/login',
     name: 'login',
-    component: () => import('@/views/LoginView.vue')
+    component: () => import('@/views/auth/Login.vue')
   }
 ]
 

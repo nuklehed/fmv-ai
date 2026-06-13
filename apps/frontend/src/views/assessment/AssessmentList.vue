@@ -28,21 +28,7 @@ const selectedAssessment = ref<FullAssessment | null>(null)
 const detailLoading = ref(false)
 const showDetailPanel = ref(false)
 
-// ─── Review Workflow State (Admin/SA only) — used for inline approve/reject in detail panel ──
 
-const isReviewing = ref(false)
-const reviewOverrides = ref<Array<{ questionId: string; selectedAnswerId: string; rationale: string }>>([])
-const rejectionReason = ref('')
-const approveTierId = ref('')
-const approveRateOverride = ref('')
-const approveRationale = ref('')
-const isApproving = ref(false)
-const isRejecting = ref(false)
-const reviewError = ref('')
-
-// ─── Available Tiers for Approval ────────────────────────────────
-
-const availableTiers = ref<Array<{ id: string; name: string; lowRate: number; highRate: number }>>([])
 
 // ─── List Operations ─────────────────────────────────────────────
 
@@ -177,26 +163,17 @@ document.addEventListener('click', (e) => {
 async function openDetailPanel(assessment: assessmentDomain.AssessmentListItem) {
   detailLoading.value = true
   showDetailPanel.value = true
-  isReviewing.value = false; reviewOverrides.value = []
-  rejectionReason.value = ''; approveTierId.value = ''
-  approveRateOverride.value = ''; approveRationale.value = ''
-  reviewError.value = ''
 
   try {
     const full = await assessmentDomain.fetchAssessment(assessment.id)
     selectedAssessment.value = full as unknown as FullAssessment
   } catch { /* keep the list item as fallback */ }
 
-  if (assessmentDomain.canApprove(selectedAssessment.value || assessment)) await loadTiers()
   detailLoading.value = false
 }
 
 function closeDetailPanel() {
   showDetailPanel.value = false; selectedAssessment.value = null
-  isReviewing.value = false; reviewOverrides.value = []
-  rejectionReason.value = ''; approveTierId.value = ''
-  approveRateOverride.value = ''; approveRationale.value = ''
-  reviewError.value = ''
 }
 
 // ─── Draft Actions ───────────────────────────────────────────────
@@ -217,49 +194,6 @@ async function deleteDraft(assessment: assessmentDomain.AssessmentListItem) {
     formError.value = error instanceof Error ? error.message : 'Failed to delete draft'
     setTimeout(() => { formError.value = '' }, 5000)
   }
-}
-
-// ─── Review Workflow (inline approve/reject for UNDER_REVIEW status) ─────────────────────────────
-// Note: Inline review mode removed — use dedicated /assessments/:id/review page instead
-
-async function loadTiers() {
-  try {
-    const criteriaSetId = selectedAssessment.value?.criteriaSetId
-    if (criteriaSetId) {
-      const data = await assessmentDomain.fetchTierThresholds(criteriaSetId)
-      availableTiers.value = data.thresholds.map((t: any) => ({
-        id: t.label,
-        name: t.label,
-        lowRate: 0,
-        highRate: 0
-      }))
-    }
-  } catch { /* silent */ }
-}
-
-async function approveAssessment() {
-  if (!selectedAssessment.value) return
-  isApproving.value = true; reviewError.value = ''
-  try {
-    await assessmentDomain.approveAssessment(selectedAssessment.value.id, {
-      tierLabel: approveTierId.value || null,
-      rateOverride: approveRateOverride.value ? parseFloat(approveRateOverride.value) : null,
-      rationale: approveRationale.value || null
-    })
-    await fetchAssessments(); closeDetailPanel()
-  } catch (error) { reviewError.value = error instanceof Error ? error.message : 'Failed to approve assessment' }
-  finally { isApproving.value = false }
-}
-
-async function rejectAssessment() {
-  if (!selectedAssessment.value) return
-  if (!rejectionReason.value.trim()) { reviewError.value = 'Rejection reason is required'; return }
-  isRejecting.value = true; reviewError.value = ''
-  try {
-    await assessmentDomain.rejectAssessment(selectedAssessment.value.id, rejectionReason.value)
-    await fetchAssessments(); closeDetailPanel()
-  } catch (error) { reviewError.value = error instanceof Error ? error.message : 'Failed to reject assessment' }
-  finally { isRejecting.value = false }
 }
 
 // ─── Retry Failed Assessment ─────────────────────────────────────
@@ -381,7 +315,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
           class="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
           <option value="">All Statuses</option>
           <template v-if="assessmentDomain.isAdminOrSAUser()">
-            <option value="AI_COMPLETE"><i class="pi pi-exclamation-triangle mr-1"></i>Needs Review</option>
+            <option value="AI_COMPLETE">Needs Review</option>
           </template>
           <option v-for="(label, status) in assessmentDomain.StatusLabels" :key="status" :value="status">{{ label }}</option>
         </select>
@@ -623,7 +557,7 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                         </div>
                         <div class="p-3 bg-green-50 border border-green-200 rounded-lg">
                           <p class="text-xs font-medium text-green-700 mb-1">Rate</p>
-                          <p class="text-sm font-semibold text-slate-900 leading-snug">${{ selectedAssessment.rate?.toFixed(2) || '—' }}</p>
+                          <p class="text-sm font-semibold text-slate-900 leading-snug">${{ (selectedAssessment.rate != null ? Number(selectedAssessment.rate) : null)?.toFixed(2) || '—' }}</p>
                         </div>
                       </div>
                     </template>
@@ -650,40 +584,6 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       </div>
                     </div>
 
-                    <!-- AI Audit (raw LLM data for review) -->
-                    <template v-if="selectedAssessment.llmRawResponse || selectedAssessment.llmUserPrompt">
-                      <div class="border-t border-slate-200 pt-4">
-                        <h4 class="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
-                          <i class="pi pi-file-edit text-sm"></i>
-                          AI Audit
-                        </h4>
-                        <!-- Raw LLM Response -->
-                        <div v-if="selectedAssessment.llmRawResponse" class="mb-3">
-                          <button @click="showRawResponse = !showRawResponse"
-                            class="text-xs text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
-                            <i :class="['pi', showRawResponse ? 'pi-chevron-down' : 'pi-chevron-right', 'text-xs']"></i>
-                            Raw LLM response ({{ selectedAssessment.llmRawResponse.length }} chars)
-                          </button>
-                          <pre v-if="showRawResponse"
-                            class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">
-                            {{ selectedAssessment.llmRawResponse }}
-                          </pre>
-                        </div>
-                        <!-- User Prompt -->
-                        <div v-if="selectedAssessment.llmUserPrompt">
-                          <button @click="showRawPrompt = !showRawPrompt"
-                            class="text-xs text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
-                            <i :class="['pi', showRawPrompt ? 'pi-chevron-down' : 'pi-chevron-right', 'text-xs']"></i>
-                            User prompt ({{ selectedAssessment.llmUserPrompt.length }} chars)
-                          </button>
-                          <pre v-if="showRawPrompt"
-                            class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">
-                            {{ selectedAssessment.llmUserPrompt }}
-                          </pre>
-                        </div>
-                      </div>
-                    </template>
-
                     <!-- Rejection Reason -->
                     <div v-if="selectedAssessment.rejectionReason">
                       <h4 class="text-xs font-medium text-red-600 mb-2 flex items-center gap-1.5">
@@ -700,68 +600,6 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                         Submitted By
                       </h4>
                       <p class="text-sm font-medium text-slate-900">{{ selectedAssessment.submittedByUser.email }}</p>
-                    </div>
-
-                    <!-- Approve Section -->
-                    <div v-if="assessmentDomain.canApprove(selectedAssessment)" class="border-t border-slate-200 pt-4">
-                      <h4 class="text-xs font-medium text-green-700 mb-3 flex items-center gap-1.5">
-                        <i class="pi pi-check-circle text-sm"></i>
-                        Approve Assessment
-                      </h4>
-                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3"><p class="text-sm text-red-600">{{ reviewError }}</p></div>
-
-                      <div>
-                        <label for="approve-tier" class="block text-xs font-medium text-slate-500 mb-1">Tier</label>
-                        <select id="approve-tier" v-model="approveTierId"
-                          class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent form-select">
-                          <option value="">Auto-assign based on score</option>
-                          <option v-for="tier in availableTiers" :key="tier.id" :value="tier.id">{{ tier.name }}</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label for="rate-override" class="block text-xs font-medium text-slate-500 mb-1">Rate Override</label>
-                        <input id="rate-override" v-model="approveRateOverride" type="number" step="0.01" placeholder="Leave blank to auto-calculate" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent form-select" />
-                      </div>
-
-                      <div>
-                        <label for="approve-rationale" class="block text-xs font-medium text-slate-500 mb-1">Rationale</label>
-                        <textarea id="approve-rationale" v-model="approveRationale" rows="2" placeholder="Explain approval decision..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"></textarea>
-                      </div>
-
-                      <button @click="approveAssessment" :disabled="isApproving || isRejecting" class="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
-                        <i v-if="!isApproving" class="pi pi-check mr-1"></i>
-                        {{ isApproving ? 'Processing...' : 'Approve Assessment' }}
-                      </button>
-                    </div>
-
-                    <!-- Reject Section (UNDER_REVIEW status) -->
-                    <div v-if="assessmentDomain.canReject(selectedAssessment)" class="border-t border-slate-200 pt-4">
-                      <h4 class="text-xs font-medium text-red-600 mb-3 flex items-center gap-1.5">
-                        <i class="pi pi-times-circle text-sm"></i>
-                        Reject Assessment
-                      </h4>
-                      <div v-if="reviewError" class="mb-3 bg-red-50 border border-red-200 rounded-lg p-3"><p class="text-sm text-red-600">{{ reviewError }}</p></div>
-
-                      <div class="space-y-3">
-                        <div>
-                          <label for="reject-reason" class="block text-xs font-medium text-slate-500 mb-1">Rejection Reason *</label>
-                        </div>
-
-                        <button @click="rejectAssessment" :disabled="isRejecting || isApproving" class="w-full px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium transition-colors">
-                          <i v-if="!isRejecting" class="pi pi-times mr-1"></i>
-                          {{ isRejecting ? 'Processing...' : 'Reject Assessment' }}
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Start Review / Continue Review Button -->
-                    <div v-if="assessmentDomain.canReview(selectedAssessment) || selectedAssessment.status === 'UNDER_REVIEW'" class="border-t border-slate-200 pt-4">
-                      <router-link :to="`/assessments/${selectedAssessment.id}/review`"
-                        class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">
-                        <i class="pi pi-pencil mr-1"></i>
-                        {{ selectedAssessment.status === 'UNDER_REVIEW' ? 'Continue Review' : 'Start Review' }}
-                      </router-link>
                     </div>
 
                     <!-- DRAFT Assessment Actions -->
@@ -784,15 +622,62 @@ onMounted(() => { fetchAssessments(); startAutoRefresh() })
                       </div>
                     </div>
 
-                    <!-- Panel Footer -->
-                    <div class="px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
-                      <!-- Retry button for AI_FAILED assessments -->
-                      <button v-if="assessmentDomain.isFailed(selectedAssessment) && assessmentDomain.canRetry(selectedAssessment)" @click.stop="retryFailedAssessment(selectedAssessment); closeDetailPanel()" :disabled="retryLoading" class="block w-full text-center px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm font-medium">
-                        <i v-if="!retryLoading" class="pi pi-sync mr-1"></i>
-                        {{ retryLoading ? 'Retrying...' : 'Retry AI Processing' }}
-                      </button>
-                      <router-link :to="{ name: 'assessmentNew', query: { hcpId: selectedAssessment.hcp.id } }" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</router-link>
+                  </div>
+                  <!-- Panel Footer -->
+                  <div class="px-4 py-3 border-t border-slate-200 bg-slate-50 space-y-2">
+                    <!-- AI Audit (raw LLM data for review) -->
+                    <template v-if="selectedAssessment.llmRawResponse || selectedAssessment.llmUserPrompt">
+                      <div>
+                        <h4 class="text-xs font-medium text-slate-500 mb-2 flex items-center gap-1.5">
+                          <i class="pi pi-file-edit text-sm"></i>
+                          AI Audit
+                        </h4>
+                        
+                        <!-- Raw LLM Response -->
+                        <div v-if="selectedAssessment.llmRawResponse" class="mb-1">
+                          <button @click="showRawResponse = !showRawResponse"
+                            class="text-xs text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
+                            <i :class="['pi', showRawResponse ? 'pi-chevron-down' : 'pi-chevron-right', 'text-xs']"></i>
+                            Raw LLM response ({{ selectedAssessment.llmRawResponse.length }} chars)
+                          </button>
+                          <pre v-if="showRawResponse"
+                            class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">
+                            {{ selectedAssessment.llmRawResponse }}
+                          </pre>
+                        </div>
+
+                        <!-- User Prompt -->
+                        <div v-if="selectedAssessment.llmUserPrompt" class="mb-4">
+                          <button @click="showRawPrompt = !showRawPrompt"
+                            class="text-xs text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1">
+                            <i :class="['pi', showRawPrompt ? 'pi-chevron-down' : 'pi-chevron-right', 'text-xs']"></i>
+                            User prompt ({{ selectedAssessment.llmUserPrompt.length }} chars)
+                          </button>
+                          <pre v-if="showRawPrompt"
+                            class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded text-xs text-slate-600 whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">
+                            {{ selectedAssessment.llmUserPrompt }}
+                          </pre>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Start Review / Continue Review Button -->
+                    <div v-if="assessmentDomain.canReview(selectedAssessment) || selectedAssessment.status === 'UNDER_REVIEW'">
+                      <router-link :to="`/assessments/${selectedAssessment.id}/review`"
+                        class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors">
+                        <i class="pi pi-pencil mr-1"></i>
+                        {{ selectedAssessment.status === 'UNDER_REVIEW' ? 'Continue Review' : 'Start Review' }}
+                      </router-link>
                     </div>
+
+                    <!-- Retry button for AI_FAILED assessments -->
+                    <button v-if="assessmentDomain.isFailed(selectedAssessment) && assessmentDomain.canRetry(selectedAssessment)" @click.stop="retryFailedAssessment(selectedAssessment); closeDetailPanel()" :disabled="retryLoading" class="block w-full text-center px-4 py-2.5 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm font-medium">
+                      <i v-if="!retryLoading" class="pi pi-sync mr-1"></i>
+                      {{ retryLoading ? 'Retrying...' : 'Retry AI Processing' }}
+                    </button>
+
+                    <!--- Request New Assessment Button -->
+                    <router-link :to="{ name: 'assessmentNew', query: { hcpId: selectedAssessment.hcp.id } }" class="block w-full text-center px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Request New Assessment</router-link>
                   </div>
                 </div>
               </Transition>

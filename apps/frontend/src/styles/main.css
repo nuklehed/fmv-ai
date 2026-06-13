@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 /* Cross-browser consistent select styling — fixes Safari height/arrow quirks */
+
+
 @layer utilities {
   .form-select {
     -webkit-appearance: none !important;

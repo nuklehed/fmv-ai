@@ -5,7 +5,7 @@
  * - Tier thresholds on the criteria set (Tier 1, 2, 3 score ranges)
  * - SpecialtyRate entries with rate ranges per tier
  * 
- * Run: npx tsx prisma/seed-tiers.ts
+ * Run: npx tsx prisma/seeds/04-tier-rates.ts
  */
 
 import { PrismaClient } from '@prisma/client'

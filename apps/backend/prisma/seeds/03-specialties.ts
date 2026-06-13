@@ -4,7 +4,7 @@
  * Creates the 10 largest specialties by provider count (Axuall 2025),
  * all linked to the FMV HCP Tiers criteria set.
  * 
- * Run: npx tsx prisma/seed-top-specialties.ts
+ * Run: npx tsx prisma/seeds/03-specialties.ts
  */
 
 import { PrismaClient } from '@prisma/client'

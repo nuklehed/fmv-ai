@@ -90,7 +90,7 @@ async function checkExpiringAssessments(prisma: PrismaClient): Promise<void> {
     const adminUsers = await prisma.user.findMany({
       where: {
         tenantId: assessment.tenantId,
-        role: { in: ['ADMIN', 'SA'] as any },
+        role: { in: ['ADMIN', 'SA'] },
         isActive: true
       }
     })

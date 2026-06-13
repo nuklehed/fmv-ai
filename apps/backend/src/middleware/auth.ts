@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { PrismaClient } from '@prisma/client'
+import { JWT_SECRET } from '../config'
 
 const prisma = new PrismaClient()
 
@@ -9,9 +10,6 @@ export interface AuthenticatedRequest extends Request {
   userRole?: 'BU' | 'ADMIN' | 'SA'
   tenantId?: string
 }
-
-// JWT configuration — must match auth.ts
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
 
 /**
  * Extracts and verifies the JWT token from the Authorization header.

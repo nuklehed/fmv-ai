@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import Toast from 'primevue/toast'
 import type { Notification } from '@/types'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
@@ -233,6 +234,7 @@ onUnmounted(() => {
 
     <!-- Page Content -->
     <RouterView />
+    <Toast position="center" :style="{ zIndex: 9999 }" />
   </div>
 </template>
 

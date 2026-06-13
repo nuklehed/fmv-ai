@@ -2,17 +2,14 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import type { StringValue } from 'ms'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { authenticate } from '../middleware/auth'
+import { JWT_SECRET, JWT_EXPIRES_IN, JWT_REFRESH_EXPIRES_IN } from '../config'
 
 const router = Router()
 const prisma = new PrismaClient()
-
-// JWT configuration — loaded from environment variables
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production'
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d'
-const JWT_REFRESH_EXPIRES_IN = process.env.JWT_REFRESH_EXPIRES_IN || '30d'
 
 /**
  * POST /api/auth/login
@@ -70,15 +67,15 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         tenantId: user.tenantId
       },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN } as any
+      JWT_SECRET as string,
+      { expiresIn: JWT_EXPIRES_IN as number | StringValue }
     )
 
     // Generate refresh token (long-lived)
     const refreshToken = jwt.sign(
       { userId: user.id, type: 'refresh' },
-      JWT_SECRET,
-      { expiresIn: JWT_REFRESH_EXPIRES_IN } as any
+      JWT_SECRET as string,
+      { expiresIn: JWT_REFRESH_EXPIRES_IN as number | StringValue }
     )
 
     res.json({
@@ -113,7 +110,7 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Verify refresh token
-    let decoded: any
+    let decoded: any = null
     try {
       decoded = jwt.verify(refreshToken, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string; type: string }
     } catch (err) {
@@ -153,8 +150,8 @@ router.post('/refresh', async (req: Request, res: Response): Promise<void> => {
         role: user.role,
         tenantId: user.tenantId
       },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN } as any
+      JWT_SECRET as string,
+      { expiresIn: JWT_EXPIRES_IN as number | StringValue }
     )
 
     res.json({ accessToken })

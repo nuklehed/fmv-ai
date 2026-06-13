@@ -108,7 +108,7 @@ export class AssessmentDomain {
         submittedByUser: { select: { id: true, email: true } },
         specialty: { select: { id: true, name: true } }
       }
-    }) as any[]
+    })
 
     return {
       data: assessments,
@@ -132,7 +132,7 @@ export class AssessmentDomain {
         submittedByUser: { select: { id: true, email: true } },
         specialty: { select: { id: true, name: true } }
       }
-    }) as any[]
+    })
 
     // Deduplicate by hcpId — keep the latest (first in desc order)
     const seen = new Set<string>()
@@ -337,14 +337,15 @@ export class AssessmentDomain {
 
     // Extract text from PDF using pdfjs-dist
     const pdfjsDist = await import('pdfjs-dist')
-    const { getDocument } = (pdfjsDist as any).default || pdfjsDist
+    const getDocumentFn = (pdfjsDist as Record<string, unknown>).default || pdfjsDist
+    const { getDocument } = getDocumentFn as { getDocument: (input: { data: Uint8Array }) => { promise: Promise<{ numPages: number; getPage: (n: number) => Promise<{ getTextContent: () => Promise<{ items: Array<{ str?: string }> }> }> }>; numPages: number } }
     const uint8Array = new Uint8Array(fileBuffer)
     const pdfDoc = await getDocument({ data: uint8Array }).promise
     let cvText = ''
     for (let i = 1; i <= pdfDoc.numPages; i++) {
       const page = await pdfDoc.getPage(i)
       const textContent = await page.getTextContent()
-      const pageText = textContent.items.map((item: any) => item.str).join(' ')
+      const pageText = textContent.items.map((item) => item.str ?? '').join(' ')
       cvText += pageText + '\n'
     }
     cvText = cvText.trim()
@@ -419,8 +420,8 @@ export class AssessmentDomain {
       data: {
         status: 'AI_PROCESSING',
         submittedAt: new Date(),
-        criteriaSnapshot
-      } as any,
+        criteriaSnapshot: criteriaSnapshot ? (criteriaSnapshot as any) : null
+      },
       include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
     })
 
@@ -436,7 +437,7 @@ export class AssessmentDomain {
 
       return {
         message: 'Assessment submitted for AI processing (queued)',
-        assessment: updatedAssessment as any,
+        assessment: updatedAssessment,
         queuePosition: await queue.getWaitingCount() + 1
       }
     } else {
@@ -448,12 +449,12 @@ export class AssessmentDomain {
           where: { id },
           include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
         })
-        return { message: 'Assessment processed synchronously (no Redis queue)', assessment: refreshed as any }
+        return { message: 'Assessment processed synchronously (no Redis queue)', assessment: refreshed }
       } catch (err) {
         console.error('Synchronous processing failed:', err)
         return {
           message: 'Assessment queued for synchronous processing',
-          assessment: updatedAssessment as any,
+          assessment: updatedAssessment,
           note: 'AI worker not available — process manually via POST /api/assessments/:id/process'
         }
       }
@@ -464,7 +465,7 @@ export class AssessmentDomain {
     id: string,
     userId: string,
     tenantId: string
-  ): Promise<SubmitResult> {
+  ): Promise<SubmitResult & { assessment: Assessment }> {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },
       include: { hcp: true }
@@ -508,8 +509,7 @@ export class AssessmentDomain {
       data: {
         status: 'AI_PROCESSING',
         submittedAt: new Date(),
-        ...(retrySnapshot ? { criteriaSnapshot: retrySnapshot } : {})
-      } as any,
+        ...(retrySnapshot ? { criteriaSnapshot: retrySnapshot } : {})},
       include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
     })
 
@@ -525,7 +525,7 @@ export class AssessmentDomain {
 
       return {
         message: 'Assessment re-queued for AI processing',
-        assessment: updatedAssessment as any,
+        assessment: updatedAssessment,
         queuePosition: await queue.getWaitingCount() + 1
       }
     } else {
@@ -537,7 +537,7 @@ export class AssessmentDomain {
           where: { id },
           include: { hcp: true, submittedByUser: { select: { id: true, email: true } } }
         })
-        return { message: 'Assessment processed synchronously (no Redis queue)', assessment: refreshed as any }
+        return { message: 'Assessment processed synchronously (no Redis queue)', assessment: refreshed }
       } catch (err) {
         console.error('Synchronous retry processing failed:', err)
         await this.prisma.assessment.update({
@@ -554,7 +554,7 @@ export class AssessmentDomain {
         })
         return {
           message: 'Retry failed — assessment marked as AI_FAILED',
-          assessment: failed as any,
+          assessment: failed,
           note: 'AI worker not available — retry later via POST /api/assessments/:id/retry'
         }
       }
@@ -566,7 +566,7 @@ export class AssessmentDomain {
     id: string,
     userId: string,
     tenantId: string
-  ): Promise<{ message: string; assessment: any }> {
+  ): Promise<{ message: string; assessment: Assessment }> {
     const existing = await this.prisma.assessment.findFirst({
       where: { id, tenantId },
       include: { hcp: true }
@@ -625,7 +625,7 @@ export class AssessmentDomain {
     console.log(`[Cancel] Assessment ${id} cancelled by user ${userId}, status reset to DRAFT`)
     return {
       message: 'Assessment cancelled and queued job removed',
-      assessment: updated as any
+      assessment: updated
     }
   }
 
@@ -674,7 +674,7 @@ export class AssessmentDomain {
     if (existing.status !== 'AI_COMPLETE') throw new Error('Only AI-complete assessments can be reviewed')
 
     // Parse existing AI results
-    const aiResults: any[] = existing.aiResults ? JSON.parse(existing.aiResults) : []
+    const aiResults = existing.aiResults ? JSON.parse(existing.aiResults) : []
     const finalResults = overrides ? [...aiResults] : aiResults
 
     // Apply overrides if provided
@@ -684,16 +684,16 @@ export class AssessmentDomain {
         if (!questionId || !selectedAnswerId) continue
 
         // Validate the answer belongs to this question
-        const question = existing.criteriaSet?.questions.find((q: any) => q.id === questionId)
+        const question = existing.criteriaSet?.questions.find((q) => q.id === questionId)
         if (!question) throw new Error(`Question ${questionId} not found in criteria set`)
 
-        const answerExists = question.answers.some((a: any) => a.id === selectedAnswerId)
+        const answerExists = question.answers.some((a) => a.id === selectedAnswerId)
         if (!answerExists) throw new Error(`Answer ${selectedAnswerId} not valid for question ${questionId}`)
 
         // Find and update the result in aiResults
-        const existingResultIndex = finalResults.findIndex((r: any) => r.questionId === questionId)
+        const existingResultIndex = finalResults.findIndex((r: Record<string, unknown>) => (r as Record<string, unknown>).questionId === questionId)
         if (existingResultIndex >= 0) {
-          ;(finalResults as any[])[existingResultIndex] = {
+          ;(finalResults as typeof finalResults)[existingResultIndex] = {
             ...finalResults[existingResultIndex],
             selectedAnswerId,
             rationale: String(rationale || '').slice(0, 500),
@@ -717,9 +717,9 @@ export class AssessmentDomain {
     // Calculate total score from final results
     let totalScore = 0
     for (const result of finalResults) {
-      const question = existing.criteriaSet?.questions.find((q: any) => q.id === result.questionId)
+      const question = existing.criteriaSet?.questions.find((q) => q.id === result.questionId)
       if (question) {
-        const answer = question.answers.find((a: any) => a.id === result.selectedAnswerId)
+        const answer = question.answers.find((a) => a.id === result.selectedAnswerId)
         if (answer) totalScore += answer.score
       }
     }
@@ -802,7 +802,7 @@ export class AssessmentDomain {
     })
     if (!criteriaSet) throw new Error('Criteria set not found')
 
-    const thresholds: any[] = criteriaSet.tierThresholds ? JSON.parse(JSON.stringify(criteriaSet.tierThresholds)) : []
+    const thresholds = criteriaSet.tierThresholds ? JSON.parse(JSON.stringify(criteriaSet.tierThresholds)) : []
     if (thresholds.length === 0) throw new Error('No tier thresholds defined for this criteria set')
 
     // Determine tier label and rate from SpecialtyRate
@@ -811,8 +811,8 @@ export class AssessmentDomain {
     if (!assignedTierLabel) {
       // Auto-assign based on score matching thresholds
       const matchingThreshold = thresholds.find((t: any) =>
-        existing.totalScore! >= t.minScore &&
-        existing.totalScore! <= t.maxScore
+        existing.totalScore! >= (t as any).minScore &&
+        existing.totalScore! <= (t as any).maxScore
       )
 
       if (!matchingThreshold) throw new Error('No tier matches the assessment score. Please assign a tier manually.')
@@ -835,31 +835,46 @@ export class AssessmentDomain {
     const range = Number(specialtyRate.highRate) - Number(specialtyRate.lowRate)
     let finalRate: number | null = null
 
+    // Always compute the auto rate for comparison and override detection
+    const pctSetting = await this.prisma.applicationSetting.findFirst({
+      where: { key: 'defaultTierPercentile', tenantId }
+    })
+    const percentile = pctSetting ? Number(pctSetting.value) : 50
+    let autoRate = Number(specialtyRate.lowRate) + (range * percentile / 100)
+
+    // Optionally round to nearest $5
+    const roundingSetting = await this.prisma.applicationSetting.findFirst({
+      where: { key: 'roundTierRateToNearest5', tenantId }
+    })
+    const doRound = roundingSetting ? (roundingSetting.value === 'true' || Number(roundingSetting.value) === 1) : true
+    if (doRound) {
+      autoRate = Math.round(autoRate / 5) * 5
+    }
+
     if (rateOverride != null && typeof rateOverride === 'number') {
       // User explicitly entered a rate — use it directly
       finalRate = rateOverride
     } else {
       // No user override — auto-calculate from SpecialtyRate range at configured percentile
-      const pctSetting = await this.prisma.applicationSetting.findFirst({
-        where: { key: 'defaultTierPercentile', tenantId }
-      })
-      const percentile = pctSetting ? Number(pctSetting.value) : 50
-      finalRate = Number(specialtyRate.lowRate) + (range * percentile / 100)
-
-      // Optionally round to nearest $5
-      const roundingSetting = await this.prisma.applicationSetting.findFirst({
-        where: { key: 'roundTierRateToNearest5', tenantId }
-      })
-      const doRound = roundingSetting ? (roundingSetting.value === 'true' || Number(roundingSetting.value) === 1) : true
-      if (doRound) {
-        finalRate = Math.round(finalRate / 5) * 5
-      }
+      finalRate = autoRate
     }
 
     // Validate rate is within tier bounds
     if (finalRate != null &&
         (finalRate < Number(specialtyRate.lowRate) || finalRate > Number(specialtyRate.highRate))) {
       throw new Error('Rate must be within tier bounds')
+    }
+
+    // ─── Rate override validation (CONTEXT.md: mandatory rationale for overrides) ───
+    let isRateOverride = false
+    if (rateOverride != null && typeof rateOverride === 'number') {
+      // If user-provided rate differs from auto-calculated rate, it's an override
+      if (Math.abs(rateOverride - autoRate) > 0.01) {
+        isRateOverride = true
+        if (!rationale || !String(rationale).trim()) {
+          throw new Error('Rate override requires a rationale explaining the deviation from the system-suggested rate')
+        }
+      }
     }
 
     // Calculate renewal date based on approval validity period (default 2 years)
@@ -893,7 +908,7 @@ export class AssessmentDomain {
         data: {
           status: 'APPROVED',
           tierLabel: assignedTierLabel,
-          rate: finalRate as any,
+          rate: finalRate,
           approvedByUserId: userId,
           effectiveDate: startDate,
           renewalDate: endDate,
@@ -927,19 +942,23 @@ export class AssessmentDomain {
         submittedByUser: { select: { id: true, email: true } },
         approvedByUser: { select: { id: true, email: true } }
       }
-    }) as any
+    })
 
     // Create audit trail entry (with supersession info if applicable)
+    const auditAction = oldActive ? 'APPROVE_SUPERSEDED' : 'APPROVE'
+    const auditFieldChanged = 'status,tier,rate' + (oldActive ? ',supersession' : '') + (isRateOverride ? ',rateOverride' : '')
+    const auditRationale = isRateOverride ? `Rate override: ${rationale}` : rationale
+
     const baseAudit = {
       userId,
       userName: 'Admin',
-      entityType: 'Assessment' as const,
+      entityType: 'Assessment',
       entityId: id,
-      action: oldActive ? 'APPROVE_SUPERSEDED' : 'APPROVE' as const,
-      fieldChanged: 'status,tier,rate' + (oldActive ? ',supersession' : ''),
+      action: auditAction,
+      fieldChanged: auditFieldChanged,
       oldValue: JSON.stringify({ status: 'UNDER_REVIEW', tierLabel: existing.tierLabel, rate: existing.rate }),
-      newValue: JSON.stringify({ status: 'APPROVED', tierLabel: assignedTierLabel, rate: finalRate }),
-      rationale
+      newValue: JSON.stringify({ status: 'APPROVED', tierLabel: assignedTierLabel, rate: finalRate, ...(isRateOverride ? { rateOverride: true } : {}) }),
+      rationale: auditRationale
     }
 
     if (oldActive) {
@@ -947,11 +966,11 @@ export class AssessmentDomain {
         data: {
           ...baseAudit,
           fieldChanged: baseAudit.fieldChanged + ',supersession',
-          rationale: `${rationale || ''} [Superseded previous assessment ${oldActive.id}]`
+          rationale: `${auditRationale || ''} [Superseded previous assessment ${oldActive.id}]`
         }
       })
     } else {
-      await this.prisma.auditTrail.create({ data: baseAudit as any })
+      await this.prisma.auditTrail.create({ data: baseAudit })
     }
 
     // Create notification for BU (new assessment approved)

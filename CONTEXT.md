@@ -80,3 +80,47 @@ SA-created accounts require email verification by default. The SA can override a
 
 ## Multi-Tenancy
 Logical multi-tenancy: one codebase with every record scoped to a `tenant_id`. Each tenant (organization) has isolated data — their own HCPs, assessments, users, criteria sets, specialties, and configuration. Other tenants' data is invisible. SAs manage users only within their own tenant.
+
+## Project File Conventions
+
+### Frontend (`apps/frontend/src/views/`)
+Group files by feature/domain. Drop the `View` suffix — it's redundant with Vue Router's `<RouterView>`.
+
+```
+views/
+├── auth/Login.vue                          # Authentication pages
+├── dashboard/Home.vue                      # Dashboard / overview
+├── assessment/                             # Assessment CRUD surface
+│   ├── AssessmentList.vue                  # Index/listing page
+│   ├── AssessmentForm.vue                  # Create / edit form
+│   └── AssessmentReview.vue                # Admin review page
+├── hcp/HcpProfile.vue                      # HCP profile detail
+└── settings/                               # Settings & admin pages
+    ├── SettingsDashboard.vue               # Admin/SA settings hub
+    ├── NotificationSettings.vue            # User notification prefs
+    ├── ApplicationSettings.vue             # App-level config (SA)
+    ├── CriteriaSets.vue                    # Criteria set CRUD
+    ├── Specialties.vue                     # Specialty CRUD
+    ├── TierRates.vue                       # Tier rate management
+    └── UserManagement.vue                  # User CRUD
+```
+
+**Rules:** New view files go in the feature folder that matches their domain. Name by domain concept, not by URL path or admin task. Use `PascalCase.vue` (no suffix).
+
+### Backend (`apps/backend/src/`)
+
+| Directory | Purpose | Naming |
+|---|---|---|
+| `routes/` | Express route handlers (one per API resource) | `PascalCase.ts` matching domain entity (e.g., `assessments.ts`, `hcps.ts`) |
+| `services/` | Business logic & background workers | `camelCase.ts` describing the service (e.g., `expiryChecker.ts`, `hcpService.ts`) |
+| `middleware/` | Auth, error handling, route group factories | `camelCase.ts` describing the concern (e.g., `routeGroups.ts`, `errorHandler.ts`) |
+| `domain/` | Shared domain models & utilities | `PascalCase.ts` or `camelCase.ts` |
+| `types/` | TypeScript type definitions | `index.ts` |
+| `config.ts` | Environment variable validation & exports | Stays at `src/config.ts` (small single file) |
+
+**Rules:** Route files map one-to-one with API resource paths. Service files handle business logic, not HTTP concerns. Router-group factories live in `middleware/`, not `routes/`. Seed scripts live in `prisma/seeds/` with numeric prefixes for execution order (e.g., `01-main.ts`, `02-criteria-sets.ts`).
+
+## Next Steps
+Review the SYSTEM.md for role and development rules
+Design principles are in the /design-principles skill
+See the latest updates in HANDOFF.md

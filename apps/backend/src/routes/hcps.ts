@@ -2,6 +2,7 @@ import type { Response } from 'express'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { createAdminRouter, createAuthedRouter, authenticate, requireBUOrHigher } from './saRouter'
+import { createHcp } from '../services/hcpService'
 
 const router = createAuthedRouter()
 const prisma = new PrismaClient()
@@ -40,7 +41,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
             }
           }
         }
-      ] as any
+      ]
     }
 
     // Map sort field to Prisma format (handle nested relations)
@@ -327,101 +328,20 @@ router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void>
       return
     }
 
-    // Multi-tenant isolation
-    const tenantId = req.tenantId!
+    const result = await createHcp({
+      firstName, lastName, email, phone, address, city, state, country,
+      specialtyId, identifiers, tenantId: req.tenantId!
+    }, prisma)
 
-    // Validate specialtyId if provided — must have a linked criteria set
-    if (specialtyId) {
-      const specialty = await prisma.specialty.findFirst({
-        where: { id: specialtyId, tenantId, isActive: true, criteriaSetId: { not: null } }
-      })
-      if (!specialty) {
-        res.status(400).json({ error: 'Invalid specialty. Must be active and linked to a criteria set.' })
-        return
-      }
-    }
-
-    // Fuzzy duplicate detection — check for matching name + any provided external identifiers
-    if (identifiers && Array.isArray(identifiers) && identifiers.length > 0) {
-      for (const identifier of identifiers) {
-        const existingWithId = await prisma.hcp.findFirst({
-          where: {
-            tenantId,
-            isActive: true,
-            firstName: { equals: firstName.trim() },
-            lastName: { equals: lastName.trim() },
-            identifiers: {
-              some: {
-                value: { equals: identifier.value },
-                isActive: true
-              }
-            }
-          }
-        })
-
-        if (existingWithId) {
-          res.status(409).json({
-            error: `Potential duplicate found`,
-            duplicate: {
-              id: existingWithId.id,
-              firstName: existingWithId.firstName,
-              lastName: existingWithId.lastName,
-              identifierType: identifier.type,
-              identifierValue: identifier.value
-            }
-          })
-          return
-        }
-      }
-    }
-
-    // Also check name-only match as a warning (not blocking)
-    const nameOnlyMatch = await prisma.hcp.findFirst({
-      where: {
-        tenantId,
-        isActive: true,
-        firstName: { equals: firstName.trim() },
-        lastName: { equals: lastName.trim() }
-      }
-    })
-
-    // Create HCP with optional identifiers
-    const hcp = await prisma.hcp.create({
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email || null,
-        phone: phone || null,
-        address: address || null,
-        city: city || null,
-        state: state || null,
-        country: country || 'US',
-        specialtyId: specialtyId || null,
-        tenantId,
-        identifiers: identifiers && Array.isArray(identifiers) ? {
-          create: identifiers.map((id: { type: string; value: string }) => ({
-            type: id.type as 'NPI' | 'STATE_LICENSE' | 'DEA' | 'OTHER',
-            value: id.value.trim()
-          }))
-        } : undefined
-      },
-      include: {
-        identifiers: true,
-        specialty: { select: { id: true, name: true } }
-      }
-    })
-
-    // Include duplicate warning in response if name-only match found
-    const response = hcp as Record<string, unknown> & { duplicateWarning?: boolean }
-    if (nameOnlyMatch) {
-      response.duplicateWarning = true
-      response.duplicateId = nameOnlyMatch.id
-    }
-
-    res.status(201).json(response)
+    res.status(201).json(result)
   } catch (error) {
-    console.error('Error creating HCP:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: number }).code === 409) {
+      const err = error as { code: number; error: string; duplicate: unknown }
+      res.status(409).json({ error: err.error, duplicate: err.duplicate })
+    } else {
+      console.error('Error creating HCP:', error)
+      res.status(500).json({ error: 'Internal server error' })
+    }
   }
 })
 
@@ -582,101 +502,20 @@ router.post('/bu-create', authenticate, requireBUOrHigher, async (req: Authentic
       return
     }
 
-    // Multi-tenant isolation
-    const tenantId = req.tenantId!
+    const result = await createHcp({
+      firstName, lastName, email, phone, address, city, state, country,
+      specialtyId, identifiers, tenantId: req.tenantId!
+    }, prisma)
 
-    // Validate specialtyId if provided — must have a linked criteria set
-    if (specialtyId) {
-      const specialty = await prisma.specialty.findFirst({
-        where: { id: specialtyId, tenantId, isActive: true, criteriaSetId: { not: null } }
-      })
-      if (!specialty) {
-        res.status(400).json({ error: 'Invalid specialty. Must be active and linked to a criteria set.' })
-        return
-      }
-    }
-
-    // Fuzzy duplicate detection — check for matching name + any provided external identifiers
-    if (identifiers && Array.isArray(identifiers) && identifiers.length > 0) {
-      for (const identifier of identifiers) {
-        const existingWithId = await prisma.hcp.findFirst({
-          where: {
-            tenantId,
-            isActive: true,
-            firstName: { equals: firstName.trim() },
-            lastName: { equals: lastName.trim() },
-            identifiers: {
-              some: {
-                value: { equals: identifier.value },
-                isActive: true
-              }
-            }
-          }
-        })
-
-        if (existingWithId) {
-          res.status(409).json({
-            error: `Potential duplicate found`,
-            duplicate: {
-              id: existingWithId.id,
-              firstName: existingWithId.firstName,
-              lastName: existingWithId.lastName,
-              identifierType: identifier.type,
-              identifierValue: identifier.value
-            }
-          })
-          return
-        }
-      }
-    }
-
-    // Also check name-only match as a warning (not blocking)
-    const nameOnlyMatch = await prisma.hcp.findFirst({
-      where: {
-        tenantId,
-        isActive: true,
-        firstName: { equals: firstName.trim() },
-        lastName: { equals: lastName.trim() }
-      }
-    })
-
-    // Create HCP with optional identifiers
-    const hcp = await prisma.hcp.create({
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email || null,
-        phone: phone || null,
-        address: address || null,
-        city: city || null,
-        state: state || null,
-        country: country || 'US',
-        specialtyId: specialtyId || null,
-        tenantId,
-        identifiers: identifiers && Array.isArray(identifiers) ? {
-          create: identifiers.map((id: { type: string; value: string }) => ({
-            type: id.type as 'NPI' | 'STATE_LICENSE' | 'DEA' | 'OTHER',
-            value: id.value.trim()
-          }))
-        } : undefined
-      },
-      include: {
-        identifiers: true,
-        specialty: { select: { id: true, name: true } }
-      }
-    })
-
-    // Include duplicate warning in response if name-only match found
-    const response = hcp as Record<string, unknown> & { duplicateWarning?: boolean }
-    if (nameOnlyMatch) {
-      response.duplicateWarning = true
-      response.duplicateId = nameOnlyMatch.id
-    }
-
-    res.status(201).json(response)
+    res.status(201).json(result)
   } catch (error) {
-    console.error('Error creating HCP:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: number }).code === 409) {
+      const err = error as { code: number; error: string; duplicate: unknown }
+      res.status(409).json({ error: err.error, duplicate: err.duplicate })
+    } else {
+      console.error('Error creating HCP:', error)
+      res.status(500).json({ error: 'Internal server error' })
+    }
   }
 })
 

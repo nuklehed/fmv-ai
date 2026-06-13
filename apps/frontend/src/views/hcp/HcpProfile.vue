@@ -248,14 +248,11 @@ onMounted(() => {
       <div v-else-if="profile" class="space-y-6">
         <!-- ─── Section 1: Identity Card ────────────────────── -->
         <div class="bg-white shadow rounded-lg overflow-hidden">
-          <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between">
+          <div class="px-6 py-5 border-b border-slate-200">
             <h2 class="text-base font-semibold text-slate-900">Identity</h2>
-            <span :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', currentStatusText.color]">
-              {{ currentStatusText.label }}
-            </span>
           </div>
 
-          <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="px-6 py-5 grid grid-cols-1 md:grid-cols-3 gap-8">
             <!-- Name & Specialty -->
             <div>
               <h4 class="text-xs font-semibold text-slate-500 mb-2">Name</h4>
@@ -273,25 +270,25 @@ onMounted(() => {
               <p v-if="!profile.hcp.email && !profile.hcp.phone" class="text-sm text-slate-400">—</p>
             </div>
 
-            <!-- Address -->
+            <!-- Identifiers -->
             <div>
-              <h4 class="text-xs font-semibold text-slate-500 mb-2">Location</h4>
-              <p v-if="profile.hcp.city || profile.hcp.country" class="text-sm text-slate-900">
-                {{ [profile.hcp.city, profile.hcp.state, profile.hcp.country].filter(Boolean).join(', ') }}
-              </p>
-              <p v-else class="text-sm text-slate-400">—</p>
-            </div>
-
-            <!-- External Identifiers -->
-            <div class="md:col-span-3">
               <h4 class="text-xs font-semibold text-slate-500 mb-2">Identifiers</h4>
-              <div v-if="profile.hcp.identifiers?.length" class="flex flex-wrap gap-2">
+              <div v-if="profile.hcp.identifiers?.length" class="flex flex-wrap gap-1.5 mt-1">
                 <span v-for="id in profile.hcp.identifiers" :key="id.type + id.value"
-                  class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
                   <span class="font-semibold mr-1">{{ id.type }}:</span> {{ id.value }}
                 </span>
               </div>
-              <p v-else class="text-sm text-slate-400">No identifiers on file</p>
+              <p v-else class="text-sm text-slate-400 mt-1">None on file</p>
+            </div>
+
+            <!-- Location -->
+            <div class="md:col-span-3 border-t pt-4 mt-1">
+              <h4 class="text-xs font-semibold text-slate-500 mb-2">Location</h4>
+              <p v-if="profile.hcp.city || profile.hcp.state || profile.hcp.country" class="text-sm text-slate-900">
+                {{ [profile.hcp.city, profile.hcp.state, profile.hcp.country].filter(Boolean).join(', ') }}
+              </p>
+              <p v-else class="text-sm text-slate-400">—</p>
             </div>
 
             <!-- Account Created -->
@@ -332,25 +329,25 @@ onMounted(() => {
             </div>
 
             <!-- Active Assessment Details -->
-            <div v-if="activeAssessment" :class="['rounded-lg border p-4', expiryUrgencyColor]">
-              <h3 class="text-xs font-semibold text-slate-500 mb-3 opacity-75">Current Approval</h3>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div v-if="activeAssessment" class="border-b border-slate-200 py-4">
+              <h3 class="text-xs font-semibold text-slate-500 mb-4">Current Approval</h3>
+              <div class="flex flex-wrap gap-x-12 gap-y-3">
                 <div>
-                  <p class="text-xs opacity-75">Score</p>
-                  <p class="text-lg font-bold">{{ activeAssessment.totalScore ?? '—' }}</p>
+                  <p class="text-xs text-slate-500">Score</p>
+                  <p class="text-base font-semibold text-slate-900">{{ activeAssessment.totalScore ?? '—' }}</p>
                 </div>
                 <div>
-                  <p class="text-xs opacity-75">Tier</p>
-                  <p class="text-lg font-bold">{{ activeAssessment.tierLabel || '—' }}</p>
+                  <p class="text-xs text-slate-500">Tier</p>
+                  <p class="text-base font-semibold text-slate-900">{{ activeAssessment.tierLabel || '—' }}</p>
                 </div>
                 <div>
-                  <p class="text-xs opacity-75">Rate</p>
-                  <p class="text-lg font-bold">${{ activeAssessment.rate?.toFixed(2) ?? '—' }}</p>
+                  <p class="text-xs text-slate-500">Rate</p>
+                  <p class="text-base font-semibold text-slate-900">${{ (activeAssessment.rate != null ? Number(activeAssessment.rate) : null)?.toFixed(2) ?? '—' }}</p>
                 </div>
                 <div>
-                  <p class="text-xs opacity-75">Renewal</p>
-                  <p class="text-lg font-bold">{{ expiryCountdown ?? '—' }}</p>
-                  <p v-if="activeAssessment.renewalDate" class="text-xs mt-0.5 opacity-75">{{ formatDate(activeAssessment.renewalDate) }}</p>
+                  <p class="text-xs text-slate-500">Renewal</p>
+                  <p class="text-base font-semibold text-emerald-700">{{ expiryCountdown ?? '—' }}</p>
+                  <p v-if="activeAssessment.renewalDate" class="text-xs mt-0.5 text-slate-500">{{ formatDate(activeAssessment.renewalDate) }}</p>
                 </div>
               </div>
             </div>
@@ -433,7 +430,7 @@ onMounted(() => {
 
                   <!-- Rate -->
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-right font-medium text-slate-900">
-                    ${{ assessment.rate?.toFixed(2) ?? '—' }}
+                    ${{ (assessment.rate != null ? Number(assessment.rate) : null)?.toFixed(2) ?? '—' }}
                   </td>
 
                   <!-- Renewal -->

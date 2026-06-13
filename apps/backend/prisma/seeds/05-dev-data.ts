@@ -5,13 +5,13 @@
  * looks like a working product — HCPs, assessments in every lifecycle
  * state, audit trails, notifications, etc.
  *
- * Run: npx tsx prisma/seed-dev-data.ts
+ * Run: npx tsx prisma/seeds/05-dev-data.ts
  *
  * Prerequisites (run these first):
- *   npx tsx prisma/seed.ts
- *   npx tsx prisma/seed-fmv-tiers.ts
- *   npx tsx prisma/seed-top-specialties.ts
- *   npx tsx prisma/seed-tiers.ts
+ *   npx tsx prisma/seeds/01-main.ts
+ *   npx tsx prisma/seeds/02-criteria-sets.ts
+ *   npx tsx prisma/seeds/03-specialties.ts
+ *   npx tsx prisma/seeds/04-tier-rates.ts
  */
 
 import { PrismaClient } from '@prisma/client'

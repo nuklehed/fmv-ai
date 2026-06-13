@@ -62,10 +62,10 @@ router.put('/me/settings', async (req: AuthenticatedRequest, res: Response): Pro
           tenantId: req.tenantId!
         }
       },
-      update: { value: preferences as any, userId: req.userId! },
+      update: { value: JSON.stringify(preferences), userId: req.userId! },
       create: {
         key: 'notificationPreferences',
-        value: preferences as any,
+        value: JSON.stringify(preferences),
         description: 'User notification channel preferences (in-app and email)',
         tenantId: req.tenantId!,
         userId: req.userId!

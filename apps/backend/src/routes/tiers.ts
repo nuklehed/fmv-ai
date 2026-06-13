@@ -33,8 +33,8 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
         where: { id: criteriaSetId as string, tenantId: req.tenantId! }
       })
       if (cs?.tierThresholds) {
-        const thresholds: any[] = JSON.parse(JSON.stringify(cs.tierThresholds))
-        tierLabels = thresholds.map((t: any) => t.label)
+        const thresholds = JSON.parse(JSON.stringify(cs.tierThresholds))
+        tierLabels = thresholds.map((t: { label: string }) => t.label)
       }
     }
 
@@ -65,7 +65,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> 
 
     // Build matrix rows
     const data = specialties.map(specialty => {
-      const row: any = { id: specialty.id, name: specialty.name }
+      const row: Record<string, string | null> = { id: specialty.id, name: specialty.name }
       const ratesForSpecialty = specialtyRatesMap.get(specialty.id) || {}
 
       for (const label of tierLabels) {
@@ -104,9 +104,9 @@ router.get('/thresholds/:criteriaSetId', async (req: AuthenticatedRequest, res: 
       return
     }
 
-    const thresholds: any[] = criteriaSet.tierThresholds ? JSON.parse(JSON.stringify(criteriaSet.tierThresholds)) : []
+    const thresholds = criteriaSet.tierThresholds ? JSON.parse(JSON.stringify(criteriaSet.tierThresholds)) : []
 
-    res.json({ labels: thresholds.map((t: any) => t.label), thresholds })
+    res.json({ labels: thresholds.map((t: { label: string }) => t.label), thresholds })
   } catch (error) {
     console.error('Error fetching tier thresholds:', error)
     res.status(500).json({ error: 'Internal server error' })

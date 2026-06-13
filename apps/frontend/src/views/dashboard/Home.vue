@@ -135,12 +135,12 @@ onMounted(() => {
         <table class="min-w-full divide-y divide-slate-200">
           <thead class="bg-slate-50">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 >HCP</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 >Score</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 >Tier</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 >Rate</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 >Renewal</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 >Actions</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500">HCP</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500">Score</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500">Tier</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500">Rate</th>
+              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500">Renewal</th>
+              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-slate-200">
@@ -160,7 +160,7 @@ onMounted(() => {
                 {{ (assessment as any).tierLabel || '—' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
-                ${{ assessment.rate?.toFixed(2) || '—' }}
+                ${{ (assessment.rate != null ? Number(assessment.rate) : null)?.toFixed(2) || '—' }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span v-if="assessment.renewalDate" :class="['inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium', getExpiryUrgency(assessment.renewalDate)?.color || 'bg-slate-100 text-slate-800']">

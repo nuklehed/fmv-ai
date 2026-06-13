@@ -1,5 +1,6 @@
 import multer from 'multer'
-import type { Response } from 'express'
+import type { Request, Response } from 'express'
+import type { MulterFile } from '../types'
 import { PrismaClient } from '@prisma/client'
 import type { AuthenticatedRequest } from '../middleware/auth'
 import { createBuRouter, requireAdminOrSA, authenticate } from './saRouter'
@@ -13,11 +14,11 @@ const domain = new AssessmentDomain(prisma)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
-  fileFilter: (_req: any, _file: any, cb: any) => {
+  fileFilter: (_req: Request, _file: MulterFile, cb: multer.FileFilterCallback) => {
     if (_file.mimetype === 'application/pdf') {
-      (cb as any)(null, true)
+      cb(null, true)
     } else {
-      (cb as any)(new Error('Only PDF files are allowed'), false)
+      cb(new Error('Only PDF files are allowed'))
     }
   }
 })
@@ -26,61 +27,44 @@ const upload = multer({
 
 /** GET /api/assessments — List assessments */
 router.get('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const result = await domain.listPaginated({
-      tenantId: req.tenantId!,
-      userId: req.userId,
-      userRole: req.userRole,
-      page: Math.max(1, parseInt(req.query.page as string) || 1),
-      limit: Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25)),
-      search: req.query.search as string | undefined,
-      statusFilter: req.query.status as string | undefined,
-      groupedByHcp: (req.query.groupedByHcp as string) === 'true'
-    })
-    res.json(result)
-  } catch (_error) {
-    res.status(500).json({ error: 'Internal server error' })
-  }
+  const result = await domain.listPaginated({
+    tenantId: req.tenantId!,
+    userId: req.userId,
+    userRole: req.userRole,
+    page: Math.max(1, parseInt(req.query.page as string) || 1),
+    limit: Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 25)),
+    search: req.query.search as string | undefined,
+    statusFilter: req.query.status as string | undefined,
+    groupedByHcp: (req.query.groupedByHcp as string) === 'true'
+  })
+  res.json(result)
 })
 
 /** GET /api/assessments/:id — Get single assessment */
 router.get('/:id', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const assessment = await domain.getById(
-      req.params.id, req.tenantId!, req.userId, req.userRole
-    )
+  const assessment = await domain.getById(
+    req.params.id, req.tenantId!, req.userId, req.userRole
+  )
 
-    if (!assessment) {
-      res.status(404).json({ error: 'Assessment not found' })
-      return
-    }
-
-    res.json(assessment)
-  } catch (_error) {
-    res.status(500).json({ error: 'Internal server error' })
+  if (!assessment) {
+    res.status(404).json({ error: 'Assessment not found' })
+    return
   }
+
+  res.json(assessment)
 })
 
 /** POST /api/assessments — Create draft */
 router.post('/', async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const { hcpId, specialtyId, criteriaSetId } = req.body
+  const { hcpId, specialtyId, criteriaSetId } = req.body
 
-    if (!hcpId) {
-      res.status(400).json({ error: 'HCP ID is required' })
-      return
-    }
-
-    const assessment = await domain.createDraft(hcpId, req.tenantId!, req.userId!, specialtyId, criteriaSetId)
-    res.status(201).json(assessment)
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('not found')) {
-      res.status(404).json({ error: error.message })
-    } else {
-      console.error('Error creating assessment:', error)
-      res.status(500).json({ error: 'Internal server error' })
-    }
+  if (!hcpId) {
+    res.status(400).json({ error: 'HCP ID is required' })
+    return
   }
+
+  const assessment = await domain.createDraft(hcpId, req.tenantId!, req.userId!, specialtyId, criteriaSetId)
+  res.status(201).json(assessment)
 })
 
 /** PUT /api/assessments/:id — Update assessment */

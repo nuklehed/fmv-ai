@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useToast } from 'primevue/usetoast'
 import { useRoute, useRouter } from 'vue-router'
 import * as assessmentDomain from '@/domain/assessment'
 
@@ -21,6 +22,7 @@ interface HcpOption {
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 const isEditMode = computed(() => !!route.params.id)
 const draftId = computed(() => route.params.id as string | undefined)
 
@@ -51,6 +53,7 @@ const additionalContext = ref('')
 
 const cvFile = ref<File | null>(null)
 const cvFileName = ref('')
+const isDragOver = ref(false)
 const cvUploadProgress = ref(0)
 const cvUploaded = ref(false)
 const cvTextLength = ref(0)
@@ -64,9 +67,6 @@ const isCreatingHcp = ref(false)
 
 const formError = ref('')
 const formSuccess = ref('')
-const submissionBanner = ref<{ show: boolean; message: string; isError?: boolean }>({ show: false, message: '', isError: false })
-const countdownSeconds = ref(4)
-let countdownTimer: ReturnType<typeof setInterval> | null = null
 const isSubmitting = ref(false)
 const isUploadingCv = ref(false)
 
@@ -192,6 +192,42 @@ function handleHcpInputFocus() {
 
 // ─── CV Upload ─────────────────────────────────────────────────────
 
+// ─── Drag & Drop Handlers ──────────────────────────────────────
+
+function handleDragEnter(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  isDragOver.value = true
+}
+
+function handleDragLeave(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  isDragOver.value = false
+}
+
+function _handleDragOver(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+async function handleDrop(event: DragEvent) {
+  event.preventDefault()
+  event.stopPropagation()
+  isDragOver.value = false
+
+  const files = event.dataTransfer?.files
+  if (!files || files.length === 0) return
+
+  const file = files[0]
+  if (file.type !== 'application/pdf') { formError.value = 'Only PDF files are allowed'; return }
+  if (file.size > 10 * 1024 * 1024) { formError.value = 'File size must be under 10MB'; return }
+
+  cvFile.value = file
+  cvFileName.value = file.name
+  formError.value = ''
+}
+
 function handleCvFileChange(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
@@ -312,17 +348,7 @@ async function handleSubmit() {
 
       // Submit for AI processing
       await assessmentDomain.submitForAi(draftId.value)
-      submissionBanner.value.isError = false
-      countdownSeconds.value = 4
-      if (countdownTimer) clearInterval(countdownTimer)
-      countdownTimer = setInterval(() => {
-        countdownSeconds.value--
-        if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
-      }, 1000)
-      submissionBanner.value = {
-        show: true,
-        message: 'Your assessment has been submitted for AI evaluation. This may take a few minutes while our local LLM analyzes the CV.'
-      }
+      toast.add({ severity: 'success', summary: 'Assessment Submitted', detail: 'Your assessment has been submitted for AI evaluation. This may take a few minutes while our local LLM analyzes the CV.', life: 8000 })
     } else {
       // ─── CREATE MODE (legacy path — uploadCv already creates draft) ──
       // In create mode, the CV upload flow above already created the draft.
@@ -344,37 +370,12 @@ async function handleSubmit() {
         throw new Error(errorData.error || 'Failed to submit assessment')
       }
 
-      submissionBanner.value.isError = false
-      countdownSeconds.value = 4
-      if (countdownTimer) clearInterval(countdownTimer)
-      countdownTimer = setInterval(() => {
-        countdownSeconds.value--
-        if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
-      }, 1000)
-      submissionBanner.value = {
-        show: true,
-        message: 'Your assessment has been submitted for AI evaluation. This may take a few minutes while our local LLM analyzes the CV.'
-      }
+      toast.add({ severity: 'success', summary: 'Assessment Submitted', detail: 'Your assessment has been submitted for AI evaluation. This may take a few minutes while our local LLM analyzes the CV.', life: 8000 })
     }
-
-    // Redirect after showing banner — list auto-refreshes for AI_PROCESSING
-    const redirectDelay = submissionBanner.value.isError ? 8000 : 4000
-    setTimeout(() => {
-      if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
-      router.push('/assessments')
-    }, redirectDelay)
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Failed to submit assessment'
-    // Show errors in the banner so they're visible before redirect
-    submissionBanner.value.isError = true
-    submissionBanner.value.show = true
-    submissionBanner.value.message = `Submission failed: ${errorMsg}`
-    countdownSeconds.value = 8
-    if (countdownTimer) clearInterval(countdownTimer)
-    countdownTimer = setInterval(() => {
-      countdownSeconds.value--
-      if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
-    }, 1000)
+    toast.add({ severity: 'error', summary: 'Submission Failed', detail: `Submission failed: ${errorMsg}`, life: 8000 })
+    setTimeout(() => { router.push('/assessments') }, 5000)
   } finally {
     isSubmitting.value = false
   }
@@ -395,20 +396,9 @@ async function loadDraft() {
     if (draft.status !== 'DRAFT') {
       const statusLabel = assessmentDomain.StatusLabels[draft.status] || draft.status
       formError.value = `This assessment is ${statusLabel} and cannot be edited.`
-      // Show banner with redirect
-      submissionBanner.value.isError = true
-      submissionBanner.value.show = true
-      submissionBanner.value.message = `Cannot edit — this assessment is ${statusLabel}. Redirecting to assessments list…`
-      countdownSeconds.value = 5
-      if (countdownTimer) clearInterval(countdownTimer)
-      countdownTimer = setInterval(() => {
-        countdownSeconds.value--
-        if (countdownSeconds.value <= 0) { clearInterval(countdownTimer!); countdownTimer = null }
-      }, 1000)
-      setTimeout(() => {
-        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null }
-        router.push('/assessments')
-      }, 5000)
+      // Show toast error and redirect after delay
+      toast.add({ severity: 'error', summary: 'Cannot Edit', detail: `This assessment is ${statusLabel} and cannot be edited. Redirecting to assessments list…`, life: 8000 })
+      setTimeout(() => { router.push('/assessments') }, 5000)
       return
     }
 
@@ -510,9 +500,7 @@ onMounted(async () => {
           <div class="flex-1">
             <p class="text-sm font-semibold text-yellow-900 mb-1">Assessment Cannot Be Edited</p>
             <p class="text-sm text-yellow-700">{{ formError }}</p>
-            <p class="text-xs text-yellow-500 mt-2">
-              Redirecting to assessments list in {{ countdownSeconds }}s…
-            </p>
+
           </div>
         </div>
       </Transition>
@@ -541,41 +529,10 @@ onMounted(async () => {
         <p class="text-sm text-red-600">{{ formError }}</p>
       </div>
 
-      <div v-if="formSuccess && !submissionBanner.show" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
+      <div v-if="formSuccess" class="mb-4 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
         <i class="pi pi-check-circle h-5 w-5 text-green-400 mt-0.5 mr-3 shrink-0"></i>
         <p class="text-sm text-green-600">{{ formSuccess }}</p>
       </div>
-
-      <!-- Submission Confirmation Banner -->
-      <Transition name="slide-fade">
-        <div v-if="submissionBanner.show" :class="[
-          'mb-4 rounded-lg p-5 flex items-start shadow-sm border',
-          submissionBanner.isError
-            ? 'bg-gradient-to-r from-red-50 to-slate-50 border-red-200'
-            : 'bg-gradient-to-r from-blue-50 to-slate-100 border-blue-200'
-        ]">
-          <i v-if="submissionBanner.isError" class="pi pi-times-circle h-6 w-6 text-red-500 mt-0.5 mr-3 shrink-0"></i>
-          <i v-else class="pi pi-check-circle h-6 w-6 text-blue-500 mt-0.5 mr-3 shrink-0"></i>
-          <div class="flex-1">
-            <p :class="[
-              'text-sm font-semibold mb-1',
-              submissionBanner.isError ? 'text-red-900' : 'text-blue-900'
-            ]">{{ submissionBanner.isError ? 'Submission Failed' : 'Assessment Submitted for AI Evaluation' }}</p>
-            <p :class="[
-              'text-sm',
-              submissionBanner.isError ? 'text-red-700' : 'text-blue-700'
-            ]">{{ submissionBanner.message }}</p>
-            <p :class="[
-              'text-xs mt-2',
-              submissionBanner.isError ? 'text-red-500' : 'text-blue-500'
-            ]">
-              {{ submissionBanner.isError
-                ? 'Redirecting to assessments list in ' + countdownSeconds + 's… (you can also go back and fix the issue)'
-                : 'Redirecting to assessments list in ' + countdownSeconds + 's…' }}
-            </p>
-          </div>
-        </div>
-      </Transition>
 
       <!-- Form Steps -->
       <div class="space-y-6">
@@ -706,7 +663,7 @@ onMounted(async () => {
                     <p class="text-xs text-amber-700 mb-3">
                       Current approval: <span class="font-medium">{{ activeAssessmentInfo.assessment.tierLabel || '—' }}</span>
                       · Score: {{ activeAssessmentInfo.assessment.totalScore ?? '—' }}
-                      · Rate: ${{ activeAssessmentInfo.assessment.rate?.toFixed(2) ?? '—' }}
+                      · Rate: ${{ (activeAssessmentInfo.assessment.rate != null ? Number(activeAssessmentInfo.assessment.rate) : null)?.toFixed(2) ?? '—' }}
                     </p>
                   </template>
                   <p class="text-xs text-amber-600 mb-3">
@@ -811,7 +768,15 @@ onMounted(async () => {
           </h3>
 
           <!-- File Input -->
-          <div v-if="!cvFileName" class="border-2 border-dashed border-slate-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+          <div v-if="!cvFileName"
+            @dragenter.prevent="handleDragEnter"
+            @dragleave.prevent="handleDragLeave"
+            @dragover.prevent="_handleDragOver"
+            @drop.prevent="handleDrop"
+            :class="[
+              'border-2 border-dashed rounded-lg p-8 text-center transition-colors',
+              isDragOver ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-blue-400'
+            ]">
             <input id="cv-upload" type="file" accept=".pdf,application/pdf" @change="handleCvFileChange" class="hidden" />
             <label for="cv-upload" class="cursor-pointer">
               <i class="pi pi-upload mx-auto h-12 w-12 text-slate-400"></i>
@@ -826,7 +791,7 @@ onMounted(async () => {
               <i class="pi pi-file-pdf h-8 w-8 text-red-500"></i>
               <div>
                 <p class="text-sm font-medium text-slate-900">{{ cvFileName }}</p>
-                <p class="text-xs text-slate-500">{{ (cvFile!.size / 1024).toFixed(1) }} KB</p>
+  
               </div>
             </div>
             <button @click="resetCvUpload" class="text-sm text-red-600 hover:text-red-800">Remove</button>

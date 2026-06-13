@@ -11,11 +11,11 @@ import assessmentRoutes from './routes/assessments'
 import tierRoutes from './routes/tiers'
 import notificationRoutes from './routes/notifications'
 import userSettingsRoutes from './routes/userSettings'
-import applicationSettingsRoutes from './routes/applicationSettings'
-import tierConfigRoutes from './routes/tierConfig'
+import { router: applicationSettingsRoutes, tierConfigRouter } from './routes/applicationSettings'
 import llmRoutes from './routes/llm'
 import { getAIWorker, closeConnection } from './services/queue'
 import { startExpiryChecker } from './services/expiryChecker'
+import { errorHandler } from './middleware/errorHandler'
 
 const app = express()
 const prisma = new PrismaClient()
@@ -36,7 +36,7 @@ app.use('/api/tiers', tierRoutes)
 app.use('/api/notifications', notificationRoutes)
 app.use('/api/userSettings', userSettingsRoutes)
 app.use('/api/application-settings', applicationSettingsRoutes)
-app.use('/api/tier-config', tierConfigRoutes)
+app.use('/api/tier-config', tierConfigRouter)
 
 // Health check endpoint
 app.get('/api/health', (_req, res) => {
@@ -61,6 +61,9 @@ const expiryChecker = startExpiryChecker(prisma)
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
+
+// ─── Error Handler (must be last, 4 params) ────────────────────────
+app.use(errorHandler)
 
 // ─── Worker Service Startup ────────────────────────────────────────
 

@@ -4,7 +4,7 @@
  * Creates a complete criteria set with 10 questions and 51 answers
  * based on the fmv_hcp_tiers.xlsx data.
  * 
- * Run: npx ts-node prisma/seed-fmv-tiers.ts
+ * Run: npx tsx prisma/seeds/02-criteria-sets.ts
  */
 
 import { PrismaClient } from '@prisma/client'
