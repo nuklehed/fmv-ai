@@ -357,7 +357,6 @@ onMounted(() => { fetchAssessment() })
     <header class="bg-white border-b border-slate-200 px-6 py-4">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <div>
-          <router-link to="/assessments" class="text-sm text-slate-500 hover:text-slate-700 mb-1 inline-block flex items-center gap-1">← Back to Assessments</router-link>
           <h1 v-if="assessment" class="text-xl font-bold text-slate-900">
             Review — {{ assessment.hcp.firstName }} {{ assessment.hcp.lastName }}
           </h1>
@@ -389,10 +388,7 @@ onMounted(() => { fetchAssessment() })
       <div v-else-if="assessment && isApproved" class="space-y-6">
         <!-- Score & Tier Summary -->
         <section class="bg-white shadow rounded-lg p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-slate-900">Assessment Approved</h2>
-            <router-link to="/assessments" class="text-sm text-slate-500 hover:text-slate-700 transition-colors">Back to Assessments</router-link>
-          </div>
+          <h2 class="text-lg font-semibold text-slate-900 mb-4">Assessment Approved</h2>
           <div class="grid grid-cols-3 gap-6">
             <div>
               <p class="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Score</p>
